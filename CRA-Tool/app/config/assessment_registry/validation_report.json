@@ -1,0 +1,30 @@
+{
+  "errors": [],
+  "stats": {
+    "parameters": 65,
+    "collectors": 65,
+    "rules": 65,
+    "recommendations": 65,
+    "collector_types": {
+      "manual": 1,
+      "portal": 7,
+      "powershell": 57
+    },
+    "domains": {
+      "best_practice": 1,
+      "collaboration": 31,
+      "compliance": 8,
+      "governance": 2,
+      "identity_access": 19,
+      "security": 3,
+      "unclassified": 1
+    },
+    "generated_at": "2026-06-03T14:05:43.631351+00:00",
+    "source_files": [
+      "CRA report template",
+      "app/config/collector_manifest.json"
+    ],
+    "source_records": 65
+  },
+  "warnings": []
+}

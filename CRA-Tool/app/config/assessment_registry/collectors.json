@@ -1,0 +1,1497 @@
+[
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.active_inactive_teams",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "active_inactive_teams",
+    "parser_mapping": {
+      "expected_output": "List of inactive teams channels",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Active /Inactive teams",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "powershell.active_sites_count",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "active_sites_count",
+    "parser_mapping": {
+      "expected_output": "List of active SharePoint site in the tenant",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Active Sites count",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.active_users_on_sharepoint",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "active_users_on_sharepoint",
+    "parser_mapping": {
+      "expected_output": "List of active users on SharePoint in the tenant",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Active users on SharePoint",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.activer_inactive_teams_users",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "activer_inactive_teams_users",
+    "parser_mapping": {
+      "expected_output": "List of inactive teams user",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Activer/Inactive Teams users",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.copilot_integration_enabled",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "copilot_integration_enabled",
+    "parser_mapping": {
+      "expected_output": "Configuration of Teams app (Copilot) integration with teams. (Identity, CopilotFromHomeTenant)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Copilot integration enabled",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.external_storage_providers_in_owa",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "external_storage_providers_in_owa",
+    "parser_mapping": {
+      "expected_output": "To see its enabled or disabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "External Storage Providers In OWA",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.external_sharing_settings",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "external_sharing_settings",
+    "parser_mapping": {
+      "expected_output": "Level of external sharing configured",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "External sharing settings",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.full_calendar_schedules_able_to_be_shared_externally",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "full_calendar_schedules_able_to_be_shared_externally",
+    "parser_mapping": {
+      "expected_output": "To see its enabled or disabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Exchange admin center, Organization --> Sharing --> Individual sharing.",
+    "powershell_script": "Full Calendar Schedules Able To Be Shared Externally",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.getting_all_sites_with_sensitivity_keywords_on_a_tenant",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "getting_all_sites_with_sensitivity_keywords_on_a_tenant",
+    "parser_mapping": {
+      "expected_output": "",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "",
+    "powershell_script": "Getting all sites with Sensitivity keywords on a Tenant",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.guest_access_enabled_disabled",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "guest_access_enabled_disabled",
+    "parser_mapping": {
+      "expected_output": "Whether Guest access is enabled or disabled.",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Guest access enabled / disabled",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.mailbox_storage_usage",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "mailbox_storage_usage",
+    "parser_mapping": {
+      "expected_output": "",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Mailbox usage. Review the mailbox usage report.",
+    "powershell_script": "Mailbox Storage usage",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.mailboxes_status_active_inactive",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "mailboxes_status_active_inactive",
+    "parser_mapping": {
+      "expected_output": "List of active mailboxes in the tenant",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Email activity. Review the email activity report.",
+    "powershell_script": "Mailboxes Status (Active/Inactive)",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.meeting_policies_configuration",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "meeting_policies_configuration",
+    "parser_mapping": {
+      "expected_output": "List of Teams meetings policies. (Identity, AllowCloudRecording, AutoAdmittedUsers, AllowMeetingReactions, MeetingChatEnabledType, AllowTranscription, AllowIPVideo, ExplicitRecordingConsent, AllowExternalNonTrustedMeetingChat, AllowBreakoutRooms)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Meeting Policies configuration",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.meeting_recording_retention_policies",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "meeting_recording_retention_policies",
+    "parser_mapping": {
+      "expected_output": "From Teams meeting policies configuration of recording expiry duration.(Identity, RecordingStorageMode, NewMeetingRecordingExpirationDays)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Meeting recording retention policies",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.meeting_transcription_enabled",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "meeting_transcription_enabled",
+    "parser_mapping": {
+      "expected_output": "From Teams meeting policies configuration of transcription. (Identity, AllowTranscription)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Meeting transcription enabled",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.minimum_number_of_owners",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "minimum_number_of_owners",
+    "parser_mapping": {
+      "expected_output": "List of Teams with the number of owners and also the number of teams with less than 2 owners(Team Name, Number of Owners, TotalTeamswithLessThan2Owners)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Minimum number of owners",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.number_of_emails_read_received",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "number_of_emails_read_received",
+    "parser_mapping": {
+      "expected_output": "Number of emails read by the users",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Email activity. Review the email activity report.",
+    "powershell_script": "Number of emails read/received",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.number_of_emails_sent",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "number_of_emails_sent",
+    "parser_mapping": {
+      "expected_output": "Number of emails sent by the users",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Email activity. Review the email activity report.",
+    "powershell_script": "Number of emails sent",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.orphan_teams",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "orphan_teams",
+    "parser_mapping": {
+      "expected_output": "List and Number of Orphan teams.(TeamName,TeamID,Total Orphan Teams)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Orphan Teams",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.sharepoint_and_onedrive_guest_access_expiry",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "sharepoint_and_onedrive_guest_access_expiry",
+    "parser_mapping": {
+      "expected_output": "SharingExpirationPeriod - how many days",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "SharePoint & OneDrive Guest Access Expiry",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.sharepoint_modern_authentication",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "sharepoint_modern_authentication",
+    "parser_mapping": {
+      "expected_output": "Mordern Authentication method should be enabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "SharePoint - Modern Authentication",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.sharing_settings_external_internal",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "sharing_settings_external_internal",
+    "parser_mapping": {
+      "expected_output": "Configuration of External sharing setting preventing external user from resharing (Allow Guests to Share Items They Don't Own)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Sharing Settings (External/Internal)",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.storage_quota_consumption",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "storage_quota_consumption",
+    "parser_mapping": {
+      "expected_output": "Details of SharePoint storage which is utilized",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the SharePoint admin center, Sites --> Active sites. Review the storage usage displayed at the top right of the page.",
+    "powershell_script": "Storage Quota consumption",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.teams_channel_email_addresses",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "teams_channel_email_addresses",
+    "parser_mapping": {
+      "expected_output": "AllowEmailIntoChannel - True means Users can send emails to a channel email address AllowEmailIntoChannel - False means Users cannot send emails to a channel email address",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Teams - Channel Email Addresses",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.teams_file_storage_option",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "teams_file_storage_option",
+    "parser_mapping": {
+      "expected_output": "Third Party storge should be disabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Teams - File Storage Option",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.teams_lobby_bypass",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "teams_lobby_bypass",
+    "parser_mapping": {
+      "expected_output": "• AllowParticipantsToBypassLobby: Specifies whether participants can bypass the lobby when joining the meeting. The possible values are: o Always: Participants can always bypass the lobby. o Organizer: Only the organizer can bypass the lobby (default). o Never: No one can bypass the lobby.",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Teams - Lobby Bypass",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.teams_meeting_chat",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "teams_meeting_chat",
+    "parser_mapping": {
+      "expected_output": "• AllowMeetingChat: This setting controls whether chat is allowed during and after meetings. Possible values include: o Enabled: Participants are allowed to use chat during and after the meeting. o Disabled: Meeting chat is disabled. o In-meeting only: Chat is allowed only during the meeting but not after the meeting ends.",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Teams - Meeting Chat",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.teams_with_external_users",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "teams_with_external_users",
+    "parser_mapping": {
+      "expected_output": "List of external users",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Teams with external users",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.third_party_apps_allowed",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "third_party_apps_allowed",
+    "parser_mapping": {
+      "expected_output": "• Get the value of Custom Apps Setting. The value in the example is False, so custom apps are unavailable in the organization's app",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Teams admin center, Teams apps --> Manage apps --> Actions dropdown --> Org-wide app settings. Scroll down to find Third-party apps.",
+    "powershell_script": "Third-party apps allowed",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.total_active_users_on_onedrive",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "total_active_users_on_onedrive",
+    "parser_mapping": {
+      "expected_output": "List of Active users on OneDrive",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Total active users on OneDrive",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.audit_logs_enabled",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "audit_logs_enabled",
+    "parser_mapping": {
+      "expected_output": "Audit logs enabled or not - True or False",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Purview portal, Solutions --> Audit --> Search",
+    "powershell_script": "Audit Logs enabled",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "portal.audit_log_retention_duration",
+    "collector_type": "portal",
+    "graph_endpoint": "",
+    "parameter_key": "audit_log_retention_duration",
+    "parser_mapping": {
+      "expected_output": "List of Audit log retention policies",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Purview portal, Solutions --> Audit --> Policies",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "portal.compliance_score_overview",
+    "collector_type": "portal",
+    "graph_endpoint": "",
+    "parameter_key": "compliance_score_overview",
+    "parser_mapping": {
+      "expected_output": "Compliance Score percentage of the tenant",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Purview portal, select Home on the left pane and scroll down to see the compliance score",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.dlp_rules_configured",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "dlp_rules_configured",
+    "parser_mapping": {
+      "expected_output": "List of DLP rules applied and configured with settings",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Purview portal, Solutions --> Data Loss Prevention --> Policies",
+    "powershell_script": "DLP rules configured",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.information_protection_labels_applied",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "information_protection_labels_applied",
+    "parser_mapping": {
+      "expected_output": "List of labels applied and configured with settings",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Purview portal, Solutions --> Information Protection --> Policies",
+    "powershell_script": "Information Protection Labels applied",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "portal.secure_score_percentage",
+    "collector_type": "portal",
+    "graph_endpoint": "",
+    "parameter_key": "secure_score_percentage",
+    "parser_mapping": {
+      "expected_output": "Secure Score Percentage of the Tenant",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "From Defender Portal (security.microsoft.com)",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.sensitivity_labels_applied_to_teams",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "sensitivity_labels_applied_to_teams",
+    "parser_mapping": {
+      "expected_output": "List of labels applied and configured with Teams settings",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Failed if Sensitivity Labels configured and applied parameter is failed",
+    "powershell_script": "Sensitivity Labels applied to Teams",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.sensitivity_labels_configured_and_applied",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "sensitivity_labels_configured_and_applied",
+    "parser_mapping": {
+      "expected_output": "List of labels applied and configured with settings",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Purview portal, Solutions --> Information Protection --> Policies. If no policies are configured then the parameter is failed",
+    "powershell_script": "Sensitivity Labels configured and applied",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.days_to_retain_a_deleted_user_s_onedrive",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "days_to_retain_a_deleted_user_s_onedrive",
+    "parser_mapping": {
+      "expected_output": "Deleted user's OneDrive retention is configured for an approved duration",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Days to retain a deleted user's OneDrive",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.inactive_site_policies",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "inactive_site_policies",
+    "parser_mapping": {
+      "expected_output": "Inactive site policy is configured",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Inactive site policies",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.site_ownership_policies",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "site_ownership_policies",
+    "parser_mapping": {
+      "expected_output": "Site ownership policies are configured",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Site Ownership policies",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.account_enabled",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "account_enabled",
+    "parser_mapping": {
+      "expected_output": "List of users and their account status",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Account enabled",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.admin_consent_workflow",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "admin_consent_workflow",
+    "parser_mapping": {
+      "expected_output": "Admin workflow for consent requests configurations(Users can request admin consent, Selected users will receive email notifications for requests , Selected users will receive request expiration reminders , Consent request expires after (days))",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Enterprise apps --> Consent and Permissions --> Admin Consent Settings",
+    "powershell_script": "Admin Consent Workflow",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.authentication_methods_enabled",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "authentication_methods_enabled",
+    "parser_mapping": {
+      "expected_output": "List of Authentication methods and state.(Authentication method, State)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Authentication Methods --> Policies",
+    "powershell_script": "Authentication methods enabled",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.cap_policies_for_risky_sign_ins",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "cap_policies_for_risky_sign_ins",
+    "parser_mapping": {
+      "expected_output": "List of CAP with conditions for risky sign ins. (Name, State, SignInRiskLevels, UserRiskLevels, GrantControls)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Conditional Access --> Policies",
+    "powershell_script": "CAP policies for risky sign-ins",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.conditional_access_policies_exclusion",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "conditional_access_policies_exclusion",
+    "parser_mapping": {
+      "expected_output": "List of Condiotional access policies with details including all exclusions.",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Conditional Access --> Policies",
+    "powershell_script": "Conditional Access Policies (Exclusion)",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "graph",
+    "collector_name": "graph.custom_banned_password_list",
+    "collector_type": "graph",
+    "graph_endpoint": "https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/password",
+    "parameter_key": "custom_banned_password_list",
+    "parser_mapping": {
+      "expected_output": "Password Protection enabled state, enforcement mode, and custom banned password count.",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Entra admin center > Protection > Authentication methods > Password protection",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.devices_without_compliance_policies",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "devices_without_compliance_policies",
+    "parser_mapping": {
+      "expected_output": "List of non complient devices in the tenant",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "",
+    "powershell_script": "Devices without compliance policies",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "manual",
+    "collector_name": "manual.emergency_access_accounts",
+    "collector_type": "manual",
+    "graph_endpoint": "",
+    "parameter_key": "emergency_access_accounts",
+    "parser_mapping": {
+      "expected_output": "",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Need to check",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.entra_tenant_creation_by_non_admin",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "entra_tenant_creation_by_non_admin",
+    "parser_mapping": {
+      "expected_output": "Whether tenant creation by non-admin is enabled or disabled.",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Entra - Tenant Creation By Non-Admin",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.entra_third_party_app_integrations",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "entra_third_party_app_integrations",
+    "parser_mapping": {
+      "expected_output": "Third party app integration should be enabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Entra - Third Party App Integrations",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.global_administrator_accounts",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "global_administrator_accounts",
+    "parser_mapping": {
+      "expected_output": "List of Global admins with Type(User/Service Princpal), Display Name, UPN and object ID",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Global Administrator Accounts",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.guest_invite_settings",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "guest_invite_settings",
+    "parser_mapping": {
+      "expected_output": "",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Guest Invite Settings",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.guest_users_count",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "guest_users_count",
+    "parser_mapping": {
+      "expected_output": "List and number of Guest users(Display name , Username, Mail ID , ID)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Guest users count",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "portal.restricted_access_to_microsoft_entra_admin_centre",
+    "collector_type": "portal",
+    "graph_endpoint": "",
+    "parameter_key": "restricted_access_to_microsoft_entra_admin_centre",
+    "parser_mapping": {
+      "expected_output": "To see its enabled or disabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "portal.self_service_password_reset_authentication_method",
+    "collector_type": "portal",
+    "graph_endpoint": "",
+    "parameter_key": "self_service_password_reset_authentication_method",
+    "parser_mapping": {
+      "expected_output": "To see how many and what methods registered",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Password Reset --> Properties",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.tenant_collaboration_invitations",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "tenant_collaboration_invitations",
+    "parser_mapping": {
+      "expected_output": "Setting configuration(AllowInvitesFrom)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Tenant Collaboration Invitations",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "portal",
+    "collector_name": "portal.user_consent_for_applications",
+    "collector_type": "portal",
+    "graph_endpoint": "",
+    "parameter_key": "user_consent_for_applications",
+    "parser_mapping": {
+      "expected_output": "Screenshot of User consent for application setting",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Enterprise apps --> Consent and Permissions --> User Consent Settings",
+    "powershell_script": "",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.user_information",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "user_information",
+    "parser_mapping": {
+      "expected_output": "List of all users and their detailed information",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "User Information",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.users_without_mfa",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "users_without_mfa",
+    "parser_mapping": {
+      "expected_output": "List of Users and MFA methods enrolled (UserPrincipalName, AuthMethodTypes)",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Admin portal, Admin Centers -> Identity --> Authentication Methods --> User Registration Details --> Download Export",
+    "powershell_script": "Users without MFA",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.auto_expiration_policy_for_inactive_m365_groups",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "auto_expiration_policy_for_inactive_m365_groups",
+    "parser_mapping": {
+      "expected_output": "Auto-expiration policy for inactive Microsoft 365 groups is configured",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Auto-expiration policy for M365 Groups",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.expiration_policy_for_anyone_links",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "expiration_policy_for_anyone_links",
+    "parser_mapping": {
+      "expected_output": "Anyone links have an expiration policy configured",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Expiration Policy for Anyone links",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.permission_setting_for_anyone_links",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "permission_setting_for_anyone_links",
+    "parser_mapping": {
+      "expected_output": "Anyone links are disabled or restricted to least privilege permissions",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Permission Settings for anyone links",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.teams_with_external_guest_as_owner",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "teams_with_external_guest_as_owner",
+    "parser_mapping": {
+      "expected_output": "No Teams have an external guest assigned as owner",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "Using Script",
+    "powershell_script": "Teams with external guest as owner",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  },
+  {
+    "collection_method": "powershell",
+    "collector_name": "powershell.customer_lockbox",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
+    "parameter_key": "customer_lockbox",
+    "parser_mapping": {
+      "expected_output": "We can see if enabled or disabled",
+      "status_field": "status",
+      "value_field": "value"
+    },
+    "portal_mapping": "On the Azure portal search for customer lockbox --> Administration",
+    "powershell_script": "Customer Lockbox",
+    "throttling_strategy": {
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ],
+      "max_retries": 3,
+      "retry_after_header": false
+    }
+  }
+]

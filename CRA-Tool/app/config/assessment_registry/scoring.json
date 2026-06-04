@@ -1,0 +1,27 @@
+{
+  "blocker_logic": {
+    "copilot_blocker_field": "copilot_blocker",
+    "critical_copilot_blockers_cap_score_at": 59
+  },
+  "domain_weights": {
+    "best_practice": 0.0132,
+    "collaboration": 0.4342,
+    "compliance": 0.1184,
+    "governance": 0.0395,
+    "identity_access": 0.2895,
+    "security": 0.0789,
+    "unclassified": 0.0263
+  },
+  "score_normalization": {
+    "maximum": 100,
+    "method": "weighted_domain_average_with_severity_deductions",
+    "minimum": 0
+  },
+  "severity_deductions": {
+    "critical": 25,
+    "high": 15,
+    "info": 1,
+    "low": 3,
+    "medium": 8
+  }
+}

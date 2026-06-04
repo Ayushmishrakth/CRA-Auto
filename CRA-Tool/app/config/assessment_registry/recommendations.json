@@ -1,0 +1,784 @@
+[
+  {
+    "copilot_impact": "Cleaning up inactive channels removes clutter, helping Copilot focus on useful conversations.",
+    "impact": "Cleaning up inactive channels removes clutter, helping Copilot focus on useful conversations.",
+    "parameter_key": "active_inactive_teams",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When a tenant does not have inactive teams"
+    ],
+    "severity": "high",
+    "title": "Remediate Active /Inactive teams"
+  },
+  {
+    "copilot_impact": "Active sites give Copilot more data to work with, making it more useful.",
+    "impact": "Active sites give Copilot more data to work with, making it more useful.",
+    "parameter_key": "active_sites_count",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the number active sites on SharePoint are more than 85%"
+    ],
+    "severity": "medium",
+    "title": "Remediate Active Sites count"
+  },
+  {
+    "copilot_impact": "Active SharePoint use means lots of data for Copilot to provide smart, helpful assistance and boost productivity.",
+    "impact": "Active SharePoint use means lots of data for Copilot to provide smart, helpful assistance and boost productivity.",
+    "parameter_key": "active_users_on_sharepoint",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the number active users on SharePoint are more than 85%"
+    ],
+    "severity": "medium",
+    "title": "Remediate Active users on SharePoint"
+  },
+  {
+    "copilot_impact": "Knowing who is active helps deploy Copilot to users who will benefit the most.",
+    "impact": "Knowing who is active helps deploy Copilot to users who will benefit the most.",
+    "parameter_key": "activer_inactive_teams_users",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the number of inactive Teams users are less than 15% for the tenant"
+    ],
+    "severity": "medium",
+    "title": "Remediate Activer/Inactive Teams users"
+  },
+  {
+    "copilot_impact": "To utilize Copilot features in teams app, It is rquired Copilot to have necessary configurations in place.",
+    "impact": "To utilize Copilot features in teams app, It is rquired Copilot to have necessary configurations in place.",
+    "parameter_key": "copilot_integration_enabled",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is enabled"
+    ],
+    "severity": "critical",
+    "title": "Remediate Copilot integration enabled"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "external_storage_providers_in_owa",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When not enabled, users cannot connect third-party storage services to Outlook Web App and: Attach files from those services Share links to external files via email Access cloud-based documents directly from their emai"
+    ],
+    "severity": "high",
+    "title": "Remediate External Storage Providers In OWA"
+  },
+  {
+    "copilot_impact": "Restricting external sharing reduces the risk of data leaks through Copilot-generated content.",
+    "impact": "Restricting external sharing reduces the risk of data leaks through Copilot-generated content.",
+    "parameter_key": "external_sharing_settings",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is set to New and existing guests or more restrictive"
+    ],
+    "severity": "high",
+    "title": "Remediate External sharing settings"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "full_calendar_schedules_able_to_be_shared_externally",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If False, calendar sharing is disabled across the organization, meaning users cannot share their calendars with anyone outside the organization."
+    ],
+    "severity": "medium",
+    "title": "Remediate Full Calendar Schedules Able To Be Shared Externally"
+  },
+  {
+    "copilot_impact": "Copilot can help to gather information related to sensitive files etc",
+    "impact": "Copilot can help to gather information related to sensitive files etc",
+    "parameter_key": "getting_all_sites_with_sensitivity_keywords_on_a_tenant",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "This will give accurate result for sensitivity sites if anything exist"
+    ],
+    "severity": "info",
+    "title": "Remediate Getting all sites with Sensitivity keywords on a Tenant"
+  },
+  {
+    "copilot_impact": "Disabling guest access prevents external users from interacting with Copilot and sensitive data.",
+    "impact": "Disabling guest access prevents external users from interacting with Copilot and sensitive data.",
+    "parameter_key": "guest_access_enabled_disabled",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is disabled"
+    ],
+    "severity": "medium",
+    "title": "Remediate Guest access enabled / disabled"
+  },
+  {
+    "copilot_impact": "Monitoring storage ensures Copilot has smooth access to necessary data without delays.",
+    "impact": "Monitoring storage ensures Copilot has smooth access to necessary data without delays.",
+    "parameter_key": "mailbox_storage_usage",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the active storage on mailbox is less than 75%"
+    ],
+    "severity": "medium",
+    "title": "Remediate Mailbox Storage usage"
+  },
+  {
+    "copilot_impact": "Active mailboxes are important because Copilot needs them to give helpful email-based support",
+    "impact": "Active mailboxes are important because Copilot needs them to give helpful email-based support",
+    "parameter_key": "mailboxes_status_active_inactive",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the number active mailboxes are more than 85%"
+    ],
+    "severity": "critical",
+    "title": "Remediate Mailboxes Status (Active/Inactive)"
+  },
+  {
+    "copilot_impact": "Proper configurations ensure that Copilot can access necessary meeting data while maintaining compliance.",
+    "impact": "Proper configurations ensure that Copilot can access necessary meeting data while maintaining compliance.",
+    "parameter_key": "meeting_policies_configuration",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When recommended settings are setup"
+    ],
+    "severity": "high",
+    "title": "Remediate Meeting Policies configuration"
+  },
+  {
+    "copilot_impact": "Ensures that Copilot has access to relevant meeting data for generating summaries or insights by expiring recordings out of date.",
+    "impact": "Ensures that Copilot has access to relevant meeting data for generating summaries or insights by expiring recordings out of date.",
+    "parameter_key": "meeting_recording_retention_policies",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is enabled"
+    ],
+    "severity": "medium",
+    "title": "Remediate Meeting recording retention policies"
+  },
+  {
+    "copilot_impact": "Copilot requires transcripts to analyze and generate meeing summaries and action items",
+    "impact": "Copilot requires transcripts to analyze and generate meeing summaries and action items",
+    "parameter_key": "meeting_transcription_enabled",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is enabled"
+    ],
+    "severity": "high",
+    "title": "Remediate Meeting transcription enabled"
+  },
+  {
+    "copilot_impact": "Prevents orphaned teams, ensuring that Copilot has access to managed and active resources.",
+    "impact": "Prevents orphaned teams, ensuring that Copilot has access to managed and active resources.",
+    "parameter_key": "minimum_number_of_owners",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When all teams have more than 1 Owner"
+    ],
+    "severity": "high",
+    "title": "Remediate Minimum number of owners"
+  },
+  {
+    "copilot_impact": "High engagement with emails suggests that Copilot's email summarization and drafting features will be beneficial.",
+    "impact": "High engagement with emails suggests that Copilot's email summarization and drafting features will be beneficial.",
+    "parameter_key": "number_of_emails_read_received",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "More than 75% of users have read more than 70% of their emails."
+    ],
+    "severity": "info",
+    "title": "Remediate Number of emails read/received"
+  },
+  {
+    "copilot_impact": "High outgoing email activity shows Copilot’s drafting and reply suggestions can boost efficiency.",
+    "impact": "High outgoing email activity shows Copilot’s drafting and reply suggestions can boost efficiency.",
+    "parameter_key": "number_of_emails_sent",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the number of emails sent by the users are more than 30"
+    ],
+    "severity": "info",
+    "title": "Remediate Number of emails sent"
+  },
+  {
+    "copilot_impact": "Orphaned teams may contain outdated or unmanaged data, which could affect Copilot's outputs.",
+    "impact": "Orphaned teams may contain outdated or unmanaged data, which could affect Copilot's outputs.",
+    "parameter_key": "orphan_teams",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When there are no orphan teams"
+    ],
+    "severity": "high",
+    "title": "Remediate Orphan Teams"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "sharepoint_and_onedrive_guest_access_expiry",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "SharingExpirationPeriod: The number of days the guest access link will be valid before it expires (if expiration is enabled)."
+    ],
+    "severity": "critical",
+    "title": "Remediate SharePoint & OneDrive Guest Access Expiry"
+  },
+  {
+    "copilot_impact": "Modern authentication improves security, keeping Copilot’s access to SharePoint data safe.",
+    "impact": "Modern authentication improves security, keeping Copilot’s access to SharePoint data safe.",
+    "parameter_key": "sharepoint_modern_authentication",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is enabled"
+    ],
+    "severity": "medium",
+    "title": "Remediate SharePoint - Modern Authentication"
+  },
+  {
+    "copilot_impact": "Restricting access to sharepoint and onedrive documents, prevents unauthorized access to data.",
+    "impact": "Restricting access to sharepoint and onedrive documents, prevents unauthorized access to data.",
+    "parameter_key": "sharing_settings_external_internal",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When settings enabled"
+    ],
+    "severity": "critical",
+    "title": "Remediate Sharing Settings (External/Internal)"
+  },
+  {
+    "copilot_impact": "Monitoring storage ensures Copilot can access data smoothly without performance problems.",
+    "impact": "Monitoring storage ensures Copilot can access data smoothly without performance problems.",
+    "parameter_key": "storage_quota_consumption",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is less than 90%"
+    ],
+    "severity": "info",
+    "title": "Remediate Storage Quota consumption"
+  },
+  {
+    "copilot_impact": "Copilot can help write the SMTP/email code that delivers messages to the Teams channel email address",
+    "impact": "Copilot can help write the SMTP/email code that delivers messages to the Teams channel email address",
+    "parameter_key": "teams_channel_email_addresses",
+    "priority": 2,
+    "reference_urls": [],
+    "remediation_steps": [
+      "This will restrict Teams channels to allow accepting channel emails only from these Restricted Domains"
+    ],
+    "severity": "low",
+    "title": "Remediate Teams - Channel Email Addresses"
+  },
+  {
+    "copilot_impact": "Ensures that Copilot accesses files stored in approved and secure locations.",
+    "impact": "Ensures that Copilot accesses files stored in approved and secure locations.",
+    "parameter_key": "teams_file_storage_option",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the files are stored within the Microsoft suit"
+    ],
+    "severity": "medium",
+    "title": "Remediate Teams - File Storage Option"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "teams_lobby_bypass",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Specifies whether participants can bypass the lobby when joining the meeting - Never"
+    ],
+    "severity": "medium",
+    "title": "Remediate Teams - Lobby Bypass"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "teams_meeting_chat",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Enabled: Participants are allowed to use chat during and after the meeting."
+    ],
+    "severity": "medium",
+    "title": "Remediate Teams - Meeting Chat"
+  },
+  {
+    "copilot_impact": "Teams with external users involve sharing data outside the organization, requiring secure management for Copilot to work safely.",
+    "impact": "Teams with external users involve sharing data outside the organization, requiring secure management for Copilot to work safely.",
+    "parameter_key": "teams_with_external_users",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is less than 20%"
+    ],
+    "severity": "high",
+    "title": "Remediate Teams with external users"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "third_party_apps_allowed",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Disabled- custom apps are unavailable in the organization's app"
+    ],
+    "severity": "high",
+    "title": "Remediate Third-party apps allowed"
+  },
+  {
+    "copilot_impact": "Total active users on OneDrive show how many people use it, indicating how much data Copilot can access to assist users.",
+    "impact": "Total active users on OneDrive show how many people use it, indicating how much data Copilot can access to assist users.",
+    "parameter_key": "total_active_users_on_onedrive",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the total active user on OneDrive are more than than 80%"
+    ],
+    "severity": "info",
+    "title": "Remediate Total active users on OneDrive"
+  },
+  {
+    "copilot_impact": "Audit logs help track who used Copilot, when, and where (e.g., in which repository or organization).",
+    "impact": "Audit logs help track who used Copilot, when, and where (e.g., in which repository or organization).",
+    "parameter_key": "audit_logs_enabled",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If audit logs enabled this will hunt the results for query"
+    ],
+    "severity": "critical",
+    "title": "Remediate Audit Logs enabled"
+  },
+  {
+    "copilot_impact": "Sufficient retention ensures visibility into how Copilot is being used, helping detect misuse or data access anomalies.",
+    "impact": "Sufficient retention ensures visibility into how Copilot is being used, helping detect misuse or data access anomalies.",
+    "parameter_key": "audit_log_retention_duration",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When policies are set up"
+    ],
+    "severity": "medium",
+    "title": "Remediate Audit log retention duration"
+  },
+  {
+    "copilot_impact": "A higher compliance score means better data control, helping Copilot work safely and within rules.",
+    "impact": "A higher compliance score means better data control, helping Copilot work safely and within rules.",
+    "parameter_key": "compliance_score_overview",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is more than or equal to 80%"
+    ],
+    "severity": "critical",
+    "title": "Remediate Compliance Score overview"
+  },
+  {
+    "copilot_impact": "DLP can detect if Copilot-suggested code includes secrets, PII, or confidential patterns (e.g., keys, passwords).",
+    "impact": "DLP can detect if Copilot-suggested code includes secrets, PII, or confidential patterns (e.g., keys, passwords).",
+    "parameter_key": "dlp_rules_configured",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If DLP rules is configured and applied correctly to exchange,sharepoint,teams etc"
+    ],
+    "severity": "critical",
+    "title": "Remediate DLP rules configured"
+  },
+  {
+    "copilot_impact": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "impact": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "parameter_key": "information_protection_labels_applied",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If labels is configured and applied"
+    ],
+    "severity": "critical",
+    "title": "Remediate Information Protection Labels applied"
+  },
+  {
+    "copilot_impact": "A higher Secure Score means stronger security, creating a safer environment for Copilot.",
+    "impact": "A higher Secure Score means stronger security, creating a safer environment for Copilot.",
+    "parameter_key": "secure_score_percentage",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is more than 70%"
+    ],
+    "severity": "critical",
+    "title": "Remediate Secure Score percentage"
+  },
+  {
+    "copilot_impact": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "impact": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "parameter_key": "sensitivity_labels_applied_to_teams",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If labels is configured and applied"
+    ],
+    "severity": "critical",
+    "title": "Remediate Sensitivity Labels applied to Teams"
+  },
+  {
+    "copilot_impact": "\"Sites labeled with sensitive information (e.g., confidential or highly confidential) ensure that Copilot can only access and generate insights from data the user is permitted to view. Example: A Confidential – HR label ensures Copilot won't generate summaries or responses based on HR-related documents unless the user has the appropriate permissions to view that content. Adding appropriate labels gives clarity on copilot assessment to have this done.\"",
+    "impact": "\"Sites labeled with sensitive information (e.g., confidential or highly confidential) ensure that Copilot can only access and generate insights from data the user is permitted to view. Example: A Confidential – HR label ensures Copilot won't generate summaries or responses based on HR-related documents unless the user has the appropriate permissions to view that content. Adding appropriate labels gives clarity on copilot assessment to have this done.\"",
+    "parameter_key": "sensitivity_labels_configured_and_applied",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If labels is configured and applied"
+    ],
+    "severity": "critical",
+    "title": "Remediate Sensitivity Labels configured and applied"
+  },
+  {
+    "copilot_impact": "Retention settings affect whether deleted-user content remains recoverable, auditable, and governed before Copilot rollout.",
+    "impact": "Retention settings affect whether deleted-user content remains recoverable, auditable, and governed before Copilot rollout.",
+    "parameter_key": "days_to_retain_a_deleted_user_s_onedrive",
+    "priority": 2,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Deleted user's OneDrive retention period is configured"
+    ],
+    "severity": "low",
+    "title": "Remediate Days to retain a deleted user’s OneDrive"
+  },
+  {
+    "copilot_impact": "Inactive sites can contain stale or ungoverned content. Inactive site policies reduce irrelevant data surfaced by Copilot.",
+    "impact": "Inactive sites can contain stale or ungoverned content. Inactive site policies reduce irrelevant data surfaced by Copilot.",
+    "parameter_key": "inactive_site_policies",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Inactive site policies are configured"
+    ],
+    "severity": "medium",
+    "title": "Remediate Inactive site policies"
+  },
+  {
+    "copilot_impact": "Site ownership helps ensure content governance and accountability for information Copilot can access.",
+    "impact": "Site ownership helps ensure content governance and accountability for information Copilot can access.",
+    "parameter_key": "site_ownership_policies",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Site ownership policies are configured and sites have accountable owners"
+    ],
+    "severity": "medium",
+    "title": "Remediate Site Ownership policies"
+  },
+  {
+    "copilot_impact": "Copilot relies on active user accounts to deliver personalized and contextual assistance. Only enabled accounts can interact with Copilot’s AI features and receive insights based on their usage and data.",
+    "impact": "Copilot relies on active user accounts to deliver personalized and contextual assistance. Only enabled accounts can interact with Copilot’s AI features and receive insights based on their usage and data.",
+    "parameter_key": "account_enabled",
+    "priority": 2,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When number of enabled account is more than 85 %"
+    ],
+    "severity": "low",
+    "title": "Remediate Account enabled"
+  },
+  {
+    "copilot_impact": "Ensures that only trusted applications can access Copilot data, maintaining security and compliance",
+    "impact": "Ensures that only trusted applications can access Copilot data, maintaining security and compliance",
+    "parameter_key": "admin_consent_workflow",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is configured"
+    ],
+    "severity": "high",
+    "title": "Remediate Admin Consent Workflow"
+  },
+  {
+    "copilot_impact": "Enforcing strong authentication ensures only verified users can use Copilot, safeguarding against misuse or data leaks via compromised accounts.",
+    "impact": "Enforcing strong authentication ensures only verified users can use Copilot, safeguarding against misuse or data leaks via compromised accounts.",
+    "parameter_key": "authentication_methods_enabled",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When authentication method has more than 2 authentication methods"
+    ],
+    "severity": "critical",
+    "title": "Remediate Authentication methods enabled"
+  },
+  {
+    "copilot_impact": "These policies ensure Copilot isn't accessed under suspicious conditions, preventing unauthorized use and protecting sensitive data Copilot might surface during such sessions.",
+    "impact": "These policies ensure Copilot isn't accessed under suspicious conditions, preventing unauthorized use and protecting sensitive data Copilot might surface during such sessions.",
+    "parameter_key": "cap_policies_for_risky_sign_ins",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When CAP policy for Risky Sign -Ins are configured"
+    ],
+    "severity": "high",
+    "title": "Remediate CAP policies for risky sign-ins"
+  },
+  {
+    "copilot_impact": "Loosely scoped exclusions can allow Copilot access from risky or unmanaged devices or users who have been excluded from various Conditional Access policies.",
+    "impact": "Loosely scoped exclusions can allow Copilot access from risky or unmanaged devices or users who have been excluded from various Conditional Access policies.",
+    "parameter_key": "conditional_access_policies_exclusion",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "If no users are excluded from conditional access policies"
+    ],
+    "severity": "high",
+    "title": "Remediate Conditional Access Policies (Exclusion)"
+  },
+  {
+    "copilot_impact": "Enforcing strong passwords (via a custom banned list) helps prevent unauthorized access to accounts that have access to Copilot.",
+    "impact": "Enforcing strong passwords (via a custom banned list) helps prevent unauthorized access to accounts that have access to Copilot.",
+    "parameter_key": "custom_banned_password_list",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Configure Microsoft Entra Password Protection custom banned password list and enforce password validation across all users."
+    ],
+    "severity": "critical",
+    "title": "Remediate Custom Banned Password List"
+  },
+  {
+    "copilot_impact": "Unmanaged devices can be risky. Enforcing rules helps keep Copilot's data safe.",
+    "impact": "Unmanaged devices can be risky. Enforcing rules helps keep Copilot's data safe.",
+    "parameter_key": "devices_without_compliance_policies",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When compliance policy is configured"
+    ],
+    "severity": "info",
+    "title": "Remediate Devices without compliance policies"
+  },
+  {
+    "copilot_impact": "These accounts are required to avoid tenant lock out",
+    "impact": "These accounts are required to avoid tenant lock out",
+    "parameter_key": "emergency_access_accounts",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is Present"
+    ],
+    "severity": "critical",
+    "title": "Remediate Emergency Access Accounts"
+  },
+  {
+    "copilot_impact": "Restricting this prevents unauthorized or unmanaged tenants that could misuse Copilot services.",
+    "impact": "Restricting this prevents unauthorized or unmanaged tenants that could misuse Copilot services.",
+    "parameter_key": "entra_tenant_creation_by_non_admin",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When non-admins are not allowed to create tenants"
+    ],
+    "severity": "critical",
+    "title": "Remediate Entra - Tenant Creation By Non-Admin"
+  },
+  {
+    "copilot_impact": "Ensuring only trusted applications are integrated helps maintain data integrity, which is crucial for Copilot's accurate functioning.",
+    "impact": "Ensuring only trusted applications are integrated helps maintain data integrity, which is crucial for Copilot's accurate functioning.",
+    "parameter_key": "entra_third_party_app_integrations",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is disabled for users"
+    ],
+    "severity": "high",
+    "title": "Remediate Entra - Third Party App Integrations"
+  },
+  {
+    "copilot_impact": "Global Admin is the account with the highest privilages. Limiting and securing these accounts prevents unauthorized configurations or access to Copilot settings.",
+    "impact": "Global Admin is the account with the highest privilages. Limiting and securing these accounts prevents unauthorized configurations or access to Copilot settings.",
+    "parameter_key": "global_administrator_accounts",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When tenant has more than 2 or less then 5 global admins"
+    ],
+    "severity": "critical",
+    "title": "Remediate Global Administrator Accounts"
+  },
+  {
+    "copilot_impact": "Guest invite settings control who can invite external users, impacting Copilot’s access and security in collaborative environments.",
+    "impact": "Guest invite settings control who can invite external users, impacting Copilot’s access and security in collaborative environments.",
+    "parameter_key": "guest_invite_settings",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is set to No one in the organization can invite guest users including admins (most restrictive), Only users assigned to specific admin roles can invite guest users"
+    ],
+    "severity": "medium",
+    "title": "Remediate Guest Invite Settings"
+  },
+  {
+    "copilot_impact": "Monitoring guest users ensures that only authorized individuals have access, reducing potential data exposure through Copilot.",
+    "impact": "Monitoring guest users ensures that only authorized individuals have access, reducing potential data exposure through Copilot.",
+    "parameter_key": "guest_users_count",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the ratio of guest accounts to total accounts is less than 15%"
+    ],
+    "severity": "medium",
+    "title": "Remediate Guest users count"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "restricted_access_to_microsoft_entra_admin_centre",
+    "priority": 1,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Non-Admin Users should not have access to Microsoft Entra Admin Centre"
+    ],
+    "severity": "info",
+    "title": "Remediate Restricted Access To Microsoft Entra Admin Centre"
+  },
+  {
+    "copilot_impact": "No Direct Integration",
+    "impact": "No Direct Integration",
+    "parameter_key": "self_service_password_reset_authentication_method",
+    "priority": 5,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Enabled to see how many methods registered"
+    ],
+    "severity": "critical",
+    "title": "Remediate Self-Service Password Reset Authentication Method"
+  },
+  {
+    "copilot_impact": "Proper management ensures that only authorized users can access data processed by Copilot",
+    "impact": "Proper management ensures that only authorized users can access data processed by Copilot",
+    "parameter_key": "tenant_collaboration_invitations",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is set to (Allow invitations only to the specified domain, Deny invitations to the specified domains)"
+    ],
+    "severity": "high",
+    "title": "Remediate Tenant Collaboration Invitations"
+  },
+  {
+    "copilot_impact": "Security by limiting access to only consent for approved application data ensures data protection.",
+    "impact": "Security by limiting access to only consent for approved application data ensures data protection.",
+    "parameter_key": "user_consent_for_applications",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When it is not set to Users can consent"
+    ],
+    "severity": "high",
+    "title": "Remediate User Consent For Applications"
+  },
+  {
+    "copilot_impact": "If user dat is not correctly configured, copilot can provide irrevelent or wrong information.",
+    "impact": "If user dat is not correctly configured, copilot can provide irrevelent or wrong information.",
+    "parameter_key": "user_information",
+    "priority": 2,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When the user information is complete for all users."
+    ],
+    "severity": "low",
+    "title": "Remediate User Information"
+  },
+  {
+    "copilot_impact": "Enforcing MFA enhances security for Copilot access.",
+    "impact": "Enforcing MFA enhances security for Copilot access.",
+    "parameter_key": "users_without_mfa",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "When MFA is enabled for all the capable users"
+    ],
+    "severity": "high",
+    "title": "Remediate Users without MFA"
+  },
+  {
+    "copilot_impact": "Inactive Microsoft 365 groups can retain data that Copilot may surface. Expiration policies reduce stale collaboration data exposure.",
+    "impact": "Inactive Microsoft 365 groups can retain data that Copilot may surface. Expiration policies reduce stale collaboration data exposure.",
+    "parameter_key": "auto_expiration_policy_for_inactive_m365_groups",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Auto-expiration policy for inactive M365 groups is configured"
+    ],
+    "severity": "medium",
+    "title": "Remediate Auto-expiration policy for M365 Groups"
+  },
+  {
+    "copilot_impact": "Expiring anonymous links limits long-lived content exposure that Copilot could otherwise index or surface.",
+    "impact": "Expiring anonymous links limits long-lived content exposure that Copilot could otherwise index or surface.",
+    "parameter_key": "expiration_policy_for_anyone_links",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Anyone links expire within the approved duration"
+    ],
+    "severity": "high",
+    "title": "Remediate Expiration Policy for Anyone links"
+  },
+  {
+    "copilot_impact": "Anyone links with broad permissions can expose SharePoint content that Copilot may index or surface to unintended users.",
+    "impact": "Anyone links with broad permissions can expose SharePoint content that Copilot may index or surface to unintended users.",
+    "parameter_key": "permission_setting_for_anyone_links",
+    "priority": 5,
+    "reference_urls": [
+      "https://learn.microsoft.com/sharepoint/turn-external-sharing-on-or-off"
+    ],
+    "remediation_steps": [
+      "Anyone links are disabled or restricted to view-only least privilege access"
+    ],
+    "severity": "critical",
+    "title": "Remediate Permission Settings for anyone links"
+  },
+  {
+    "copilot_impact": "External guest owners can influence Teams content and access boundaries that Copilot may use for summaries and responses.",
+    "impact": "External guest owners can influence Teams content and access boundaries that Copilot may use for summaries and responses.",
+    "parameter_key": "teams_with_external_guest_as_owner",
+    "priority": 4,
+    "reference_urls": [],
+    "remediation_steps": [
+      "No Teams have external guests as owners"
+    ],
+    "severity": "high",
+    "title": "Remediate Teams with external guest as owner"
+  },
+  {
+    "copilot_impact": "No relation",
+    "impact": "No relation",
+    "parameter_key": "customer_lockbox",
+    "priority": 3,
+    "reference_urls": [],
+    "remediation_steps": [
+      "Microsoft support staff cannot access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed"
+    ],
+    "severity": "medium",
+    "title": "Remediate Customer Lockbox"
+  }
+]

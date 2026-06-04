@@ -1,0 +1,807 @@
+[
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When a tenant has inactive teams",
+      "pass_criteria": "When a tenant does not have inactive teams"
+    },
+    "parameter_key": "active_inactive_teams",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        85.0
+      ],
+      "fail_criteria": "When the number active sites on SharePoint are less than 85%",
+      "pass_criteria": "When the number active sites on SharePoint are more than 85%",
+      "percentage_thresholds": [
+        85.0
+      ]
+    },
+    "parameter_key": "active_sites_count",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        85.0
+      ],
+      "fail_criteria": "When the number active users on SharePoint are less than 85%",
+      "pass_criteria": "When the number active users on SharePoint are more than 85%",
+      "percentage_thresholds": [
+        85.0
+      ]
+    },
+    "parameter_key": "active_users_on_sharepoint",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        15.0
+      ],
+      "fail_criteria": "When the number of active Teams users are more than 15% for the tenant",
+      "pass_criteria": "When the number of inactive Teams users are less than 15% for the tenant",
+      "percentage_thresholds": [
+        15.0
+      ]
+    },
+    "parameter_key": "activer_inactive_teams_users",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "When it is disabled",
+      "pass_criteria": "When it is enabled"
+    },
+    "parameter_key": "copilot_integration_enabled",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When enabled, users can connect third-party storage services to Outlook Web App and: Attach files from those services Share links to external files via email Access cloud-based documents directly from their emai",
+      "pass_criteria": "When not enabled, users cannot connect third-party storage services to Outlook Web App and: Attach files from those services Share links to external files via email Access cloud-based documents directly from their emai"
+    },
+    "parameter_key": "external_storage_providers_in_owa",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is set to Anyone(Least restrictive)",
+      "pass_criteria": "When it is set to New and existing guests or more restrictive"
+    },
+    "parameter_key": "external_sharing_settings",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "If True, calendar sharing is enabled for the organization, allowing users to share their calendars with external users (or with internal users, depending on other settings).",
+      "pass_criteria": "If False, calendar sharing is disabled across the organization, meaning users cannot share their calendars with anyone outside the organization."
+    },
+    "parameter_key": "full_calendar_schedules_able_to_be_shared_externally",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "If there is no sites with sensitivity keywords then we can consider there are no sites with sensitive information.",
+      "pass_criteria": "This will give accurate result for sensitivity sites if anything exist"
+    },
+    "parameter_key": "getting_all_sites_with_sensitivity_keywords_on_a_tenant",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is enabled",
+      "pass_criteria": "When it is disabled"
+    },
+    "parameter_key": "guest_access_enabled_disabled",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        75.0
+      ],
+      "fail_criteria": "When the active storage on mailbox is more than 75%",
+      "pass_criteria": "When the active storage on mailbox is less than 75%",
+      "percentage_thresholds": [
+        75.0
+      ]
+    },
+    "parameter_key": "mailbox_storage_usage",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "count_thresholds": [
+        85.0
+      ],
+      "fail_criteria": "When the number active mailboxes are less than 85%",
+      "pass_criteria": "When the number active mailboxes are more than 85%",
+      "percentage_thresholds": [
+        85.0
+      ]
+    },
+    "parameter_key": "mailboxes_status_active_inactive",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When recommended settings aren't setup",
+      "pass_criteria": "When recommended settings are setup"
+    },
+    "parameter_key": "meeting_policies_configuration",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is disabled",
+      "pass_criteria": "When it is enabled"
+    },
+    "parameter_key": "meeting_recording_retention_policies",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is disabled",
+      "pass_criteria": "When it is enabled"
+    },
+    "parameter_key": "meeting_transcription_enabled",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        1.0,
+        2.0
+      ],
+      "fail_criteria": "When teams have less than 2 Owner",
+      "pass_criteria": "When all teams have more than 1 Owner"
+    },
+    "parameter_key": "minimum_number_of_owners",
+    "rule_type": "count_threshold",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        70.0,
+        75.0
+      ],
+      "fail_criteria": "Less than 75% of users have read more than 70% of their emails.",
+      "pass_criteria": "More than 75% of users have read more than 70% of their emails.",
+      "percentage_thresholds": [
+        70.0,
+        75.0
+      ]
+    },
+    "parameter_key": "number_of_emails_read_received",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        30.0
+      ],
+      "fail_criteria": "When the number of emails sent by the users are less than 30",
+      "pass_criteria": "When the number of emails sent by the users are more than 30"
+    },
+    "parameter_key": "number_of_emails_sent",
+    "rule_type": "count_threshold",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When orphan teams are present",
+      "pass_criteria": "When there are no orphan teams"
+    },
+    "parameter_key": "orphan_teams",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "SharingExpirationPeriod not enabled",
+      "pass_criteria": "SharingExpirationPeriod: The number of days the guest access link will be valid before it expires (if expiration is enabled)."
+    },
+    "parameter_key": "sharepoint_and_onedrive_guest_access_expiry",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is disabled",
+      "pass_criteria": "When it is enabled"
+    },
+    "parameter_key": "sharepoint_modern_authentication",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "When restrictive setting no set up",
+      "pass_criteria": "When settings enabled"
+    },
+    "parameter_key": "sharing_settings_external_internal",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        90.0
+      ],
+      "fail_criteria": "When it is more than or equal to 90%",
+      "pass_criteria": "When it is less than 90%",
+      "percentage_thresholds": [
+        90.0
+      ]
+    },
+    "parameter_key": "storage_quota_consumption",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "This will not restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+      "pass_criteria": "This will restrict Teams channels to allow accepting channel emails only from these Restricted Domains"
+    },
+    "parameter_key": "teams_channel_email_addresses",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 2.0,
+    "severity": "low"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When the files are stored outside the Microsoft suit",
+      "pass_criteria": "When the files are stored within the Microsoft suit"
+    },
+    "parameter_key": "teams_file_storage_option",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "Specifies whether participants can bypass the lobby when joining the meeting - Anyone",
+      "pass_criteria": "Specifies whether participants can bypass the lobby when joining the meeting - Never"
+    },
+    "parameter_key": "teams_lobby_bypass",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "Disabled: Meeting chat is disabled",
+      "pass_criteria": "Enabled: Participants are allowed to use chat during and after the meeting."
+    },
+    "parameter_key": "teams_meeting_chat",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        20.0
+      ],
+      "fail_criteria": "When it is more than to 20%",
+      "pass_criteria": "When it is less than 20%",
+      "percentage_thresholds": [
+        20.0
+      ]
+    },
+    "parameter_key": "teams_with_external_users",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "Enabled- custom apps are available in the organization's app",
+      "pass_criteria": "Disabled- custom apps are unavailable in the organization's app"
+    },
+    "parameter_key": "third_party_apps_allowed",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When the total active user on OneDrive are more than than 80%",
+      "pass_criteria": "When the total active user on OneDrive are more than than 80%",
+      "percentage_thresholds": [
+        80.0
+      ]
+    },
+    "parameter_key": "total_active_users_on_onedrive",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "If audit logs not enabled we cannot get the logs for the query",
+      "pass_criteria": "If audit logs enabled this will hunt the results for query"
+    },
+    "parameter_key": "audit_logs_enabled",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When no policies are set up",
+      "pass_criteria": "When policies are set up"
+    },
+    "parameter_key": "audit_log_retention_duration",
+    "rule_type": "policy_existence_check",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "count_thresholds": [
+        80.0
+      ],
+      "fail_criteria": "When it is less than 80%",
+      "pass_criteria": "When it is more than or equal to 80%",
+      "percentage_thresholds": [
+        80.0
+      ]
+    },
+    "parameter_key": "compliance_score_overview",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "If DLP rules is not configured and applied correctly to exchange,sharepoint,teams etc",
+      "pass_criteria": "If DLP rules is configured and applied correctly to exchange,sharepoint,teams etc"
+    },
+    "parameter_key": "dlp_rules_configured",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "If labels is not configured and applied",
+      "pass_criteria": "If labels is configured and applied"
+    },
+    "parameter_key": "information_protection_labels_applied",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "count_thresholds": [
+        70.0
+      ],
+      "fail_criteria": "When it is less than 70%",
+      "pass_criteria": "When it is more than 70%",
+      "percentage_thresholds": [
+        70.0
+      ]
+    },
+    "parameter_key": "secure_score_percentage",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "If labels is not configured and applied",
+      "pass_criteria": "If labels is configured and applied"
+    },
+    "parameter_key": "sensitivity_labels_applied_to_teams",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "If labels is not configured and applied",
+      "pass_criteria": "If labels is configured and applied"
+    },
+    "parameter_key": "sensitivity_labels_configured_and_applied",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "Deleted user's OneDrive retention period is configured",
+      "fail_criteria": "Deleted user's OneDrive retention period is not configured or is below the expected baseline"
+    },
+    "parameter_key": "days_to_retain_a_deleted_user_s_onedrive",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 2.0,
+    "severity": "low"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "Inactive site policies are configured",
+      "fail_criteria": "Inactive site policies are not configured"
+    },
+    "parameter_key": "inactive_site_policies",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "Site ownership policies are configured and sites have accountable owners",
+      "fail_criteria": "Site ownership policies are not configured or sites lack accountable ownership"
+    },
+    "parameter_key": "site_ownership_policies",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        85.0
+      ],
+      "fail_criteria": "When number of enabled account is less than 85 %",
+      "pass_criteria": "When number of enabled account is more than 85 %",
+      "percentage_thresholds": [
+        85.0
+      ]
+    },
+    "parameter_key": "account_enabled",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 2.0,
+    "severity": "low"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is not configured",
+      "pass_criteria": "When it is configured"
+    },
+    "parameter_key": "admin_consent_workflow",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "count_thresholds": [
+        2.0
+      ],
+      "fail_criteria": "When authentication method has less than 2 authentication methods",
+      "pass_criteria": "When authentication method has more than 2 authentication methods"
+    },
+    "parameter_key": "authentication_methods_enabled",
+    "rule_type": "count_threshold",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When CAP policy for Risky Sign -Ins are not configured",
+      "pass_criteria": "When CAP policy for Risky Sign -Ins are configured"
+    },
+    "parameter_key": "cap_policies_for_risky_sign_ins",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "If users are excluded from conditional access policies",
+      "pass_criteria": "If no users are excluded from conditional access policies"
+    },
+    "parameter_key": "conditional_access_policies_exclusion",
+    "rule_type": "policy_existence_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "If custom banned password is not enabled then users can use banned password which is not security best practise (example : welcome,Happy,Password etc",
+      "pass_criteria": "If custom banned password is enabled then users cannot use banned password which is security best practise (example : welcome,Happy,Password etc"
+    },
+    "parameter_key": "custom_banned_password_list",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When compliance policy is not configured",
+      "pass_criteria": "When compliance policy is configured"
+    },
+    "parameter_key": "devices_without_compliance_policies",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "When not present",
+      "pass_criteria": "When it is Present"
+    },
+    "parameter_key": "emergency_access_accounts",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "When non-admins are allowed to create tenants",
+      "pass_criteria": "When non-admins are not allowed to create tenants"
+    },
+    "parameter_key": "entra_tenant_creation_by_non_admin",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is enabled for users",
+      "pass_criteria": "When it is disabled for users"
+    },
+    "parameter_key": "entra_third_party_app_integrations",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "count_thresholds": [
+        2.0
+      ],
+      "fail_criteria": "When tenant has less than 2 or more then 5 global admins",
+      "pass_criteria": "When tenant has more than 2 or less then 5 global admins"
+    },
+    "parameter_key": "global_administrator_accounts",
+    "rule_type": "count_threshold",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "Anyone in the organization can invite guest users including guests and non-admins] ,Member users and users assigned to specific admin roles can invite guest users including guests with member permissions",
+      "pass_criteria": "When it is set to No one in the organization can invite guest users including admins (most restrictive), Only users assigned to specific admin roles can invite guest users"
+    },
+    "parameter_key": "guest_invite_settings",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "count_thresholds": [
+        15.0
+      ],
+      "fail_criteria": "When the ratio of guest accounts to total accounts is more than 15%",
+      "pass_criteria": "When the ratio of guest accounts to total accounts is less than 15%",
+      "percentage_thresholds": [
+        15.0
+      ]
+    },
+    "parameter_key": "guest_users_count",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "Non-Admin Users have access to Microsoft Entra Admin Centre",
+      "pass_criteria": "Non-Admin Users should not have access to Microsoft Entra Admin Centre"
+    },
+    "parameter_key": "restricted_access_to_microsoft_entra_admin_centre",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 1.0,
+    "severity": "info"
+  },
+  {
+    "copilot_blocking": true,
+    "expression": {
+      "fail_criteria": "No methods enabled",
+      "pass_criteria": "Enabled to see how many methods registered"
+    },
+    "parameter_key": "self_service_password_reset_authentication_method",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is set to (Allow invitations to be sent to any domain )",
+      "pass_criteria": "When it is set to (Allow invitations only to the specified domain, Deny invitations to the specified domains)"
+    },
+    "parameter_key": "tenant_collaboration_invitations",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When it is set to Users can consent",
+      "pass_criteria": "When it is not set to Users can consent"
+    },
+    "parameter_key": "user_consent_for_applications",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When the user information is not configured for all users",
+      "pass_criteria": "When the user information is complete for all users."
+    },
+    "parameter_key": "user_information",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 2.0,
+    "severity": "low"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "When MFA is not configured for some capable user",
+      "pass_criteria": "When MFA is enabled for all the capable users"
+    },
+    "parameter_key": "users_without_mfa",
+    "rule_type": "boolean_gate",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "Auto-expiration policy for inactive M365 groups is configured",
+      "fail_criteria": "Auto-expiration policy for inactive M365 groups is not configured"
+    },
+    "parameter_key": "auto_expiration_policy_for_inactive_m365_groups",
+    "rule_type": "percentage_threshold",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "Anyone links expire within the approved duration",
+      "fail_criteria": "Anyone links do not expire or exceed the approved duration"
+    },
+    "parameter_key": "expiration_policy_for_anyone_links",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "Anyone links are disabled or restricted to view-only least privilege access",
+      "fail_criteria": "Anyone links allow edit or overly permissive access"
+    },
+    "parameter_key": "permission_setting_for_anyone_links",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 5.0,
+    "severity": "critical"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "pass_criteria": "No Teams have external guests as owners",
+      "fail_criteria": "One or more Teams have external guests as owners"
+    },
+    "parameter_key": "teams_with_external_guest_as_owner",
+    "rule_type": "configuration_value_check",
+    "scoring_weight": 4.0,
+    "severity": "high"
+  },
+  {
+    "copilot_blocking": false,
+    "expression": {
+      "fail_criteria": "Microsoft support staff can access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed",
+      "pass_criteria": "Microsoft support staff cannot access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed"
+    },
+    "parameter_key": "customer_lockbox",
+    "rule_type": "composite_rule",
+    "scoring_weight": 3.0,
+    "severity": "medium"
+  }
+]

@@ -1,0 +1,2032 @@
+[
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Cleaning up inactive channels removes clutter, helping Copilot focus on useful conversations.",
+    "display_name": "Active /Inactive teams",
+    "domain": "collaboration",
+    "expected_output": "List of inactive teams channels",
+    "fail_criteria": "When a tenant has inactive teams",
+    "graph_endpoint": "",
+    "parameter_key": "active_inactive_teams",
+    "pass_criteria": "When a tenant does not have inactive teams",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Active /Inactive teams",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 45,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 44,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "portal",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Active sites give Copilot more data to work with, making it more useful.",
+    "display_name": "Active Sites count",
+    "domain": "collaboration",
+    "expected_output": "List of active SharePoint site in the tenant",
+    "fail_criteria": "When the number active sites on SharePoint are less than 85%",
+    "graph_endpoint": "",
+    "parameter_key": "active_sites_count",
+    "pass_criteria": "When the number active sites on SharePoint are more than 85%",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Active Sites count",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 59,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 63,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Active SharePoint use means lots of data for Copilot to provide smart, helpful assistance and boost productivity.",
+    "display_name": "Active users on SharePoint",
+    "domain": "collaboration",
+    "expected_output": "List of active users on SharePoint in the tenant",
+    "fail_criteria": "When the number active users on SharePoint are less than 85%",
+    "graph_endpoint": "",
+    "parameter_key": "active_users_on_sharepoint",
+    "pass_criteria": "When the number active users on SharePoint are more than 85%",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Active users on SharePoint",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 60,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 66,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Knowing who is active helps deploy Copilot to users who will benefit the most.",
+    "display_name": "Activer/Inactive Teams users",
+    "domain": "collaboration",
+    "expected_output": "List of inactive teams user",
+    "fail_criteria": "When the number of active Teams users are more than 15% for the tenant",
+    "graph_endpoint": "",
+    "parameter_key": "activer_inactive_teams_users",
+    "pass_criteria": "When the number of inactive Teams users are less than 15% for the tenant",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Activer/Inactive Teams users",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 46,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 52,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "To utilize Copilot features in teams app, It is rquired Copilot to have necessary configurations in place.",
+    "display_name": "Copilot integration enabled",
+    "domain": "collaboration",
+    "expected_output": "Configuration of Teams app (Copilot) integration with teams. (Identity, CopilotFromHomeTenant)",
+    "fail_criteria": "When it is disabled",
+    "graph_endpoint": "",
+    "parameter_key": "copilot_integration_enabled",
+    "pass_criteria": "When it is enabled",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Copilot integration enabled",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 49,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 43,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Exchange Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "External Storage Providers In OWA",
+    "domain": "collaboration",
+    "expected_output": "To see its enabled or disabled",
+    "fail_criteria": "When enabled, users can connect third-party storage services to Outlook Web App and: Attach files from those services Share links to external files via email Access cloud-based documents directly from their emai",
+    "graph_endpoint": "",
+    "parameter_key": "external_storage_providers_in_owa",
+    "pass_criteria": "When not enabled, users cannot connect third-party storage services to Outlook Web App and: Attach files from those services Share links to external files via email Access cloud-based documents directly from their emai",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "External Storage Providers In OWA",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 28,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 42,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Exchange Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "OneDrive for Business",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Restricting external sharing reduces the risk of data leaks through Copilot-generated content.",
+    "display_name": "External sharing settings",
+    "domain": "collaboration",
+    "expected_output": "Level of external sharing configured",
+    "fail_criteria": "When it is set to Anyone(Least restrictive)",
+    "graph_endpoint": "",
+    "parameter_key": "external_sharing_settings",
+    "pass_criteria": "When it is set to New and existing guests or more restrictive",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "External sharing settings",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 57,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 59,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "OneDrive for Business",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Exchange Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "Full Calendar Schedules Able To Be Shared Externally",
+    "domain": "collaboration",
+    "expected_output": "To see its enabled or disabled",
+    "fail_criteria": "If True, calendar sharing is enabled for the organization, allowing users to share their calendars with external users (or with internal users, depending on other settings).",
+    "graph_endpoint": "",
+    "parameter_key": "full_calendar_schedules_able_to_be_shared_externally",
+    "pass_criteria": "If False, calendar sharing is disabled across the organization, meaning users cannot share their calendars with anyone outside the organization.",
+    "portal_mapping": "On the Exchange admin center, Organization --> Sharing --> Individual sharing.",
+    "powershell_mapping": "Full Calendar Schedules Able To Be Shared Externally",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 29,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 16,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Exchange Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Copilot can help to gather information related to sensitive files etc",
+    "display_name": "Getting all sites with Sensitivity keywords on a Tenant",
+    "domain": "collaboration",
+    "expected_output": "",
+    "fail_criteria": "If there is no sites with sensitivity keywords then we can consider there are no sites with sensitive information.",
+    "graph_endpoint": "",
+    "parameter_key": "getting_all_sites_with_sensitivity_keywords_on_a_tenant",
+    "pass_criteria": "This will give accurate result for sensitivity sites if anything exist",
+    "portal_mapping": "",
+    "powershell_mapping": "Getting all sites with Sensitivity keywords on a Tenant",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 65,
+        "sheet": "Parameters"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Disabling guest access prevents external users from interacting with Copilot and sensitive data.",
+    "display_name": "Guest access enabled / disabled",
+    "domain": "collaboration",
+    "expected_output": "Whether Guest access is enabled or disabled.",
+    "fail_criteria": "When it is enabled",
+    "graph_endpoint": "",
+    "parameter_key": "guest_access_enabled_disabled",
+    "pass_criteria": "When it is disabled",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Guest access enabled / disabled",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 40,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 53,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Exchange Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Monitoring storage ensures Copilot has smooth access to necessary data without delays.",
+    "display_name": "Mailbox Storage usage",
+    "domain": "collaboration",
+    "expected_output": "",
+    "fail_criteria": "When the active storage on mailbox is more than 75%",
+    "graph_endpoint": "",
+    "parameter_key": "mailbox_storage_usage",
+    "pass_criteria": "When the active storage on mailbox is less than 75%",
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Mailbox usage. Review the mailbox usage report.",
+    "powershell_mapping": "Mailbox Storage usage",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 25,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 21,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Exchange Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Exchange Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Active mailboxes are important because Copilot needs them to give helpful email-based support",
+    "display_name": "Mailboxes Status (Active/Inactive)",
+    "domain": "collaboration",
+    "expected_output": "List of active mailboxes in the tenant",
+    "fail_criteria": "When the number active mailboxes are less than 85%",
+    "graph_endpoint": "",
+    "parameter_key": "mailboxes_status_active_inactive",
+    "pass_criteria": "When the number active mailboxes are more than 85%",
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Email activity. Review the email activity report.",
+    "powershell_mapping": "Mailboxes Status (Active/Inactive)",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 24,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 18,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Exchange Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Proper configurations ensure that Copilot can access necessary meeting data while maintaining compliance.",
+    "display_name": "Meeting Policies configuration",
+    "domain": "collaboration",
+    "expected_output": "List of Teams meetings policies. (Identity, AllowCloudRecording, AutoAdmittedUsers, AllowMeetingReactions, MeetingChatEnabledType, AllowTranscription, AllowIPVideo, ExplicitRecordingConsent, AllowExternalNonTrustedMeetingChat, AllowBreakoutRooms)",
+    "fail_criteria": "When recommended settings aren't setup",
+    "graph_endpoint": "",
+    "parameter_key": "meeting_policies_configuration",
+    "pass_criteria": "When recommended settings are setup",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Meeting Policies configuration",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 52,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 45,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Ensures that Copilot has access to relevant meeting data for generating summaries or insights by expiring recordings out of date.",
+    "display_name": "Meeting recording retention policies",
+    "domain": "collaboration",
+    "expected_output": "From Teams meeting policies configuration of recording expiry duration.(Identity, RecordingStorageMode, NewMeetingRecordingExpirationDays)",
+    "fail_criteria": "When it is disabled",
+    "graph_endpoint": "",
+    "parameter_key": "meeting_recording_retention_policies",
+    "pass_criteria": "When it is enabled",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Meeting recording retention policies",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 51,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 54,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Copilot requires transcripts to analyze and generate meeing summaries and action items",
+    "display_name": "Meeting transcription enabled",
+    "domain": "collaboration",
+    "expected_output": "From Teams meeting policies configuration of transcription. (Identity, AllowTranscription)",
+    "fail_criteria": "When it is disabled",
+    "graph_endpoint": "",
+    "parameter_key": "meeting_transcription_enabled",
+    "pass_criteria": "When it is enabled",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Meeting transcription enabled",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 50,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 46,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Prevents orphaned teams, ensuring that Copilot has access to managed and active resources.",
+    "display_name": "Minimum number of owners",
+    "domain": "collaboration",
+    "expected_output": "List of Teams with the number of owners and also the number of teams with less than 2 owners(Team Name, Number of Owners, TotalTeamswithLessThan2Owners)",
+    "fail_criteria": "When teams have less than 2 Owner",
+    "graph_endpoint": "",
+    "parameter_key": "minimum_number_of_owners",
+    "pass_criteria": "When all teams have more than 1 Owner",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Minimum number of owners",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 41,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 47,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Exchange Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "High engagement with emails suggests that Copilot's email summarization and drafting features will be beneficial.",
+    "display_name": "Number of emails read/received",
+    "domain": "collaboration",
+    "expected_output": "Number of emails read by the users",
+    "fail_criteria": "Less than 75% of users have read more than 70% of their emails.",
+    "graph_endpoint": "",
+    "parameter_key": "number_of_emails_read_received",
+    "pass_criteria": "More than 75% of users have read more than 70% of their emails.",
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Email activity. Review the email activity report.",
+    "powershell_mapping": "Number of emails read/received",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 26,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 19,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Exchange Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Exchange Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "High outgoing email activity shows Copilot’s drafting and reply suggestions can boost efficiency.",
+    "display_name": "Number of emails sent",
+    "domain": "collaboration",
+    "expected_output": "Number of emails sent by the users",
+    "fail_criteria": "When the number of emails sent by the users are less than 30",
+    "graph_endpoint": "",
+    "parameter_key": "number_of_emails_sent",
+    "pass_criteria": "When the number of emails sent by the users are more than 30",
+    "portal_mapping": "On the Microsoft 365 admin center, Reports --> Usage --> Exchange --> Email activity. Review the email activity report.",
+    "powershell_mapping": "Number of emails sent",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 27,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 20,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Exchange Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Orphaned teams may contain outdated or unmanaged data, which could affect Copilot's outputs.",
+    "display_name": "Orphan Teams",
+    "domain": "collaboration",
+    "expected_output": "List and Number of Orphan teams.(TeamName,TeamID,Total Orphan Teams)",
+    "fail_criteria": "When orphan teams are present",
+    "graph_endpoint": "",
+    "parameter_key": "orphan_teams",
+    "pass_criteria": "When there are no orphan teams",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Orphan Teams",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 42,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 48,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "SharePoint & OneDrive Guest Access Expiry",
+    "domain": "collaboration",
+    "expected_output": "SharingExpirationPeriod - how many days",
+    "fail_criteria": "SharingExpirationPeriod not enabled",
+    "graph_endpoint": "",
+    "parameter_key": "sharepoint_and_onedrive_guest_access_expiry",
+    "pass_criteria": "SharingExpirationPeriod: The number of days the guest access link will be valid before it expires (if expiration is enabled).",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "SharePoint & OneDrive Guest Access Expiry",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 64,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 65,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Modern authentication improves security, keeping Copilot’s access to SharePoint data safe.",
+    "display_name": "SharePoint - Modern Authentication",
+    "domain": "collaboration",
+    "expected_output": "Mordern Authentication method should be enabled",
+    "fail_criteria": "When it is disabled",
+    "graph_endpoint": "",
+    "parameter_key": "sharepoint_modern_authentication",
+    "pass_criteria": "When it is enabled",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "SharePoint - Modern Authentication",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 61,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 61,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Restricting access to sharepoint and onedrive documents, prevents unauthorized access to data.",
+    "display_name": "Sharing Settings (External/Internal)",
+    "domain": "collaboration",
+    "expected_output": "Configuration of External sharing setting preventing external user from resharing (Allow Guests to Share Items They Don't Own)",
+    "fail_criteria": "When restrictive setting no set up",
+    "graph_endpoint": "",
+    "parameter_key": "sharing_settings_external_internal",
+    "pass_criteria": "When settings enabled",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Sharing Settings (External/Internal)",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 63,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 62,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Monitoring storage ensures Copilot can access data smoothly without performance problems.",
+    "display_name": "Storage Quota consumption",
+    "domain": "collaboration",
+    "expected_output": "Details of SharePoint storage which is utilized",
+    "fail_criteria": "When it is more than or equal to 90%",
+    "graph_endpoint": "",
+    "parameter_key": "storage_quota_consumption",
+    "pass_criteria": "When it is less than 90%",
+    "portal_mapping": "On the SharePoint admin center, Sites --> Active sites. Review the storage usage displayed at the top right of the page.",
+    "powershell_mapping": "Storage Quota consumption",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 62,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 31,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "SharePoint Online",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Copilot can help write the SMTP/email code that delivers messages to the Teams channel email address",
+    "display_name": "Teams - Channel Email Addresses",
+    "domain": "collaboration",
+    "expected_output": "AllowEmailIntoChannel - True means Users can send emails to a channel email address AllowEmailIntoChannel - False means Users cannot send emails to a channel email address",
+    "fail_criteria": "This will not restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+    "graph_endpoint": "",
+    "parameter_key": "teams_channel_email_addresses",
+    "pass_criteria": "This will restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Teams - Channel Email Addresses",
+    "scoring_weight": 2.0,
+    "severity": "low",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 53,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 51,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Ensures that Copilot accesses files stored in approved and secure locations.",
+    "display_name": "Teams - File Storage Option",
+    "domain": "collaboration",
+    "expected_output": "Third Party storge should be disabled",
+    "fail_criteria": "When the files are stored outside the Microsoft suit",
+    "graph_endpoint": "",
+    "parameter_key": "teams_file_storage_option",
+    "pass_criteria": "When the files are stored within the Microsoft suit",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Teams - File Storage Option",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 47,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 55,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "Teams - Lobby Bypass",
+    "domain": "collaboration",
+    "expected_output": "• AllowParticipantsToBypassLobby: Specifies whether participants can bypass the lobby when joining the meeting. The possible values are: o Always: Participants can always bypass the lobby. o Organizer: Only the organizer can bypass the lobby (default). o Never: No one can bypass the lobby.",
+    "fail_criteria": "Specifies whether participants can bypass the lobby when joining the meeting - Anyone",
+    "graph_endpoint": "",
+    "parameter_key": "teams_lobby_bypass",
+    "pass_criteria": "Specifies whether participants can bypass the lobby when joining the meeting - Never",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Teams - Lobby Bypass",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 54,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 56,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "Teams - Meeting Chat",
+    "domain": "collaboration",
+    "expected_output": "• AllowMeetingChat: This setting controls whether chat is allowed during and after meetings. Possible values include: o Enabled: Participants are allowed to use chat during and after the meeting. o Disabled: Meeting chat is disabled. o In-meeting only: Chat is allowed only during the meeting but not after the meeting ends.",
+    "fail_criteria": "Disabled: Meeting chat is disabled",
+    "graph_endpoint": "",
+    "parameter_key": "teams_meeting_chat",
+    "pass_criteria": "Enabled: Participants are allowed to use chat during and after the meeting.",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Teams - Meeting Chat",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 55,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 57,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Teams with external users involve sharing data outside the organization, requiring secure management for Copilot to work safely.",
+    "display_name": "Teams with external users",
+    "domain": "collaboration",
+    "expected_output": "List of external users",
+    "fail_criteria": "When it is more than to 20%",
+    "graph_endpoint": "",
+    "parameter_key": "teams_with_external_users",
+    "pass_criteria": "When it is less than 20%",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Teams with external users",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 48,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 50,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "Third-party apps allowed",
+    "domain": "collaboration",
+    "expected_output": "• Get the value of Custom Apps Setting. The value in the example is False, so custom apps are unavailable in the organization's app",
+    "fail_criteria": "Enabled- custom apps are available in the organization's app",
+    "graph_endpoint": "",
+    "parameter_key": "third_party_apps_allowed",
+    "pass_criteria": "Disabled- custom apps are unavailable in the organization's app",
+    "portal_mapping": "On the Teams admin center, Teams apps --> Manage apps --> Actions dropdown --> Org-wide app settings. Scroll down to find Third-party apps.",
+    "powershell_mapping": "Third-party apps allowed",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 56,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 32,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "OneDrive for Business",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Total active users on OneDrive show how many people use it, indicating how much data Copilot can access to assist users.",
+    "display_name": "Total active users on OneDrive",
+    "domain": "collaboration",
+    "expected_output": "List of Active users on OneDrive",
+    "fail_criteria": "When the total active user on OneDrive are more than than 80%",
+    "graph_endpoint": "",
+    "parameter_key": "total_active_users_on_onedrive",
+    "pass_criteria": "When the total active user on OneDrive are more than than 80%",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Total active users on OneDrive",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 58,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 60,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "OneDrive for Business",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Audit logs help track who used Copilot, when, and where (e.g., in which repository or organization).",
+    "display_name": "Audit Logs enabled",
+    "domain": "compliance",
+    "expected_output": "Audit logs enabled or not - True or False",
+    "fail_criteria": "If audit logs not enabled we cannot get the logs for the query",
+    "graph_endpoint": "",
+    "parameter_key": "audit_logs_enabled",
+    "pass_criteria": "If audit logs enabled this will hunt the results for query",
+    "portal_mapping": "On the Purview portal, Solutions --> Audit --> Search",
+    "powershell_mapping": "Audit Logs enabled",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 35,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 22,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": false,
+    "copilot_relevance": "Sufficient retention ensures visibility into how Copilot is being used, helping detect misuse or data access anomalies.",
+    "display_name": "Audit log retention duration",
+    "domain": "compliance",
+    "expected_output": "List of Audit log retention policies",
+    "fail_criteria": "When no policies are set up",
+    "graph_endpoint": "",
+    "parameter_key": "audit_log_retention_duration",
+    "pass_criteria": "When policies are set up",
+    "portal_mapping": "On the Purview portal, Solutions --> Audit --> Policies",
+    "powershell_mapping": "",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 33,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 26,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": true,
+    "copilot_relevance": "A higher compliance score means better data control, helping Copilot work safely and within rules.",
+    "display_name": "Compliance Score overview",
+    "domain": "compliance",
+    "expected_output": "Compliance Score percentage of the tenant",
+    "fail_criteria": "When it is less than 80%",
+    "graph_endpoint": "",
+    "parameter_key": "compliance_score_overview",
+    "pass_criteria": "When it is more than or equal to 80%",
+    "portal_mapping": "On the Purview portal, select Home on the left pane and scroll down to see the compliance score",
+    "powershell_mapping": "",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 31,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 25,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "DLP can detect if Copilot-suggested code includes secrets, PII, or confidential patterns (e.g., keys, passwords).",
+    "display_name": "DLP rules configured",
+    "domain": "compliance",
+    "expected_output": "List of DLP rules applied and configured with settings",
+    "fail_criteria": "If DLP rules is not configured and applied correctly to exchange,sharepoint,teams etc",
+    "graph_endpoint": "",
+    "parameter_key": "dlp_rules_configured",
+    "pass_criteria": "If DLP rules is configured and applied correctly to exchange,sharepoint,teams etc",
+    "portal_mapping": "On the Purview portal, Solutions --> Data Loss Prevention --> Policies",
+    "powershell_mapping": "DLP rules configured",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 36,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 23,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "display_name": "Information Protection Labels applied",
+    "domain": "compliance",
+    "expected_output": "List of labels applied and configured with settings",
+    "fail_criteria": "If labels is not configured and applied",
+    "graph_endpoint": "",
+    "parameter_key": "information_protection_labels_applied",
+    "pass_criteria": "If labels is configured and applied",
+    "portal_mapping": "On the Purview portal, Solutions --> Information Protection --> Policies",
+    "powershell_mapping": "Information Protection Labels applied",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 37,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 27,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": true,
+    "copilot_relevance": "A higher Secure Score means stronger security, creating a safer environment for Copilot.",
+    "display_name": "Secure Score percentage",
+    "domain": "compliance",
+    "expected_output": "Secure Score Percentage of the Tenant",
+    "fail_criteria": "When it is less than 70%",
+    "graph_endpoint": "",
+    "parameter_key": "secure_score_percentage",
+    "pass_criteria": "When it is more than 70%",
+    "portal_mapping": "From Defender Portal (security.microsoft.com)",
+    "powershell_mapping": "",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 32,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 3,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "display_name": "Sensitivity Labels applied to Teams",
+    "domain": "compliance",
+    "expected_output": "List of labels applied and configured with Teams settings",
+    "fail_criteria": "If labels is not configured and applied",
+    "graph_endpoint": "",
+    "parameter_key": "sensitivity_labels_applied_to_teams",
+    "pass_criteria": "If labels is configured and applied",
+    "portal_mapping": "Failed if Sensitivity Labels configured and applied parameter is failed",
+    "powershell_mapping": "Sensitivity Labels applied to Teams",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 38,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 2,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Purview",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "\"Sites labeled with sensitive information (e.g., confidential or highly confidential) ensure that Copilot can only access and generate insights from data the user is permitted to view. Example: A Confidential – HR label ensures Copilot won't generate summaries or responses based on HR-related documents unless the user has the appropriate permissions to view that content. Adding appropriate labels gives clarity on copilot assessment to have this done.\"",
+    "display_name": "Sensitivity Labels configured and applied",
+    "domain": "compliance",
+    "expected_output": "List of labels applied and configured with settings",
+    "fail_criteria": "If labels is not configured and applied",
+    "graph_endpoint": "",
+    "parameter_key": "sensitivity_labels_configured_and_applied",
+    "pass_criteria": "If labels is configured and applied",
+    "portal_mapping": "On the Purview portal, Solutions --> Information Protection --> Policies. If no policies are configured then the parameter is failed",
+    "powershell_mapping": "Sensitivity Labels configured and applied",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 34,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 24,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Microsoft Purview",
+    "warning_threshold": ""
+  },
+  {
+    "category": "OneDrive for Business",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Retention settings affect whether deleted-user content remains recoverable, auditable, and governed before Copilot rollout.",
+    "display_name": "Days to retain a deleted user’s OneDrive",
+    "domain": "governance",
+    "expected_output": "Deleted user's OneDrive retention is configured for an approved duration",
+    "fail_criteria": "Deleted user's OneDrive retention period is not configured or is below the expected baseline",
+    "graph_endpoint": "",
+    "parameter_key": "days_to_retain_a_deleted_user_s_onedrive",
+    "pass_criteria": "Deleted user's OneDrive retention period is configured",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Days to retain a deleted user's OneDrive",
+    "scoring_weight": 2.0,
+    "severity": "low",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "OneDrive",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Inactive sites can contain stale or ungoverned content. Inactive site policies reduce irrelevant data surfaced by Copilot.",
+    "display_name": "Inactive site policies",
+    "domain": "best_practice",
+    "expected_output": "Inactive site policy is configured",
+    "fail_criteria": "Inactive site policies are not configured",
+    "graph_endpoint": "",
+    "parameter_key": "inactive_site_policies",
+    "pass_criteria": "Inactive site policies are configured",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Inactive site policies",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "SharePoint",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Site ownership helps ensure content governance and accountability for information Copilot can access.",
+    "display_name": "Site Ownership policies",
+    "domain": "governance",
+    "expected_output": "Site ownership policies are configured",
+    "fail_criteria": "Site ownership policies are not configured or sites lack accountable ownership",
+    "graph_endpoint": "",
+    "parameter_key": "site_ownership_policies",
+    "pass_criteria": "Site ownership policies are configured and sites have accountable owners",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Site Ownership policies",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "SharePoint",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Copilot relies on active user accounts to deliver personalized and contextual assistance. Only enabled accounts can interact with Copilot’s AI features and receive insights based on their usage and data.",
+    "display_name": "Account enabled",
+    "domain": "identity_access",
+    "expected_output": "List of users and their account status",
+    "fail_criteria": "When number of enabled account is less than 85 %",
+    "graph_endpoint": "",
+    "parameter_key": "account_enabled",
+    "pass_criteria": "When number of enabled account is more than 85 %",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Account enabled",
+    "scoring_weight": 2.0,
+    "severity": "low",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 19,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 38,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Ensures that only trusted applications can access Copilot data, maintaining security and compliance",
+    "display_name": "Admin Consent Workflow",
+    "domain": "identity_access",
+    "expected_output": "Admin workflow for consent requests configurations(Users can request admin consent, Selected users will receive email notifications for requests , Selected users will receive request expiration reminders , Consent request expires after (days))",
+    "fail_criteria": "When it is not configured",
+    "graph_endpoint": "",
+    "parameter_key": "admin_consent_workflow",
+    "pass_criteria": "When it is configured",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Enterprise apps --> Consent and Permissions --> Admin Consent Settings",
+    "powershell_mapping": "Admin Consent Workflow",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 9,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 9,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Enforcing strong authentication ensures only verified users can use Copilot, safeguarding against misuse or data leaks via compromised accounts.",
+    "display_name": "Authentication methods enabled",
+    "domain": "identity_access",
+    "expected_output": "List of Authentication methods and state.(Authentication method, State)",
+    "fail_criteria": "When authentication method has less than 2 authentication methods",
+    "graph_endpoint": "",
+    "parameter_key": "authentication_methods_enabled",
+    "pass_criteria": "When authentication method has more than 2 authentication methods",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Authentication Methods --> Policies",
+    "powershell_mapping": "Authentication methods enabled",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 8,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 6,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "These policies ensure Copilot isn't accessed under suspicious conditions, preventing unauthorized use and protecting sensitive data Copilot might surface during such sessions.",
+    "display_name": "CAP policies for risky sign-ins",
+    "domain": "identity_access",
+    "expected_output": "List of CAP with conditions for risky sign ins. (Name, State, SignInRiskLevels, UserRiskLevels, GrantControls)",
+    "fail_criteria": "When CAP policy for Risky Sign -Ins are not configured",
+    "graph_endpoint": "",
+    "parameter_key": "cap_policies_for_risky_sign_ins",
+    "pass_criteria": "When CAP policy for Risky Sign -Ins are configured",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Conditional Access --> Policies",
+    "powershell_mapping": "CAP policies for risky sign-ins",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 10,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 7,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Loosely scoped exclusions can allow Copilot access from risky or unmanaged devices or users who have been excluded from various Conditional Access policies.",
+    "display_name": "Conditional Access Policies (Exclusion)",
+    "domain": "identity_access",
+    "expected_output": "List of Condiotional access policies with details including all exclusions.",
+    "fail_criteria": "If users are excluded from conditional access policies",
+    "graph_endpoint": "",
+    "parameter_key": "conditional_access_policies_exclusion",
+    "pass_criteria": "If no users are excluded from conditional access policies",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Conditional Access --> Policies",
+    "powershell_mapping": "Conditional Access Policies (Exclusion)",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 21,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 8,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": true,
+    "copilot_relevance": "Enforcing strong passwords (via a custom banned list) helps prevent unauthorized access to accounts that have access to Copilot.",
+    "display_name": "Custom Banned Password List",
+    "domain": "identity_access",
+    "expected_output": "We can see what custom banned password is being used.",
+    "fail_criteria": "If custom banned password is not enabled then users can use banned password which is not security best practise (example : welcome,Happy,Password etc",
+    "graph_endpoint": "",
+    "parameter_key": "custom_banned_password_list",
+    "pass_criteria": "If custom banned password is enabled then users cannot use banned password which is security best practise (example : welcome,Happy,Password etc",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Authentication Methods --> Password Protection",
+    "powershell_mapping": "",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 15,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 5,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Unmanaged devices can be risky. Enforcing rules helps keep Copilot's data safe.",
+    "display_name": "Devices without compliance policies",
+    "domain": "identity_access",
+    "expected_output": "List of non complient devices in the tenant",
+    "fail_criteria": "When compliance policy is not configured",
+    "graph_endpoint": "",
+    "parameter_key": "devices_without_compliance_policies",
+    "pass_criteria": "When compliance policy is configured",
+    "portal_mapping": "",
+    "powershell_mapping": "Devices without compliance policies",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 23,
+        "sheet": "Parameters"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "manual",
+    "collector_type": "manual",
+    "copilot_blocker": true,
+    "copilot_relevance": "These accounts are required to avoid tenant lock out",
+    "display_name": "Emergency Access Accounts",
+    "domain": "identity_access",
+    "expected_output": "",
+    "fail_criteria": "When not present",
+    "graph_endpoint": "",
+    "parameter_key": "emergency_access_accounts",
+    "pass_criteria": "When it is Present",
+    "portal_mapping": "Need to check",
+    "powershell_mapping": "",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 13,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 4,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Restricting this prevents unauthorized or unmanaged tenants that could misuse Copilot services.",
+    "display_name": "Entra - Tenant Creation By Non-Admin",
+    "domain": "identity_access",
+    "expected_output": "Whether tenant creation by non-admin is enabled or disabled.",
+    "fail_criteria": "When non-admins are allowed to create tenants",
+    "graph_endpoint": "",
+    "parameter_key": "entra_tenant_creation_by_non_admin",
+    "pass_criteria": "When non-admins are not allowed to create tenants",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Entra - Tenant Creation By Non-Admin",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 22,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 34,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Ensuring only trusted applications are integrated helps maintain data integrity, which is crucial for Copilot's accurate functioning.",
+    "display_name": "Entra - Third Party App Integrations",
+    "domain": "identity_access",
+    "expected_output": "Third party app integration should be enabled",
+    "fail_criteria": "When it is enabled for users",
+    "graph_endpoint": "",
+    "parameter_key": "entra_third_party_app_integrations",
+    "pass_criteria": "When it is disabled for users",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Entra - Third Party App Integrations",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 6,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 35,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": true,
+    "copilot_relevance": "Global Admin is the account with the highest privilages. Limiting and securing these accounts prevents unauthorized configurations or access to Copilot settings.",
+    "display_name": "Global Administrator Accounts",
+    "domain": "identity_access",
+    "expected_output": "List of Global admins with Type(User/Service Princpal), Display Name, UPN and object ID",
+    "fail_criteria": "When tenant has less than 2 or more then 5 global admins",
+    "graph_endpoint": "",
+    "parameter_key": "global_administrator_accounts",
+    "pass_criteria": "When tenant has more than 2 or less then 5 global admins",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Global Administrator Accounts",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 2,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 33,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Guest invite settings control who can invite external users, impacting Copilot’s access and security in collaborative environments.",
+    "display_name": "Guest Invite Settings",
+    "domain": "identity_access",
+    "expected_output": "",
+    "fail_criteria": "Anyone in the organization can invite guest users including guests and non-admins] ,Member users and users assigned to specific admin roles can invite guest users including guests with member permissions",
+    "graph_endpoint": "",
+    "parameter_key": "guest_invite_settings",
+    "pass_criteria": "When it is set to No one in the organization can invite guest users including admins (most restrictive), Only users assigned to specific admin roles can invite guest users",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Guest Invite Settings",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 5,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 39,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Monitoring guest users ensures that only authorized individuals have access, reducing potential data exposure through Copilot.",
+    "display_name": "Guest users count",
+    "domain": "identity_access",
+    "expected_output": "List and number of Guest users(Display name , Username, Mail ID , ID)",
+    "fail_criteria": "When the ratio of guest accounts to total accounts is more than 15%",
+    "graph_endpoint": "",
+    "parameter_key": "guest_users_count",
+    "pass_criteria": "When the ratio of guest accounts to total accounts is less than 15%",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Guest users count",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 3,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 40,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": false,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "Restricted Access To Microsoft Entra Admin Centre",
+    "domain": "identity_access",
+    "expected_output": "To see its enabled or disabled",
+    "fail_criteria": "Non-Admin Users have access to Microsoft Entra Admin Centre",
+    "graph_endpoint": "",
+    "parameter_key": "restricted_access_to_microsoft_entra_admin_centre",
+    "pass_criteria": "Non-Admin Users should not have access to Microsoft Entra Admin Centre",
+    "portal_mapping": "",
+    "powershell_mapping": "",
+    "scoring_weight": 1.0,
+    "severity": "info",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 17,
+        "sheet": "Parameters"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": true,
+    "copilot_relevance": "No Direct Integration",
+    "display_name": "Self-Service Password Reset Authentication Method",
+    "domain": "identity_access",
+    "expected_output": "To see how many and what methods registered",
+    "fail_criteria": "No methods enabled",
+    "graph_endpoint": "",
+    "parameter_key": "self_service_password_reset_authentication_method",
+    "pass_criteria": "Enabled to see how many methods registered",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Password Reset --> Properties",
+    "powershell_mapping": "",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 18,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 12,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Proper management ensures that only authorized users can access data processed by Copilot",
+    "display_name": "Tenant Collaboration Invitations",
+    "domain": "identity_access",
+    "expected_output": "Setting configuration(AllowInvitesFrom)",
+    "fail_criteria": "When it is set to (Allow invitations to be sent to any domain )",
+    "graph_endpoint": "",
+    "parameter_key": "tenant_collaboration_invitations",
+    "pass_criteria": "When it is set to (Allow invitations only to the specified domain, Deny invitations to the specified domains)",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Tenant Collaboration Invitations",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 7,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 36,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "portal",
+    "collector_type": "portal",
+    "copilot_blocker": false,
+    "copilot_relevance": "Security by limiting access to only consent for approved application data ensures data protection.",
+    "display_name": "User Consent For Applications",
+    "domain": "identity_access",
+    "expected_output": "Screenshot of User consent for application setting",
+    "fail_criteria": "When it is set to Users can consent",
+    "graph_endpoint": "",
+    "parameter_key": "user_consent_for_applications",
+    "pass_criteria": "When it is not set to Users can consent",
+    "portal_mapping": "On the Admin portal , Admin Centers --> Identity --> Entra ID --> Enterprise apps --> Consent and Permissions --> User Consent Settings",
+    "powershell_mapping": "",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 14,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 10,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "If user dat is not correctly configured, copilot can provide irrevelent or wrong information.",
+    "display_name": "User Information",
+    "domain": "identity_access",
+    "expected_output": "List of all users and their detailed information",
+    "fail_criteria": "When the user information is not configured for all users",
+    "graph_endpoint": "",
+    "parameter_key": "user_information",
+    "pass_criteria": "When the user information is complete for all users.",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "User Information",
+    "scoring_weight": 2.0,
+    "severity": "low",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 4,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 37,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Enforcing MFA enhances security for Copilot access.",
+    "display_name": "Users without MFA",
+    "domain": "identity_access",
+    "expected_output": "List of Users and MFA methods enrolled (UserPrincipalName, AuthMethodTypes)",
+    "fail_criteria": "When MFA is not configured for some capable user",
+    "graph_endpoint": "",
+    "parameter_key": "users_without_mfa",
+    "pass_criteria": "When MFA is enabled for all the capable users",
+    "portal_mapping": "On the Admin portal, Admin Centers -> Identity --> Authentication Methods --> User Registration Details --> Download Export",
+    "powershell_mapping": "Users without MFA",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 11,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 14,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Entra ID",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Inactive Microsoft 365 groups can retain data that Copilot may surface. Expiration policies reduce stale collaboration data exposure.",
+    "display_name": "Auto-expiration policy for M365 Groups",
+    "domain": "security",
+    "expected_output": "Auto-expiration policy for inactive Microsoft 365 groups is configured",
+    "fail_criteria": "Auto-expiration policy for inactive M365 groups is not configured",
+    "graph_endpoint": "",
+    "parameter_key": "auto_expiration_policy_for_inactive_m365_groups",
+    "pass_criteria": "Auto-expiration policy for inactive M365 groups is configured",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Auto-expiration policy for M365 Groups",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "Entra ID",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Expiring anonymous links limits long-lived content exposure that Copilot could otherwise index or surface.",
+    "display_name": "Expiration Policy for Anyone links",
+    "domain": "security",
+    "expected_output": "Anyone links have an expiration policy configured",
+    "fail_criteria": "Anyone links do not expire or exceed the approved duration",
+    "graph_endpoint": "",
+    "parameter_key": "expiration_policy_for_anyone_links",
+    "pass_criteria": "Anyone links expire within the approved duration",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Expiration Policy for Anyone links",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "SharePoint",
+    "warning_threshold": ""
+  },
+  {
+    "category": "SharePoint Online",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "Anyone links with broad permissions can expose SharePoint content that Copilot may index or surface to unintended users.",
+    "display_name": "Permission Settings for anyone links",
+    "domain": "security",
+    "expected_output": "Anyone links are disabled or restricted to least privilege permissions",
+    "fail_criteria": "Anyone links allow edit or overly permissive access",
+    "graph_endpoint": "",
+    "parameter_key": "permission_setting_for_anyone_links",
+    "pass_criteria": "Anyone links are disabled or restricted to view-only least privilege access",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Permission Settings for anyone links",
+    "scoring_weight": 5.0,
+    "severity": "critical",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "SharePoint",
+    "warning_threshold": ""
+  },
+  {
+    "category": "Microsoft Teams",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "External guest owners can influence Teams content and access boundaries that Copilot may use for summaries and responses.",
+    "display_name": "Teams with external guest as owner",
+    "domain": "collaboration",
+    "expected_output": "No Teams have an external guest assigned as owner",
+    "fail_criteria": "One or more Teams have external guests as owners",
+    "graph_endpoint": "",
+    "parameter_key": "teams_with_external_guest_as_owner",
+    "pass_criteria": "No Teams have external guests as owners",
+    "portal_mapping": "Using Script",
+    "powershell_mapping": "Teams with external guest as owner",
+    "scoring_weight": 4.0,
+    "severity": "high",
+    "source_refs": [
+      {
+        "file": "CRA report template",
+        "row": null,
+        "sheet": "65-parameter template"
+      }
+    ],
+    "technology": "Microsoft Teams",
+    "warning_threshold": ""
+  },
+  {
+    "category": "M365",
+    "collection_method": "powershell",
+    "collector_type": "powershell",
+    "copilot_blocker": false,
+    "copilot_relevance": "No relation",
+    "display_name": "Customer Lockbox",
+    "domain": "unclassified",
+    "expected_output": "We can see if enabled or disabled",
+    "fail_criteria": "Microsoft support staff can access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed",
+    "graph_endpoint": "",
+    "parameter_key": "customer_lockbox",
+    "pass_criteria": "Microsoft support staff cannot access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed",
+    "portal_mapping": "On the Azure portal search for customer lockbox --> Administration",
+    "powershell_mapping": "Customer Lockbox",
+    "scoring_weight": 3.0,
+    "severity": "medium",
+    "source_refs": [
+      {
+        "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
+        "row": 30,
+        "sheet": "Parameters"
+      },
+      {
+        "file": "CRA parameters and how to get them(1) (1) 2.xlsx",
+        "row": 15,
+        "sheet": "Sheet1"
+      }
+    ],
+    "technology": "M365",
+    "warning_threshold": ""
+  }
+]

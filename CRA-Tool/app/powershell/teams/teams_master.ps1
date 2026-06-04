@@ -103,11 +103,53 @@ try {
 }
 Export-CraExpectedCsv $thirdPartyEvidence $out "third_party_apps_allowed.csv" $files "Get-CsTeamsAppPermissionPolicy"
 
-$copilotEvidence = @([pscustomobject]@{
-  status = "not_collected"
-  value = "Copilot app integration requires Teams app policy/application inventory command support in the MicrosoftTeams module for this tenant."
-  evidence_source = "Teams app policy inventory"
-})
-Export-CraExpectedCsv $copilotEvidence $out "copilot_integration_enabled.csv" $files "Teams app policy inventory"
+try {
+  $copilotApps = @(Get-TeamsApp -DisplayName "Copilot" -ErrorAction Stop)
+  $setupPolicies = @(Get-CsTeamsAppSetupPolicy -ErrorAction Stop | Select-Object Identity,AllowUserPinning,PinnedAppBarApps,PinnedMessageBarApps,AppPresetList)
+  $permissionPolicies = @(Get-CsTeamsAppPermissionPolicy -ErrorAction Stop | Select-Object Identity,DefaultCatalogAppsType,GlobalCatalogAppsType,PrivateCatalogAppsType,DefaultCatalogApps,GlobalCatalogApps,PrivateCatalogApps)
+  $copilotEvidence = foreach ($policy in $permissionPolicies) {
+    $allowsMicrosoftApps = $policy.DefaultCatalogAppsType -ne "AllowedAppList" -or @($policy.DefaultCatalogApps).Count -gt 0
+    [pscustomobject]@{
+      Identity = $policy.Identity
+      CopilotAppMatches = @($copilotApps).Count
+      DefaultCatalogAppsType = $policy.DefaultCatalogAppsType
+      GlobalCatalogAppsType = $policy.GlobalCatalogAppsType
+      PrivateCatalogAppsType = $policy.PrivateCatalogAppsType
+      SetupPolicyCount = @($setupPolicies).Count
+      AllowsMicrosoftApps = $allowsMicrosoftApps
+      status = if (@($copilotApps).Count -gt 0 -and $allowsMicrosoftApps) { "pass" } else { "fail" }
+      value = "CopilotAppMatches=$(@($copilotApps).Count);DefaultCatalogAppsType=$($policy.DefaultCatalogAppsType);AllowsMicrosoftApps=$allowsMicrosoftApps"
+      evidence_source = "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
+    }
+  }
+  if (-not $copilotEvidence -or @($copilotEvidence).Count -eq 0) {
+    $copilotEvidence = @([pscustomobject]@{
+      Identity = ""
+      CopilotAppMatches = @($copilotApps).Count
+      DefaultCatalogAppsType = ""
+      GlobalCatalogAppsType = ""
+      PrivateCatalogAppsType = ""
+      SetupPolicyCount = @($setupPolicies).Count
+      AllowsMicrosoftApps = $false
+      status = if (@($copilotApps).Count -gt 0) { "pass" } else { "fail" }
+      value = "CopilotAppMatches=$(@($copilotApps).Count);No app permission policies returned"
+      evidence_source = "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
+    })
+  }
+} catch {
+  $copilotEvidence = @([pscustomobject]@{
+    Identity = ""
+    CopilotAppMatches = ""
+    DefaultCatalogAppsType = ""
+    GlobalCatalogAppsType = ""
+    PrivateCatalogAppsType = ""
+    SetupPolicyCount = ""
+    AllowsMicrosoftApps = ""
+    status = "not_collected"
+    value = $_.Exception.Message
+    evidence_source = "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
+  })
+}
+Export-CraExpectedCsv $copilotEvidence $out "copilot_integration_enabled.csv" $files "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
 
 Write-CraContract -CollectorName $CollectorName -TenantId $TenantId -ParameterKey $ParameterKey -GeneratedFiles $files.ToArray()

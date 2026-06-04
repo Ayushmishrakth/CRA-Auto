@@ -69,6 +69,22 @@ $calendarRows = @($sharingPolicies) + @(
 )
 $path = Join-Path $out "full_calendar_schedules_able_to_be_shared_externally.csv"; Export-CraCsv $calendarRows $path; $files.Add($path)
 
+try {
+  $lockbox = Get-OrganizationConfig | Select-Object Identity,CustomerLockBoxEnabled
+  $lockboxEvidence = $lockbox | ForEach-Object {
+    [pscustomobject]@{
+      Identity = $_.Identity
+      CustomerLockBoxEnabled = $_.CustomerLockBoxEnabled
+      status = if ($_.CustomerLockBoxEnabled -eq $true) { "pass" } else { "fail" }
+      value = "CustomerLockBoxEnabled=$($_.CustomerLockBoxEnabled)"
+      evidence_source = "Get-OrganizationConfig"
+    }
+  }
+} catch {
+  $lockboxEvidence = @([pscustomobject]@{ Identity = ""; CustomerLockBoxEnabled = ""; status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-OrganizationConfig" })
+}
+Export-CraExpectedCsv $lockboxEvidence $out "customer_lockbox.csv" $files "Get-OrganizationConfig"
+
 $mailboxStatusEvidence = $mailboxes | Select-Object ExternalDirectoryObjectId,DisplayName,UserPrincipalName,RecipientTypeDetails,@{Name="status";Expression={ if ($_.RecipientTypeDetails) { "pass" } else { "fail" } }},@{Name="value";Expression={ "RecipientTypeDetails=$($_.RecipientTypeDetails)" }},@{Name="evidence_source";Expression={ "Get-EXOMailbox" }}
 Export-CraExpectedCsv $mailboxStatusEvidence $out "mailboxes_status_active_inactive.csv" $files "Get-EXOMailbox"
 

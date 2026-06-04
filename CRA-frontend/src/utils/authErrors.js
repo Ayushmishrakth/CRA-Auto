@@ -1,3 +1,5 @@
+import { safeStringify } from "./safeStringify";
+
 /**
  * Normalize API and network errors for display in the UI.
  */
@@ -22,7 +24,7 @@ export function formatApiError(error) {
     return detail;
   }
   if (Array.isArray(detail)) {
-    return detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+    return detail.map((d) => d.msg || safeStringify(d, 0)).join("; ");
   }
   return error.response.statusText || `Error ${error.response.status}`;
 }

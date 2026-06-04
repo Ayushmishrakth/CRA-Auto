@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { safeStringify } from "../../utils/safeStringify";
 
 const PAGE_SIZE = 8;
 
 function displayValue(value) {
   if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "object") return safeStringify(value, 0);
   return String(value);
 }
 

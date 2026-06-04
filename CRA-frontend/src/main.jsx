@@ -22,7 +22,9 @@ async function bootstrap() {
     }
   }
 
-  ReactDOM.createRoot(document.getElementById("root")).render(
+  const root = document.getElementById("root");
+  if (!root) throw new Error("CRA root element was not found.");
+  ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
@@ -31,19 +33,28 @@ async function bootstrap() {
 
 bootstrap().catch((err) => {
   console.error("[CRA] Bootstrap failed:", err);
+  if (typeof document === "undefined") return;
   const root = document.getElementById("root");
   if (root) {
-    root.innerHTML = `
-      <div class="session-recovery">
-        <div class="panel session-panel">
+    ReactDOM.createRoot(root).render(
+      <div className="session-recovery">
+        <div className="panel session-panel">
           <h1>CRA startup failed</h1>
           <p>The application could not initialize the Microsoft sign-in session.</p>
-          <pre class="error-details">${String(err?.message || err)}</pre>
-          <div class="modal-actions">
-            <button class="primary-action" onclick="window.location.href='/login'">Sign in again</button>
+          <pre className="error-details">{String(err?.message || err)}</pre>
+          <div className="modal-actions">
+            <button
+              className="primary-action"
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.href = "/login";
+              }}
+            >
+              Sign in again
+            </button>
           </div>
         </div>
       </div>
-    `;
+    );
   }
 });

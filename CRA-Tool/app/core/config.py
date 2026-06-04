@@ -47,6 +47,17 @@ class Settings(BaseSettings):
         default=None,
         description="Optional path to the master CRA Word report template",
     )
+    rate_limit_requests_per_minute: int = Field(
+        default=180,
+        ge=1,
+        le=10000,
+        description="Maximum HTTP requests per client IP per rolling minute.",
+    )
+    max_parameter_workbook_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        ge=1024,
+        description="Maximum uploaded CRA parameter workbook size in bytes.",
+    )
 
     # --- CORS (CRA React frontend) ---
     cors_origins: List[str] = Field(

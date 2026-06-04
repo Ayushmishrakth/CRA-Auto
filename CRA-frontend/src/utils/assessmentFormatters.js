@@ -1,4 +1,5 @@
 import { DOMAIN_KEYS, DOMAIN_LABELS } from "./assessmentTypes";
+import { safeStringify } from "./safeStringify";
 
 export function unwrapApiData(response) {
   return response?.data?.data ?? response?.data ?? response;
@@ -59,7 +60,7 @@ export function normalizeFinding(raw = {}) {
   const rawValue =
     typeof raw.raw_value === "string"
       ? raw.raw_value
-      : JSON.stringify(raw.raw_value ?? {}, null, 2);
+      : safeStringify(raw.raw_value ?? {});
   return {
     ...raw,
     id: String(raw.id ?? `${raw.parameter_id}-${raw.status}`),
@@ -71,7 +72,7 @@ export function normalizeFinding(raw = {}) {
     actual_value: raw.actual_value ?? rawObject.actual_value ?? rawObject.evidence?.actual_value,
     expected_value: raw.expected_value ?? rawObject.expected_value,
     collector_name: raw.collector_name ?? rawObject.collector_name,
-    raw_evidence_json: JSON.stringify(raw.raw_evidence_json ?? rawObject.evidence ?? rawObject.raw_response ?? {}, null, 2),
+    raw_evidence_json: safeStringify(raw.raw_evidence_json ?? rawObject.evidence ?? rawObject.raw_response ?? {}),
     collection_timestamp: raw.collection_timestamp ?? raw.collected_at,
     recommendation:
       raw.recommendation ??
@@ -140,9 +141,15 @@ export function makeTimelineEvent(event) {
     "collector.started": "Collector started",
     "collector.completed": "Collector completed",
     "collector.failed": "Collector failed",
+    "collector.stdout": "Collector output received",
+    "collector.warning": "Collector warning",
+    "collector.timeout": "Collector timed out",
+    "csv.detected": "Evidence file detected",
     "finding.generated": "Finding generated",
     "scoring.completed": "Scoring completed",
     "recommendation.generated": "Recommendation generated",
+    "report.generated": "Report generated",
+    "assessment.collectors_incomplete": "Collection incomplete",
     "assessment.completed": "Scoring complete",
     "assessment.failed": "Assessment failed",
   };

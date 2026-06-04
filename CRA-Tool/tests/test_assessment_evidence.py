@@ -138,8 +138,9 @@ async def test_assessment_evidence_endpoint_returns_persisted_artifact_and_findi
     row = next(item for item in data["parameters"] if item["parameter_key"] == "global_administrator_accounts")
     assert row["status"] == "PASS"
     assert row["actual_value"] == 3
-    assert row["artifact_id"]
-    assert row["evidence"]["evidence"]["members"][0]["displayName"] == "Admin One"
+    assert row["artifact_id"] is None
+    assert row["collector"] is None
+    assert row["evidence"]["members"][0]["displayName"] == "Admin One"
     assert row["recommendation"]["recommendation_text"] == "Maintain the current administrator count."
 
 
@@ -220,7 +221,7 @@ async def test_assessment_evidence_surfaces_failed_artifact_without_finding(
     assert failures == [
         {
             "parameter": "external_storage_providers_in_owa",
-            "collector": "powershell.external_storage_providers_in_owa",
+            "collector": None,
             "status": "FAILED",
             "error": "ExchangeOnlineManagement module missing",
         }

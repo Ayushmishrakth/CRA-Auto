@@ -43,6 +43,22 @@ RUNTIME_STAGES = {
     "completed": ("completed", 100.0),
 }
 
+POWERSHELL_REQUIRED_PARAMETERS = {
+    "copilot_integration_enabled",
+    "customer_lockbox",
+    "external_storage_providers_in_owa",
+    "full_calendar_schedules_able_to_be_shared_externally",
+    "guest_access_enabled_disabled",
+    "meeting_policies_configuration",
+    "meeting_recording_retention_policies",
+    "meeting_transcription_enabled",
+    "teams_channel_email_addresses",
+    "teams_file_storage_option",
+    "teams_lobby_bypass",
+    "teams_meeting_chat",
+    "third_party_apps_allowed",
+}
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -128,6 +144,8 @@ def _select_runtime(
     manifest_entry = manifest_entry or {}
     supports_powershell = bool(manifest_entry.get("supports_powershell"))
     supports_graph = bool(manifest_entry.get("supports_graph"))
+    if parameter_key in POWERSHELL_REQUIRED_PARAMETERS and supports_powershell:
+        return "powershell"
     if parameter_key in GRAPH_COLLECTORS:
         return "graph"
     if supports_powershell and not supports_graph:

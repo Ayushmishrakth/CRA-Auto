@@ -25,10 +25,14 @@ export default class AppErrorBoundary extends Component {
           </p>
           <pre className="error-details">{this.state.error?.message || "Unknown UI error"}</pre>
           <div className="modal-actions">
-            <button type="button" className="btn-secondary inline" onClick={() => window.location.reload()}>
+            <button type="button" className="btn-secondary inline" onClick={() => {
+              if (typeof window !== "undefined") window.location.reload();
+            }}>
               Refresh
             </button>
-            <button type="button" className="primary-action" onClick={() => { window.location.href = "/dashboard"; }}>
+            <button type="button" className="primary-action" onClick={() => {
+              if (typeof window !== "undefined") window.location.href = "/dashboard";
+            }}>
               Dashboard
             </button>
           </div>

@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAssessments } from "../context/AssessmentContext";
 import { extractApiError } from "../utils/apiErrors";
 import { formatDateTime, formatDuration, numberOrZero } from "../utils/assessmentFormatters";
+import { safeStringify } from "../utils/safeStringify";
 import {
   businessDomain,
   businessName,
@@ -88,7 +89,7 @@ function DetailDrawer({ item, onClose }) {
       </details>
       <details className="drawer-section">
         <summary>Raw Data</summary>
-        <pre className="evidence-json">{JSON.stringify(rawData, null, 2)}</pre>
+        <pre className="evidence-json">{safeStringify(rawData)}</pre>
       </details>
     </aside>
   );
@@ -197,7 +198,7 @@ export default function AssessmentDetailPage() {
       <section className="metric-grid dashboard-metrics">
         <article className="metric-card"><span>Passed Controls</span><strong>{passed}</strong></article>
         <article className="metric-card"><span>Failed Controls</span><strong>{failed}</strong></article>
-        <article className="metric-card"><span>Collection Issues</span><strong>{coverage.failed ?? failedCollectors}</strong></article>
+        <article className="metric-card"><span>Collection Issues</span><strong>{failedCollectors}</strong></article>
         <article className="metric-card"><span>Licensing Required</span><strong>{coverage.licensing_required ?? 0}</strong></article>
         <article className="metric-card"><span>Manual Validation</span><strong>{coverage.manual_validation ?? 0}</strong></article>
         <article className="metric-card"><span>Coverage</span><strong>{visibleCoverage}%</strong></article>
@@ -245,37 +246,47 @@ export default function AssessmentDetailPage() {
             ))}
           </div>
         </div>
-        <div className="control-grid">
-          {visibleRows.map((item) => (
-            <article className="control-card" key={item.parameter_key}>
-              <div className="control-card-top">
-                <div>
-                  <h3>{businessName(item)}</h3>
-                  <p>{businessDomain(item)}</p>
-                </div>
-                <span className={`status-pill tone-${statusTone(item.status)}`}>{executiveStatus(item.status)}</span>
-              </div>
-              <dl>
-                <dt>Found</dt>
-                <dd>{foundText(item)}</dd>
-                <dt>Expected</dt>
-                <dd>{expectedText(item)}</dd>
-                <dt>Severity</dt>
-                <dd>{item.severity || "info"}</dd>
-                <dt>Business Impact</dt>
-                <dd>{item.recommendation?.impact || "This control affects Copilot readiness, data exposure, or governance posture."}</dd>
-                <dt>Recommendation</dt>
-                <dd>{item.recommendation?.recommendation_text || "Review and remediate this control according to Microsoft 365 readiness guidance."}</dd>
-              </dl>
-              <button type="button" className="btn-secondary inline" onClick={() => setSelected(item)}>
-                View Details
-              </button>
-            </article>
-          ))}
-          {!rows.length && <p className="muted-text">No assessment results are available yet.</p>}
-          {rows.length > 0 && visibleRows.length === 0 && (
-            <p className="muted-text">No controls match this filter.</p>
-          )}
+        <div className="table-wrap executive-results-wrap">
+          <table className="data-table executive-results-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Service</th>
+                <th>Status</th>
+                <th>Actual Result</th>
+                <th>Expected Result</th>
+                <th>Severity</th>
+                <th>Business Impact</th>
+                <th>Recommendation</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((item) => (
+                <tr key={item.parameter_key}>
+                  <td><strong>{businessName(item)}</strong></td>
+                  <td>{businessDomain(item)}</td>
+                  <td><span className={`status-pill tone-${statusTone(item.status)}`}>{executiveStatus(item.status)}</span></td>
+                  <td>{foundText(item)}</td>
+                  <td>{expectedText(item)}</td>
+                  <td>{item.severity || "info"}</td>
+                  <td>{item.recommendation?.impact || "This control affects Copilot readiness, data exposure, or governance posture."}</td>
+                  <td>{item.recommendation?.recommendation_text || "Review and remediate this control according to Microsoft 365 readiness guidance."}</td>
+                  <td>
+                    <button type="button" className="btn-secondary inline" onClick={() => setSelected(item)}>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length && (
+                <tr><td colSpan="9" className="muted-text">No assessment results are available yet.</td></tr>
+              )}
+              {rows.length > 0 && visibleRows.length === 0 && (
+                <tr><td colSpan="9" className="muted-text">No controls match this filter.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
 

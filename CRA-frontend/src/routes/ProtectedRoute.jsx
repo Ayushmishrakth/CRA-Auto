@@ -30,6 +30,8 @@ export default function ProtectedRoute({ children }) {
       return undefined;
     }
 
+    if (typeof window === "undefined") return undefined;
+
     const timeout = window.setTimeout(() => {
       setSessionTimedOut(true);
       setError(

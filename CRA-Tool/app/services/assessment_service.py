@@ -428,18 +428,18 @@ def _failure_details(artifact: AssessmentArtifact | None) -> dict:
     raw_evidence = artifact.raw_evidence_json if isinstance(artifact.raw_evidence_json, dict) else {}
     nested = raw_evidence.get("failure_details") if isinstance(raw_evidence.get("failure_details"), dict) else {}
     details = {**nested, **payload}
-    powershell_output = details.get("powershell_output")
-    if not isinstance(powershell_output, dict):
-        powershell_output = {
-            "stdout": artifact.stdout,
-            "stderr": artifact.stderr,
-        }
     return {
         "collector_error": details.get("collector_error") or details.get("error") or artifact.stderr,
         "exception_type": details.get("exception_type"),
         "exception_message": details.get("exception_message") or details.get("error") or artifact.stderr,
-        "powershell_output": powershell_output,
-        "graph_error": details.get("graph_error"),
+        "graph_error": (
+            {
+                "code": details["graph_error"].get("code"),
+                "message": details["graph_error"].get("message"),
+            }
+            if isinstance(details.get("graph_error"), dict)
+            else None
+        ),
     }
 
 
@@ -469,27 +469,24 @@ def _failure_reason(
 
 def _collection_method(parameter: dict, collector: dict, artifact: AssessmentArtifact | None) -> str:
     if artifact and artifact.source_script:
-        return f"PowerShell: {artifact.source_script}"
+        return "PowerShell"
     if artifact and artifact.graph_endpoint:
-        return f"Microsoft Graph: {artifact.graph_endpoint}"
+        return "Microsoft Graph"
     return (
-        parameter.get("collection_method")
-        or collector.get("collector_type")
-        or collector.get("runtime")
-        or "unknown"
+        "Microsoft Graph" if parameter.get("graph_endpoint") else
+        "PowerShell" if parameter.get("powershell_mapping") else
+        "Automated"
     )
 
 
 def _evidence_source(artifact: AssessmentArtifact | None, collector: dict) -> str | None:
     if artifact is None:
-        return collector.get("graph_endpoint") or collector.get("collector_name")
-    return (
-        artifact.graph_endpoint
-        or artifact.source_csv
-        or artifact.source_script
-        or artifact.collector_name
-        or collector.get("collector_name")
-    )
+        return None
+    if artifact.graph_endpoint:
+        return "Microsoft Graph"
+    if artifact.source_csv or artifact.source_script:
+        return "PowerShell"
+    return "Collector"
 
 
 def _recommendation_payload(item: AssessmentRecommendation | None) -> dict | None:
@@ -542,16 +539,15 @@ def _evidence_json(artifact: AssessmentArtifact | None, finding: AssessmentFindi
     if artifact and artifact.raw_evidence_json is not None:
         if not isinstance(artifact.raw_evidence_json, dict):
             return artifact.raw_evidence_json
-        return {
-            "graph_endpoint": artifact.graph_endpoint,
-            **artifact.raw_evidence_json,
+        return artifact.raw_evidence_json.get("evidence") or {
+            key: value
+            for key, value in artifact.raw_evidence_json.items()
+            if key not in {"raw_response", "graph_endpoint", "collector_contract", "failure_details"}
         }
     raw = finding.raw_value if finding else {}
     if isinstance(raw, dict):
         return {
-            "graph_endpoint": raw.get("graph_endpoint"),
             "evidence": raw.get("evidence"),
-            "raw_response": raw.get("raw_response"),
         }
     return None
 
@@ -629,11 +625,7 @@ async def get_evidence(
             "parameter_key": key,
             "parameter_name": parameter.get("display_name") or key,
             "service": _service_for_parameter(key, parameter),
-            "collector": (
-                artifact.collector_name
-                if artifact and artifact.collector_name
-                else collector.get("collector_name")
-            ),
+            "collector": None,
             "status": status,
             "collector_status": status,
             "failure_reason": failure_reason,
@@ -647,8 +639,8 @@ async def get_evidence(
             "finding": finding.evaluated_value if finding else None,
             "recommendation": _recommendation_payload(recommendation_by_key.get(key)),
             "evidence": _evidence_json(artifact, finding),
-            "artifact_json": artifact.payload if artifact else None,
-            "artifact_id": artifact.id if artifact else None,
+            "artifact_json": None,
+            "artifact_id": None,
             "collected_at": (
                 artifact.collection_timestamp
                 if artifact and artifact.collection_timestamp
@@ -696,7 +688,7 @@ async def get_assessment_failures(
             continue
         failures.append({
             "parameter": item["parameter_key"],
-            "collector": item.get("collector"),
+            "collector": None,
             "status": item["status"],
             "error": item.get("failure_reason") or item.get("reason"),
         })

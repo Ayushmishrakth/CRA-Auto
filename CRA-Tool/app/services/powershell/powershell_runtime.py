@@ -44,10 +44,13 @@ class PowerShellExecutionEngine:
 
     def _timeout_seconds(self, collector: dict[str, Any]) -> float:
         configured = float(collector.get("timeout_seconds") or self.timeout_seconds)
+        raw_cap = os.getenv("CRA_COLLECTOR_TIMEOUT_SECONDS")
+        if raw_cap is None:
+            return max(1.0, configured)
         try:
-            cap = float(os.getenv("CRA_COLLECTOR_TIMEOUT_SECONDS", self.timeout_seconds))
+            cap = float(raw_cap)
         except ValueError:
-            cap = self.timeout_seconds
+            return max(1.0, configured)
         return max(1.0, min(configured, cap))
 
     @staticmethod

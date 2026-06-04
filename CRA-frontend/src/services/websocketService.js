@@ -9,6 +9,10 @@ function getWsBaseUrl() {
   return base.replace(/^http/, "ws");
 }
 
+function browserTimers() {
+  return typeof window === "undefined" ? null : window;
+}
+
 export class AssessmentWebSocket {
   constructor(path, handlers = {}) {
     this.path = path;
@@ -21,6 +25,10 @@ export class AssessmentWebSocket {
   }
 
   connect() {
+    if (typeof WebSocket === "undefined") {
+      this.handlers.onStatus?.("error");
+      return;
+    }
     this.closedByUser = false;
     const token = tokenStorage.getAccessToken();
     const separator = this.path.includes("?") ? "&" : "?";
@@ -59,15 +67,19 @@ export class AssessmentWebSocket {
   }
 
   scheduleReconnect() {
-    window.clearTimeout(this.reconnectTimer);
+    const timers = browserTimers();
+    if (!timers) return;
+    timers.clearTimeout(this.reconnectTimer);
     const delay = Math.min(DEFAULT_RECONNECT_MS * 2 ** this.reconnectAttempts, 15000);
     this.reconnectAttempts += 1;
-    this.reconnectTimer = window.setTimeout(() => this.connect(), delay);
+    this.reconnectTimer = timers.setTimeout(() => this.connect(), delay);
   }
 
   startHeartbeat() {
     this.stopHeartbeat();
-    this.heartbeatTimer = window.setInterval(() => {
+    const timers = browserTimers();
+    if (!timers) return;
+    this.heartbeatTimer = timers.setInterval(() => {
       if (this.socket?.readyState === WebSocket.OPEN) {
         this.socket.send(JSON.stringify({ type: "heartbeat", timestamp: Date.now() }));
       }
@@ -75,12 +87,12 @@ export class AssessmentWebSocket {
   }
 
   stopHeartbeat() {
-    window.clearInterval(this.heartbeatTimer);
+    browserTimers()?.clearInterval(this.heartbeatTimer);
   }
 
   disconnect() {
     this.closedByUser = true;
-    window.clearTimeout(this.reconnectTimer);
+    browserTimers()?.clearTimeout(this.reconnectTimer);
     this.stopHeartbeat();
     this.socket?.close();
   }

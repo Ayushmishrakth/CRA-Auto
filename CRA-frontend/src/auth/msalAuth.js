@@ -13,7 +13,9 @@ function decodeJwtPayload(token) {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
-    return JSON.parse(window.atob(padded));
+    const decode = typeof window === "undefined" ? globalThis.atob : window.atob;
+    if (typeof decode !== "function") throw new Error("Base64 decoder is not available.");
+    return JSON.parse(decode(padded));
   } catch {
     throw new Error("Microsoft Graph access token payload could not be decoded.");
   }

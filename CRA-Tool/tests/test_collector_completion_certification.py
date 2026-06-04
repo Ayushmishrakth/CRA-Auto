@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from app.services.graph_cra_collector_service import GRAPH_COLLECTORS
-from app.services.runtime_assessment_service import _select_runtime
+from app.services.runtime_assessment_service import POWERSHELL_REQUIRED_PARAMETERS, _select_runtime
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,11 +67,24 @@ def test_python_graph_collectors_route_to_graph_first():
     parameters = _load_json("app/config/assessment_registry/parameters.json")
     official_keys = {item["parameter_key"] for item in parameters}
 
-    for key in sorted(official_keys & set(GRAPH_COLLECTORS)):
+    graph_first_keys = official_keys & set(GRAPH_COLLECTORS) - POWERSHELL_REQUIRED_PARAMETERS
+    for key in sorted(graph_first_keys):
         assert _select_runtime(
             parameter_key=key,
             manifest_entry=manifest.get(key),
         ) == "graph"
+
+
+def test_powershell_required_parameters_do_not_route_to_graph_shims():
+    manifest = {
+        item["parameter_key"]: item
+        for item in _load_json("app/config/collector_manifest.json")
+    }
+    for key in sorted(POWERSHELL_REQUIRED_PARAMETERS):
+        assert _select_runtime(
+            parameter_key=key,
+            manifest_entry=manifest.get(key),
+        ) == "powershell"
 
 
 def test_no_collector_notimplemented_errors_in_backend_app():

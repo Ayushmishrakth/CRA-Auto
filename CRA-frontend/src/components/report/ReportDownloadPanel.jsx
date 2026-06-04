@@ -7,16 +7,20 @@ const MIME_TYPES = {
 };
 
 async function saveReport(assessmentId, reportType) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
   const data = await downloadAssessmentReport(assessmentId, reportType);
   const blob = new Blob([data], { type: MIME_TYPES[reportType] });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `copilot-readiness-assessment.${reportType}`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `copilot-readiness-assessment.${reportType}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export default function ReportDownloadPanel({ assessmentId, report = {} }) {

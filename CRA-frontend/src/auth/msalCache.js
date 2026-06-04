@@ -7,6 +7,7 @@ import { tokenStorage } from "../utils/tokenStorage";
 const MSAL_KEY_PREFIXES = ["msal.", "msal", "login.", "server-telemetry"];
 
 function clearStorageByPrefix(storage) {
+  if (!storage) return;
   const keysToRemove = [];
   for (let i = 0; i < storage.length; i++) {
     const key = storage.key(i);
@@ -23,8 +24,8 @@ function clearStorageByPrefix(storage) {
  */
 export async function clearAllAuthCaches(msalInstance) {
   console.info("[CRA] Clearing MSAL + CRA auth caches");
-  clearStorageByPrefix(sessionStorage);
-  clearStorageByPrefix(localStorage);
+  clearStorageByPrefix(typeof sessionStorage === "undefined" ? null : sessionStorage);
+  clearStorageByPrefix(typeof localStorage === "undefined" ? null : localStorage);
   tokenStorage.clear();
 
   if (msalInstance?.clearCache) {

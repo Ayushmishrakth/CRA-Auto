@@ -14,6 +14,33 @@ from app.services.graph_service_principal_service import ensure_service_principa
 from app.services.graph_consent_service import build_admin_consent_url
 
 
+@pytest.fixture(autouse=True)
+def fake_permission_access_validation(monkeypatch: pytest.MonkeyPatch):
+    async def fake_ensure_application_required_resource_access(
+        client,
+        *,
+        application_object_id,
+        required_resource_access,
+    ):
+        application_client_id = (
+            "new-client-id" if application_object_id == "new-object-id" else "application-client-id"
+        )
+        return (
+            {
+                "id": application_object_id,
+                "appId": application_client_id,
+                "requiredResourceAccess": required_resource_access,
+            },
+            None,
+        )
+
+    monkeypatch.setattr(
+        tenant_deployment_service,
+        "ensure_application_required_resource_access",
+        fake_ensure_application_required_resource_access,
+    )
+
+
 class RecordingGraphClient:
     def __init__(self, *, stored_redirect_uris=None):
         self.posts = []
@@ -459,7 +486,7 @@ async def test_deployment_debug_endpoint_returns_persisted_redirect_diagnostics(
     assert data["redirect_uri_expected"] == "http://localhost:3000/tenant/deployment-success"
     assert data["redirect_uri_actual"] == ["http://localhost:3000/tenant/deployment-success"]
     assert data["service_principal_id"] == "service-principal-id"
-    assert data["secret_id"] == "secret-id"
+    assert "secret_id" not in data
     assert data["deployment_status"] == "CONSENT_REQUIRED"
     assert data["deployment_step"] == "CONSENT_GENERATION"
 

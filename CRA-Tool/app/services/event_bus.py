@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.models.assessment_event import AssessmentEvent
+from app.utils.logger import logger
 
 
 def _now() -> datetime:
@@ -94,7 +95,11 @@ async def persist_event(
 
 
 async def publish_event(payload: dict[str, Any]) -> None:
-    encoded = json.dumps(payload, default=_json_default)
+    try:
+        encoded = json.dumps(payload, default=_json_default)
+    except (TypeError, ValueError) as exc:
+        logger.exception("Failed to serialize assessment event payload: %s", exc)
+        raise
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     try:
         await redis.publish(assessment_channel(payload["assessment_id"]), encoded)
@@ -125,7 +130,12 @@ async def emit_event(
     event_payload = event_to_payload(event)
     try:
         await publish_event(event_payload)
-    except Exception:
+    except Exception as exc:
         # Persistence is authoritative; Redis fanout is best-effort for local/dev availability.
-        pass
+        logger.warning(
+            "Assessment event persisted but Redis fanout failed: assessment_id=%s event_type=%s error=%s",
+            assessment_id,
+            event_type,
+            exc,
+        )
     return event_payload

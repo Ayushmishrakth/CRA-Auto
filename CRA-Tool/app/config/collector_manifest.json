@@ -1,26 +1,5 @@
 [
   {
-    "parameter_key": "restricted_access_to_microsoft_entra_admin_center",
-    "domain": "best_practice",
-    "service": "entra",
-    "script": "app/powershell/entra/entra_master.ps1",
-    "output_type": "csv",
-    "output_file": "restricted_access_to_microsoft_entra_admin_center.csv",
-    "parser": "entra_csv_parser",
-    "finding_rule": "restricted_access_to_microsoft_entra_admin_center_rule",
-    "recommendation": "restricted_access_to_microsoft_entra_admin_center",
-    "scoring_weight": 5.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "critical",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
     "parameter_key": "active_inactive_teams",
     "domain": "collaboration",
     "service": "teams",
@@ -98,27 +77,6 @@
       "*"
     ],
     "severity": "medium",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
-    "parameter_key": "checking_sharing_permissions_for_each_sites_on_a_tenant",
-    "domain": "collaboration",
-    "service": "sharepoint",
-    "script": "app/powershell/sharepoint/sharepoint_master.ps1",
-    "output_type": "csv",
-    "output_file": "checking_sharing_permissions_for_each_sites_on_a_tenant.csv",
-    "parser": "sharepoint_csv_parser",
-    "finding_rule": "checking_sharing_permissions_for_each_sites_on_a_tenant_rule",
-    "recommendation": "checking_sharing_permissions_for_each_sites_on_a_tenant",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
     "supports_graph": false,
     "supports_powershell": true,
     "timeout_seconds": 900,
@@ -317,11 +275,11 @@
   {
     "parameter_key": "meeting_recording_retention_policies",
     "domain": "collaboration",
-    "service": "purview",
-    "script": "app/powershell/purview/purview_master.ps1",
+    "service": "teams",
+    "script": "app/powershell/teams/teams_master.ps1",
     "output_type": "csv",
     "output_file": "meeting_recording_retention_policies.csv",
-    "parser": "purview_csv_parser",
+    "parser": "teams_csv_parser",
     "finding_rule": "meeting_recording_retention_policies_rule",
     "recommendation": "meeting_recording_retention_policies",
     "scoring_weight": 3.0,
@@ -525,27 +483,6 @@
     "admin_url": null
   },
   {
-    "parameter_key": "teams_anonymous_users",
-    "domain": "collaboration",
-    "service": "teams",
-    "script": "app/powershell/teams/teams_master.ps1",
-    "output_type": "csv",
-    "output_file": "teams_anonymous_users.csv",
-    "parser": "teams_csv_parser",
-    "finding_rule": "teams_anonymous_users_rule",
-    "recommendation": "teams_anonymous_users",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
     "parameter_key": "teams_channel_email_addresses",
     "domain": "collaboration",
     "service": "exchange",
@@ -560,27 +497,6 @@
       "*"
     ],
     "severity": "low",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
-    "parameter_key": "teams_external_unmanaged_user_communication",
-    "domain": "collaboration",
-    "service": "teams",
-    "script": "app/powershell/teams/teams_master.ps1",
-    "output_type": "csv",
-    "output_file": "teams_external_unmanaged_user_communication.csv",
-    "parser": "teams_csv_parser",
-    "finding_rule": "teams_external_unmanaged_user_communication_rule",
-    "recommendation": "teams_external_unmanaged_user_communication",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
     "supports_graph": false,
     "supports_powershell": true,
     "timeout_seconds": 900,
@@ -882,27 +798,6 @@
     "admin_url": null
   },
   {
-    "parameter_key": "sensitivity_labels_are_applied",
-    "domain": "compliance",
-    "service": "purview",
-    "script": "app/powershell/purview/purview_master.ps1",
-    "output_type": "csv",
-    "output_file": "sensitivity_labels_are_applied.csv",
-    "parser": "purview_csv_parser",
-    "finding_rule": "sensitivity_labels_are_applied_rule",
-    "recommendation": "sensitivity_labels_are_applied",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
     "parameter_key": "days_to_retain_a_deleted_user_s_onedrive",
     "domain": "governance",
     "service": "onedrive",
@@ -1001,27 +896,6 @@
       "*"
     ],
     "severity": "high",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
-    "parameter_key": "assigned_license",
-    "domain": "identity_access",
-    "service": "entra",
-    "script": "app/powershell/entra/entra_master.ps1",
-    "output_type": "csv",
-    "output_file": "assigned_license.csv",
-    "parser": "entra_csv_parser",
-    "finding_rule": "assigned_license_rule",
-    "recommendation": "assigned_license",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
     "supports_graph": false,
     "supports_powershell": true,
     "timeout_seconds": 900,
@@ -1265,27 +1139,6 @@
     "admin_url": null
   },
   {
-    "parameter_key": "non_admin_users_can_register_applications",
-    "domain": "identity_access",
-    "service": "entra",
-    "script": "app/powershell/entra/entra_master.ps1",
-    "output_type": "csv",
-    "output_file": "non_admin_users_can_register_applications.csv",
-    "parser": "entra_csv_parser",
-    "finding_rule": "non_admin_users_can_register_applications_rule",
-    "recommendation": "non_admin_users_can_register_applications",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
     "parameter_key": "restricted_access_to_microsoft_entra_admin_centre",
     "domain": "identity_access",
     "service": "entra",
@@ -1433,27 +1286,6 @@
     "admin_url": null
   },
   {
-    "parameter_key": "device_without_compliance_policy",
-    "domain": "security",
-    "service": "m365",
-    "script": "app/powershell/entra/entra_master.ps1",
-    "output_type": "csv",
-    "output_file": "device_without_compliance_policy.csv",
-    "parser": "m365_csv_parser",
-    "finding_rule": "device_without_compliance_policy_rule",
-    "recommendation": "device_without_compliance_policy",
-    "scoring_weight": 5.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "critical",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
     "parameter_key": "expiration_policy_for_anyone_links",
     "domain": "security",
     "service": "sharepoint",
@@ -1496,27 +1328,6 @@
     "admin_url": null
   },
   {
-    "parameter_key": "sensitive_sharepoint_site_excluded_from_copilot_search",
-    "domain": "security",
-    "service": "sharepoint",
-    "script": "app/powershell/sharepoint/sharepoint_master.ps1",
-    "output_type": "csv",
-    "output_file": "sensitive_sharepoint_site_excluded_from_copilot_search.csv",
-    "parser": "sharepoint_csv_parser",
-    "finding_rule": "sensitive_sharepoint_site_excluded_from_copilot_search_rule",
-    "recommendation": "sensitive_sharepoint_site_excluded_from_copilot_search",
-    "scoring_weight": 5.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "critical",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
     "parameter_key": "teams_with_external_guest_as_owner",
     "domain": "security",
     "service": "teams",
@@ -1540,11 +1351,11 @@
   {
     "parameter_key": "customer_lockbox",
     "domain": "unclassified",
-    "service": "purview",
-    "script": "app/powershell/purview/purview_master.ps1",
+    "service": "exchange",
+    "script": "app/powershell/exchange/exchange_master.ps1",
     "output_type": "csv",
     "output_file": "customer_lockbox.csv",
-    "parser": "purview_csv_parser",
+    "parser": "exchange_csv_parser",
     "finding_rule": "customer_lockbox_rule",
     "recommendation": "customer_lockbox",
     "scoring_weight": 3.0,
@@ -1552,27 +1363,6 @@
       "*"
     ],
     "severity": "medium",
-    "supports_graph": false,
-    "supports_powershell": true,
-    "timeout_seconds": 900,
-    "output_root": "artifacts",
-    "admin_url": null
-  },
-  {
-    "parameter_key": "note_for_purview_if_e5_licenses_are_not_available_all_parameters_will_fail",
-    "domain": "unclassified",
-    "service": "purview",
-    "script": "app/powershell/purview/purview_master.ps1",
-    "output_type": "csv",
-    "output_file": "note_for_purview_if_e5_licenses_are_not_available_all_parameters_will_fail.csv",
-    "parser": "purview_csv_parser",
-    "finding_rule": "note_for_purview_if_e5_licenses_are_not_available_all_parameters_will_fail_rule",
-    "recommendation": "note_for_purview_if_e5_licenses_are_not_available_all_parameters_will_fail",
-    "scoring_weight": 1.0,
-    "evidence_fields": [
-      "*"
-    ],
-    "severity": "info",
     "supports_graph": false,
     "supports_powershell": true,
     "timeout_seconds": 900,

@@ -10,6 +10,11 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner";
 import { getApiErrorMessage } from "../utils/apiErrors";
 
+function deploymentRedirectUri() {
+  const origin = typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
+  return `${origin}/tenant/deployment-success`;
+}
+
 export default function TenantConnectionPage() {
   const { user, getTenantDeploymentToken } = useAuth();
   const location = useLocation();
@@ -46,7 +51,7 @@ export default function TenantConnectionPage() {
       const result = await deployTenantAccess({
         tenantId: user.microsoft_tid,
         graphAccessToken,
-        redirectUri: `${window.location.origin}/tenant/deployment-success`,
+        redirectUri: deploymentRedirectUri(),
       });
       setDeployment(result);
       setTenant((current) => ({ ...(current || {}), ...result }));

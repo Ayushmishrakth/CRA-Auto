@@ -214,7 +214,15 @@ async def refresh_access_token(db: AsyncSession, body: RefreshTokenRequest) -> T
             detail="Refresh token has been revoked",
         )
 
-    user = await db.get(User, uuid.UUID(payload["sub"]))
+    try:
+        user_id = uuid.UUID(str(payload["sub"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token subject",
+        ) from exc
+
+    user = await db.get(User, user_id)
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

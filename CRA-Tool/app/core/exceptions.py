@@ -108,13 +108,11 @@ async def validation_exception_handler(
 
 async def database_exception_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
     logger.exception("Database exception request_id=%s", _request_id(request))
-    root_error = getattr(exc, "orig", None)
-    message = str(root_error or exc)
     return _error_response(
         request=request,
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         code="DATABASE_ERROR",
-        message=f"Database operation failed: {message}",
+        message="Database operation failed",
         details={"sqlalchemy_error": exc.__class__.__name__},
     )
 

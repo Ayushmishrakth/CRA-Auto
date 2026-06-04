@@ -3,6 +3,10 @@
  * Values align with Azure App Registration (Entra ID).
  */
 
+function browserOrigin() {
+  return typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
+}
+
 export const msalConfig = {
   auth: {
     clientId: import.meta.env.VITE_MSAL_CLIENT_ID,
@@ -13,11 +17,11 @@ export const msalConfig = {
 
     redirectUri:
       import.meta.env.VITE_MSAL_REDIRECT_URI ||
-      window.location.origin,
+      browserOrigin(),
 
     postLogoutRedirectUri:
       import.meta.env.VITE_MSAL_REDIRECT_URI ||
-      window.location.origin,
+      browserOrigin(),
 
     navigateToLoginRequestUrl: false,
   },
@@ -50,8 +54,8 @@ export const tenantDeploymentRequest = {
 export const logoutRequest = {
   postLogoutRedirectUri:
     import.meta.env.VITE_MSAL_REDIRECT_URI ||
-    window.location.origin,
+    browserOrigin(),
   mainWindowRedirectUri:
     import.meta.env.VITE_MSAL_REDIRECT_URI ||
-    window.location.origin,
+    browserOrigin(),
 };

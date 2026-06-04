@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import tempfile
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -11,6 +12,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BusinessLogicException
+from app.core.config import settings
 from app.db.models.cra_parameter import CraParameter, CraParameterVersion
 from app.db.models.user import User
 from scripts.build_registry import ValidationReport, build_registries, extract_records
@@ -31,6 +33,12 @@ def _decimal_weight(value: Any) -> Decimal:
         return Decimal("1.0")
 
 
+def _safe_source_filename(filename: str) -> str:
+    name = Path(filename or "cra-parameters.xlsx").name
+    sanitized = re.sub(r"[^A-Za-z0-9._ -]+", "_", name).strip(" .")
+    return sanitized or "cra-parameters.xlsx"
+
+
 async def import_parameter_workbook(
     db: AsyncSession,
     *,
@@ -39,8 +47,11 @@ async def import_parameter_workbook(
     content: bytes,
     activate: bool = True,
 ) -> dict[str, Any]:
+    filename = _safe_source_filename(filename)
     if not content:
         raise BusinessLogicException("Uploaded CRA parameter workbook is empty")
+    if len(content) > settings.max_parameter_workbook_bytes:
+        raise BusinessLogicException("Uploaded CRA parameter workbook exceeds the configured size limit")
     if not filename.lower().endswith((".xlsx", ".xlsm")):
         raise BusinessLogicException("CRA parameter import requires an .xlsx or .xlsm workbook")
 

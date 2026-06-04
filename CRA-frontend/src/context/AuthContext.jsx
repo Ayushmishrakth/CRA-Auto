@@ -18,6 +18,7 @@ const AuthContext = createContext(null);
 const SESSION_RESTORE_TIMEOUT_MS = 8000;
 
 function withTimeout(promise, message) {
+  if (typeof window === "undefined") return promise;
   let timeoutId;
   const timeout = new Promise((_, reject) => {
     timeoutId = window.setTimeout(() => reject(new Error(message)), SESSION_RESTORE_TIMEOUT_MS);

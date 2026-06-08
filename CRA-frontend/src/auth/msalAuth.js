@@ -3,8 +3,32 @@
  */
 
 import { BrowserAuthError, InteractionRequiredAuthError } from "@azure/msal-browser";
-import { loginRequest, logoutRequest, tenantDeploymentRequest, tokenRequest } from "./msalConfig";
+import {
+  CRA_AUTH_TENANT_ID,
+  loginRequest,
+  logoutRequest,
+  tenantDeploymentRequest,
+  tokenRequest,
+} from "./msalConfig";
 import { clearAllAuthCaches } from "./msalCache";
+import { friendlyAuthMessage } from "../utils/authErrors";
+
+function accountTenantId(account) {
+  return account?.tenantId || account?.idTokenClaims?.tid || account?.homeAccountId?.split(".")?.[1] || "";
+}
+
+const _MULTI_TENANT_MODES = new Set(["common", "organizations", ""]);
+
+/** Skip tenant assertion in multi-tenant / common authority mode. */
+function assertConfiguredTenantAccount(account) {
+  if (_MULTI_TENANT_MODES.has(CRA_AUTH_TENANT_ID.toLowerCase())) return;
+  const tenantId = accountTenantId(account);
+  if (tenantId && tenantId.toLowerCase() !== CRA_AUTH_TENANT_ID.toLowerCase()) {
+    throw new Error(
+      "Your Microsoft account belongs to a different tenant than the configured application. Please contact your administrator."
+    );
+  }
+}
 
 function decodeJwtPayload(token) {
   if (!token || typeof token !== "string" || token.split(".").length !== 3) {
@@ -62,7 +86,7 @@ export function mapMsalError(error) {
       case "no_network_connectivity":
         return "No network. Check your connection.";
       default:
-        return error.message || `Microsoft error: ${error.errorCode}`;
+        return friendlyAuthMessage(error.message || `Microsoft error: ${error.errorCode}`);
     }
   }
 
@@ -70,7 +94,7 @@ export function mapMsalError(error) {
     return "Additional Microsoft consent required. Contact your admin.";
   }
 
-  return error.message || "Microsoft login failed";
+  return friendlyAuthMessage(error.message || "Microsoft login failed");
 }
 
 /**
@@ -84,7 +108,7 @@ export async function loginWithMicrosoftPopup(msalInstance) {
     console.info("[CRA] MSAL loginPopup starting…");
     loginResponse = await msalInstance.loginPopup({
       ...loginRequest,
-      redirectUri: msalInstance.getConfiguration().auth.redirectUri,
+      redirectUri: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
       prompt: "select_account",
     });
     console.info("[CRA] MSAL loginPopup success", loginResponse.account?.username);
@@ -94,6 +118,7 @@ export async function loginWithMicrosoftPopup(msalInstance) {
   }
 
   const account = loginResponse.account;
+  assertConfiguredTenantAccount(account);
   if (account) {
     msalInstance.setActiveAccount(account);
   }
@@ -146,10 +171,13 @@ export async function logoutMicrosoft(msalInstance) {
 }
 
 export async function acquireTenantDeploymentToken(msalInstance) {
-  const account = msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+  const account =
+    msalInstance.getActiveAccount() ||
+    msalInstance.getAllAccounts().find((item) => accountTenantId(item).toLowerCase() === CRA_AUTH_TENANT_ID.toLowerCase());
   if (!account) {
     throw new Error("Microsoft session is not active. Sign in again.");
   }
+  assertConfiguredTenantAccount(account);
   try {
     const silent = await msalInstance.acquireTokenSilent({
       ...tenantDeploymentRequest,

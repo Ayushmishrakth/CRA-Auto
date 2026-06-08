@@ -1,20 +1,42 @@
-import { Download, FileText } from "lucide-react";
+import { useState } from "react";
+import { Download, FileSpreadsheet, Printer } from "lucide-react";
 import { downloadAssessmentReport } from "../../api/assessmentApi";
 
-const MIME_TYPES = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-};
 
 async function saveReport(assessmentId, reportType) {
   if (typeof window === "undefined" || typeof document === "undefined") return;
-  const data = await downloadAssessmentReport(assessmentId, reportType);
-  const blob = new Blob([data], { type: MIME_TYPES[reportType] });
+  const { data, filename } = await downloadAssessmentReport(assessmentId, reportType);
+  // data is already a correctly-typed Blob from downloadAssessmentReport
+  const url = URL.createObjectURL(data);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function csvEscape(value) {
+  const text = value === null || value === undefined || value === "" ? "No data available" : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function saveCsv(report = {}) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const rows = report?.summary
+    ? Object.entries(report.summary).map(([key, value]) => [key, value])
+    : [["message", "Assessment data not collected"]];
+  const csv = ["Field,Value", ...rows.map((row) => row.map(csvEscape).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   try {
     const link = document.createElement("a");
     link.href = url;
-    link.download = `copilot-readiness-assessment.${reportType}`;
+    link.download = "copilot-readiness-assessment.csv";
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -24,10 +46,18 @@ async function saveReport(assessmentId, reportType) {
 }
 
 export default function ReportDownloadPanel({ assessmentId, report = {} }) {
+  const [busyType, setBusyType] = useState(null);
   const safeReport = report ?? {};
   const artifacts = Array.isArray(safeReport.artifacts) ? safeReport.artifacts : [];
   const hasPdf = artifacts.some((item) => item.report_type === "pdf");
-  const hasDocx = artifacts.some((item) => item.report_type === "docx");
+  const runDownload = async (reportType) => {
+    setBusyType(reportType);
+    try {
+      await saveReport(assessmentId, reportType);
+    } finally {
+      setBusyType(null);
+    }
+  };
 
   return (
     <section className="panel">
@@ -42,19 +72,18 @@ export default function ReportDownloadPanel({ assessmentId, report = {} }) {
           type="button"
           className={`primary-action ${hasPdf ? "" : "disabled-link"}`}
           disabled={!hasPdf}
-          onClick={() => saveReport(assessmentId, "pdf")}
+          onClick={() => runDownload("pdf")}
         >
           <Download size={16} />
-          Download PDF
+          {busyType === "pdf" ? "Preparing PDF..." : "Export PDF"}
         </button>
-        <button
-          type="button"
-          className={`btn-secondary inline ${hasDocx ? "" : "disabled-link"}`}
-          disabled={!hasDocx}
-          onClick={() => saveReport(assessmentId, "docx")}
-        >
-          <FileText size={16} />
-          Download DOCX
+        <button type="button" className="btn-secondary inline" onClick={() => saveCsv(safeReport)}>
+          <FileSpreadsheet size={16} />
+          Export Excel
+        </button>
+        <button type="button" className="btn-secondary inline" onClick={() => window.print()}>
+          <Printer size={16} />
+          Print Report
         </button>
       </div>
     </section>

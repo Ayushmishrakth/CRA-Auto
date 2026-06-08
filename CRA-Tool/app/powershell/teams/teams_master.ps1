@@ -16,58 +16,119 @@ $collector = $CollectorJson | ConvertFrom-Json
 $out = Initialize-CraArtifactDirectory -OutputRoot $OutputRoot -AssessmentId $AssessmentId -Domain "teams"
 $files = New-Object System.Collections.Generic.List[string]
 
-Connect-CraTeams -TenantId $TenantId -Collector $collector
+# Attempt Teams connection — emit a clean skipped contract if Teams admin access
+# is unavailable (no credentials, wrong permissions, etc.) rather than crashing.
+$teamsConnected = $false
+try {
+  Connect-CraTeams -TenantId $TenantId -Collector $collector
+  # Validate by calling an actual Teams admin API — Get-CsTeamsMeetingPolicy throws
+  # "You must call Connect-MicrosoftTeams" immediately when the session isn't established.
+  $null = Get-CsTeamsMeetingPolicy -ErrorAction Stop
+  $teamsConnected = $true
+} catch {
+  $teamsErrMsg = $_.Exception.Message
+  # Emit a clean service_unavailable finding and exit
+  [ordered]@{
+    status    = "success"; collector = $CollectorName; tenant_id = $TenantId
+    timestamp = (Get-Date).ToUniversalTime().ToString("o")
+    findings  = @([ordered]@{
+      parameter_key      = $ParameterKey
+      status             = "service_unavailable"
+      severity           = "info"
+      value              = "teams_unavailable"
+      message            = "Microsoft Teams PowerShell is not available in this tenant (authentication failed or Teams not licensed). This module is skipped and excluded from scoring."
+      score_contribution = 0
+    })
+    metrics  = [ordered]@{ generated_files = @(); generated_file_count = 0 }
+    warnings = @("TEAMS_UNAVAILABLE: $teamsErrMsg"); errors = @()
+  } | ConvertTo-Json -Depth 8 -Compress
+  exit 0
+}
 Connect-CraGraph -TenantId $TenantId -Scopes @("Reports.Read.All","Group.Read.All","Team.ReadBasic.All") -Collector $collector | Out-Null
 
-$teams = Get-Team | Select-Object GroupId,DisplayName,Visibility,Archived,MailNickName,Description
-$path = Join-Path $out "teams_inventory.csv"; Export-CraCsv $teams $path; $files.Add($path)
+$teamInventoryParameters = @(
+  "active_inactive_teams",
+  "activer_inactive_teams_users",
+  "minimum_number_of_owners",
+  "orphan_teams",
+  "teams_with_external_users",
+  "teams_with_external_guest_as_owner"
+)
 
-$externalUsers = foreach ($team in $teams) {
-  Get-TeamUser -GroupId $team.GroupId | Where-Object { $_.User -match "#EXT#|\.onmicrosoft\.com" } |
-    Select-Object @{Name="GroupId";Expression={$team.GroupId}}, @{Name="Team";Expression={$team.DisplayName}}, User, Role
+if ($ParameterKey -in $teamInventoryParameters) {
+  $teams = Get-Team | Where-Object { $_.GroupId } | Select-Object GroupId,DisplayName,Visibility,Archived,MailNickName,Description
+  $path = Join-Path $out "teams_inventory.csv"; Export-CraCsv $teams $path; $files.Add($path)
+
+  $externalUsers = foreach ($team in $teams) {
+    try {
+      Get-TeamUser -GroupId $team.GroupId -ErrorAction Stop | Where-Object { $_.User -match "#EXT#|\.onmicrosoft\.com" } |
+        Select-Object @{Name="GroupId";Expression={$team.GroupId}}, @{Name="Team";Expression={$team.DisplayName}}, User, Role
+    } catch {
+      [pscustomobject]@{
+        GroupId = $team.GroupId
+        Team = $team.DisplayName
+        User = ""
+        Role = ""
+        status = "not_collected"
+        value = $_.Exception.Message
+        evidence_source = "Get-TeamUser"
+      }
+    }
+  }
+  $path = Join-Path $out "teams_external_users.csv"; Export-CraCsv $externalUsers $path; $files.Add($path)
+  $externalGuestOwners = $externalUsers | Where-Object { $_.Role -match "Owner" }
+  $externalGuestOwnerEvidence = if (@($externalGuestOwners).Count -gt 0) {
+    $externalGuestOwners | Select-Object GroupId,Team,User,Role,@{Name="status";Expression={"fail"}},@{Name="value";Expression={"External guest owner=$($_.User)"}},@{Name="evidence_source";Expression={"Get-TeamUser"}}
+  } else {
+    @([pscustomobject]@{ GroupId = ""; Team = ""; User = ""; Role = ""; status = "pass"; value = "No external guest owners found"; evidence_source = "Get-TeamUser" })
+  }
+  $path = Join-Path $out "teams_with_external_guest_as_owner.csv"; Export-CraCsv $externalGuestOwnerEvidence $path; $files.Add($path)
+
+  $inactiveTeams = $teams | Where-Object { $_.Archived -eq $true } |
+    Select-Object GroupId,DisplayName,Archived,Visibility
+  $path = Join-Path $out "inactive_teams.csv"; Export-CraCsv $inactiveTeams $path; $files.Add($path)
+
+  $activeTeamsEvidence = $teams | Select-Object GroupId,DisplayName,Archived,Visibility,@{Name="status";Expression={ if ($_.Archived -eq $true) { "fail" } else { "pass" } }},@{Name="value";Expression={ "Archived=$($_.Archived)" }},@{Name="evidence_source";Expression={ "Get-Team" }}
+  Export-CraExpectedCsv $activeTeamsEvidence $out "active_inactive_teams.csv" $files "Get-Team"
+
+  $activeUsersEvidence = $externalUsers | Select-Object GroupId,Team,User,Role,@{Name="status";Expression={ if ($_.status -eq "not_collected") { "not_collected" } else { "pass" } }},@{Name="value";Expression={ if ($_.value) { $_.value } else { "User=$($_.User);Role=$($_.Role)" } }},@{Name="evidence_source";Expression={ "Get-TeamUser" }}
+  if (-not $activeUsersEvidence -or @($activeUsersEvidence).Count -eq 0) {
+    $activeUsersEvidence = @([pscustomobject]@{ status = "pass"; value = "No external Teams users returned by Get-TeamUser"; evidence_source = "Get-TeamUser" })
+  }
+  Export-CraExpectedCsv $activeUsersEvidence $out "activer_inactive_teams_users.csv" $files "Get-TeamUser"
+  Export-CraExpectedCsv $activeUsersEvidence $out "teams_with_external_users.csv" $files "Get-TeamUser"
+
+  $ownerCounts = foreach ($team in $teams) {
+    try {
+      $owners = @(Get-TeamUser -GroupId $team.GroupId -Role Owner -ErrorAction Stop)
+      [pscustomobject]@{
+        GroupId = $team.GroupId
+        Team = $team.DisplayName
+        OwnerCount = $owners.Count
+        status = if ($owners.Count -ge 2) { "pass" } else { "fail" }
+        value = "OwnerCount=$($owners.Count)"
+        evidence_source = "Get-TeamUser -Role Owner"
+      }
+    } catch {
+      [pscustomobject]@{
+        GroupId = $team.GroupId
+        Team = $team.DisplayName
+        OwnerCount = ""
+        status = "not_collected"
+        value = $_.Exception.Message
+        evidence_source = "Get-TeamUser -Role Owner"
+      }
+    }
+  }
+  Export-CraExpectedCsv $ownerCounts $out "minimum_number_of_owners.csv" $files "Get-TeamUser -Role Owner"
+
+  $orphanEvidence = $ownerCounts | Select-Object GroupId,Team,OwnerCount,@{Name="status";Expression={ if ($_.status -eq "not_collected") { "not_collected" } elseif ($_.OwnerCount -gt 0) { "pass" } else { "fail" } }},@{Name="value";Expression={ if ($_.value) { $_.value } else { "OwnerCount=$($_.OwnerCount)" } }},@{Name="evidence_source";Expression={ "Get-TeamUser -Role Owner" }}
+  Export-CraExpectedCsv $orphanEvidence $out "orphan_teams.csv" $files "Get-TeamUser -Role Owner"
 }
-$path = Join-Path $out "teams_external_users.csv"; Export-CraCsv $externalUsers $path; $files.Add($path)
-$externalGuestOwners = $externalUsers | Where-Object { $_.Role -match "Owner" }
-$externalGuestOwnerEvidence = if (@($externalGuestOwners).Count -gt 0) {
-  $externalGuestOwners | Select-Object GroupId,Team,User,Role,@{Name="status";Expression={"fail"}},@{Name="value";Expression={"External guest owner=$($_.User)"}},@{Name="evidence_source";Expression={"Get-TeamUser"}}
-} else {
-  @([pscustomobject]@{ GroupId = ""; Team = ""; User = ""; Role = ""; status = "pass"; value = "No external guest owners found"; evidence_source = "Get-TeamUser" })
-}
-$path = Join-Path $out "teams_with_external_guest_as_owner.csv"; Export-CraCsv $externalGuestOwnerEvidence $path; $files.Add($path)
 
 $meetingPolicies = Get-CsTeamsMeetingPolicy |
   Select-Object Identity,AllowCloudRecording,AllowTranscription,AllowAnonymousUsersToJoinMeeting,AutoAdmittedUsers,MeetingChatEnabledType,NewMeetingRecordingExpirationDays
 $path = Join-Path $out "meeting_policies.csv"; Export-CraCsv $meetingPolicies $path; $files.Add($path)
-
-$inactiveTeams = $teams | Where-Object { $_.Archived -eq $true } |
-  Select-Object GroupId,DisplayName,Archived,Visibility
-$path = Join-Path $out "inactive_teams.csv"; Export-CraCsv $inactiveTeams $path; $files.Add($path)
-
-$activeTeamsEvidence = $teams | Select-Object GroupId,DisplayName,Archived,Visibility,@{Name="status";Expression={ if ($_.Archived -eq $true) { "fail" } else { "pass" } }},@{Name="value";Expression={ "Archived=$($_.Archived)" }},@{Name="evidence_source";Expression={ "Get-Team" }}
-Export-CraExpectedCsv $activeTeamsEvidence $out "active_inactive_teams.csv" $files "Get-Team"
-
-$activeUsersEvidence = $externalUsers | Select-Object GroupId,Team,User,Role,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "User=$($_.User);Role=$($_.Role)" }},@{Name="evidence_source";Expression={ "Get-TeamUser" }}
-if (-not $activeUsersEvidence -or @($activeUsersEvidence).Count -eq 0) {
-  $activeUsersEvidence = @([pscustomobject]@{ status = "pass"; value = "No external Teams users returned by Get-TeamUser"; evidence_source = "Get-TeamUser" })
-}
-Export-CraExpectedCsv $activeUsersEvidence $out "activer_inactive_teams_users.csv" $files "Get-TeamUser"
-Export-CraExpectedCsv $activeUsersEvidence $out "teams_with_external_users.csv" $files "Get-TeamUser"
-
-$ownerCounts = foreach ($team in $teams) {
-  $owners = @(Get-TeamUser -GroupId $team.GroupId -Role Owner)
-  [pscustomobject]@{
-    GroupId = $team.GroupId
-    Team = $team.DisplayName
-    OwnerCount = $owners.Count
-    status = if ($owners.Count -ge 2) { "pass" } else { "fail" }
-    value = "OwnerCount=$($owners.Count)"
-    evidence_source = "Get-TeamUser -Role Owner"
-  }
-}
-Export-CraExpectedCsv $ownerCounts $out "minimum_number_of_owners.csv" $files "Get-TeamUser -Role Owner"
-
-$orphanEvidence = $ownerCounts | Select-Object GroupId,Team,OwnerCount,@{Name="status";Expression={ if ($_.OwnerCount -gt 0) { "pass" } else { "fail" } }},@{Name="value";Expression={ "OwnerCount=$($_.OwnerCount)" }},@{Name="evidence_source";Expression={ "Get-TeamUser -Role Owner" }}
-Export-CraExpectedCsv $orphanEvidence $out "orphan_teams.csv" $files "Get-TeamUser -Role Owner"
 
 $meetingPolicyEvidence = $meetingPolicies | Select-Object Identity,AllowCloudRecording,AllowTranscription,AllowAnonymousUsersToJoinMeeting,AutoAdmittedUsers,MeetingChatEnabledType,NewMeetingRecordingExpirationDays,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "AllowCloudRecording=$($_.AllowCloudRecording);AllowTranscription=$($_.AllowTranscription);MeetingChatEnabledType=$($_.MeetingChatEnabledType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
 Export-CraExpectedCsv $meetingPolicyEvidence $out "meeting_policies_configuration.csv" $files "Get-CsTeamsMeetingPolicy"

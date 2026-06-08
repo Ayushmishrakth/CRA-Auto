@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import re
 import struct
+import zipfile
 import zlib
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -20,7 +22,44 @@ from app.db.models.tenant import ConnectedTenant
 from app.db.models.user import User
 
 
+# XML 1.0 illegal control characters (everything except \x09, \x0A, \x0D, \x20+)
+_XML_ILLEGAL = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
+
+def _sanitize(text: Any) -> str:
+    """Strip XML-illegal characters so python-docx never writes corrupt XML."""
+    if text is None:
+        return ""
+    s = str(text)
+    s = _XML_ILLEGAL.sub("", s)
+    # Remove Unicode surrogates that survive str() conversion
+    s = s.encode("utf-8", errors="ignore").decode("utf-8")
+    return s
+
+
+def _validate_docx(path: Path) -> None:
+    """Raise ValueError if the DOCX is a bad ZIP or contains invalid XML."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()
+            for required in ("word/document.xml", "[Content_Types].xml", "_rels/.rels"):
+                if required not in names:
+                    raise ValueError(f"DOCX missing required part: {required}")
+            for name in names:
+                if not (name.endswith(".xml") or name.endswith(".rels")):
+                    continue
+                with z.open(name) as f:
+                    data = f.read()
+                try:
+                    ET.fromstring(data)
+                except ET.ParseError as exc:
+                    raise ValueError(f"Corrupt XML in {name}: {exc}") from exc
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"Generated DOCX is not a valid ZIP archive: {exc}") from exc
+
+
 REFERENCE_TEMPLATE_CANDIDATES = [
+    Path("out/sample.docx"),
     Path("app/services/reporting/templates/AAA Legal Process Copilot Readiness Assessment Report.docx"),
     Path(r"C:\Users\Admin\Downloads\AAA Legal Process Copilot Readiness Assessment Report (1).docx"),
     Path(r"C:\Users\Admin\Downloads\AAA Legal Process Copilot Readiness Assessment Report.docx"),
@@ -88,6 +127,14 @@ def render_word_report(
     _replace_template_placeholders(
         doc,
         {
+            # sample.docx placeholders - must come before substring variants
+            "XYZ.": f"{tenant_name}.",
+            "XYZ ": f"{tenant_name} ",
+            "XYZ": tenant_name,
+            "xyz": tenant_name,
+            "April 20, 2026": assessment_date,
+            "April 20, 202": assessment_date,
+            # Legacy AAA-template placeholders
             "Customer Name": f"{tenant_name}\nTenant ID: {tenant_id}",
             "DD-MM-YYYY": assessment_date,
             "__________": tenant_name,
@@ -105,6 +152,7 @@ def render_word_report(
 
     _enable_field_update(doc)
     doc.save(path)
+    _validate_docx(path)
     return path
 
 
@@ -162,13 +210,30 @@ def _resolve_template_path(template_path: Path | str | None) -> Path | None:
 
 
 def _replace_template_placeholders(doc, replacements: dict[str, str]) -> None:
-    for node in doc.element.xpath(".//w:t"):
-        if not node.text:
-            continue
-        value = node.text
-        for old, new in replacements.items():
-            value = value.replace(old, new)
-        node.text = value
+    # Sanitize all replacement values upfront
+    safe_replacements = {old: _sanitize(new) for old, new in replacements.items()}
+
+    def _apply_to_para(para) -> None:
+        # Fast path: none of the old values appear in this paragraph at all
+        full_text = para.text
+        if not any(old in full_text for old in safe_replacements):
+            return
+        # Per-node replacement (handles simple cases where placeholder is in one run)
+        for node in para._p.xpath(".//w:t"):
+            if not node.text:
+                continue
+            value = node.text
+            for old, new in safe_replacements.items():
+                value = value.replace(old, new)
+            node.text = value
+
+    for para in doc.paragraphs:
+        _apply_to_para(para)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    _apply_to_para(para)
 
 
 def _remove_from_heading(doc, heading_text: str) -> None:
@@ -228,30 +293,55 @@ def _update_template_summary(
 ) -> None:
     failed = summary["fail"] + summary["collection_error"]
     observations = _key_observations(rows, tenant_name, readiness_score, readiness_level)
+    # Exact-match replacements (normalized whitespace)
     replacements = {
+        # AAA template variants
         "The Copilot Readiness Assessment uncovered several configuration gaps and policy deficiencies that could impact the secure and compliant adoption of Microsoft Copilot. Each finding has been categorized by severity and mapped to specific areas of risk within the": (
             f"The Copilot Readiness Assessment for {tenant_name} evaluated {summary['total']} approved parameters. "
             f"The assessment identified {failed} gaps that could affect secure and compliant Microsoft 365 Copilot adoption."
         ),
-        "Based on the findings, the Client’s current readiness level for Copilot integration is assessed as:": (
+        "Based on the findings, the Client's current readiness level for Copilot integration is assessed as:": (
+            f"Based on the runtime findings, {tenant_name}'s current readiness level for Copilot integration is assessed as:"
+        ),
+        # sample.docx variant
+        f"Based on the findings, the Client's current readiness level for Copilot integration is assessed as:": (
             f"Based on the runtime findings, {tenant_name}'s current readiness level for Copilot integration is assessed as:"
         ),
         "Readiness Level: Not Ready": f"Readiness Level: {readiness_level}",
+        "Readiness Level: Ready/Not Ready": f"Readiness Level: {readiness_level}",
         "Readiness Gaps: out of 65": f"Readiness Gaps: {failed} out of {summary['total']}",
         "Significant remediation is required prior to enabling Copilot in the production environment.": (
             _deployment_sentence(readiness_level)
         ),
         "A total of gaps out of 65 parameters were identified, distributed across Security, Governance, and Best Practice categories.": observations[0],
         "Medium to Critical severity issues make up most of the findings, indicating substantial exposure to operational and compliance risks.": observations[1] if len(observations) > 1 else "",
+        # AAA-template: "failed" wording
         "Gap findings reveal that the percentage of failed parameters is Security (%), Governance (%), and Best Practices (%) pillars, indicating a critical need for immediate remediation in those areas.": observations[2] if len(observations) > 2 else "",
         "There are user accounts out of that are eligible for a M365 Copilot license. Copilot requires a base Microsoft 365 subscription, such as Microsoft 365 E3, E5, Business Standard, or Business Premium.": (
             f"{summary['licensing_required']} parameters require licensing validation. Copilot requires the appropriate Microsoft 365 base subscription and Copilot entitlement."
         ),
     }
+    # Prefix-match replacements - for sample.docx paragraphs that embed dynamic values
+    # (e.g., "ABed" instead of "failed", or specific percentage values baked in)
+    prefix_replacements = {
+        "Gap findings reveal that the percentage of": observations[2] if len(observations) > 2 else "",
+        "There are 4 user accounts out of": (
+            f"{summary['licensing_required']} parameters require licensing validation. Copilot requires the appropriate Microsoft 365 base subscription and Copilot entitlement."
+        ),
+        "There are user accounts out of": (
+            f"{summary['licensing_required']} parameters require licensing validation. Copilot requires the appropriate Microsoft 365 base subscription and Copilot entitlement."
+        ),
+        "Overall Readiness:": f"Overall Readiness: {readiness_score:.1f}% - {readiness_level}",
+    }
     for para in doc.paragraphs:
         text = " ".join(para.text.split())
         if text in replacements:
             _set_paragraph_text(para, replacements[text])
+            continue
+        for prefix, new_text in prefix_replacements.items():
+            if text.startswith(prefix) and new_text:
+                _set_paragraph_text(para, new_text)
+                break
 
 
 def _update_service_tables(doc, rows: list[dict[str, Any]], template_order: dict[str, list[str]]) -> None:
@@ -262,14 +352,27 @@ def _update_service_tables(doc, rows: list[dict[str, Any]], template_order: dict
         _resize_table(table, len(service_rows) + 1)
         headers = ["S. No", "Parameter", "CRA Pillar", "Finding", "Severity"]
         for idx, header in enumerate(headers):
-            table.rows[0].cells[idx].text = header
+            _write_cell(table.rows[0], idx, header)
         for index, row in enumerate(service_rows, start=1):
-            cells = table.rows[index].cells
-            cells[0].text = f"{index:02d}"
-            cells[1].text = template_names[index - 1] if index - 1 < len(template_names) else str(row.get("title") or row.get("parameter_key") or "-")
-            cells[2].text = str(row.get("pillar") or row.get("category") or "-")
-            cells[3].text = _status_label(row).title()
-            cells[4].text = str(row.get("severity") or "info").title()
+            tbl_row = table.rows[index]
+            sl = _status_label(row)
+            param_name = (
+                template_names[index - 1]
+                if index - 1 < len(template_names)
+                else str(row.get("title") or row.get("parameter_key") or "-")
+            )
+            sev_key = str(row.get("severity") or "info").lower()
+            _write_cell(tbl_row, 0, f"{index:02d}")
+            _write_cell(tbl_row, 1, param_name)
+            _write_cell(tbl_row, 2, str(row.get("pillar") or row.get("category") or "-"))
+            _write_cell(tbl_row, 3, "BC" if sl == "PASS" else "N/A" if sl in ("NOT COLLECTED", "LICENSING REQUIRED", "MANUAL VALIDATION") else "AB")
+            _write_cell(tbl_row, 4, sev_key.title())
+            # Row background: green for pass, red for fail, light grey otherwise
+            row_bg = "E8F5E9" if sl == "PASS" else "FFEBEE" if sl == "FAIL" else "F9F9F9"
+            for cell in tbl_row.cells:
+                _set_cell_bg(cell, row_bg)
+            # Severity column override with severity-specific color
+            _set_cell_bg(tbl_row.cells[4], _SEVERITY_COLORS.get(sev_key, "F5F5F5"))
 
 
 def _update_detailed_blocks(doc, rows: list[dict[str, Any]], template_order: dict[str, list[str]]) -> None:
@@ -388,8 +491,54 @@ def _is_purview_row(row: dict[str, Any]) -> bool:
 def _resize_table(table, target_rows: int) -> None:
     while len(table.rows) < target_rows:
         table.add_row()
-    while len(table.rows) > target_rows:
-        table._tbl.remove(table.rows[-1]._tr)
+    # Collect excess rows first, then remove — never modify while iterating
+    excess = list(table.rows[target_rows:])
+    for row in excess:
+        row._tr.getparent().remove(row._tr)
+
+
+def _write_cell(row, col_idx: int, text: str) -> None:
+    """Write sanitized text to a table cell, preserving existing run formatting."""
+    if col_idx >= len(row.cells):
+        return
+    cell = row.cells[col_idx]
+    safe = _sanitize(text)
+    # Clear all runs in all paragraphs, write to first paragraph's first run
+    for para in cell.paragraphs:
+        for run in para.runs:
+            run.text = ""
+    if cell.paragraphs and cell.paragraphs[0].runs:
+        cell.paragraphs[0].runs[0].text = safe
+    elif cell.paragraphs:
+        cell.paragraphs[0].add_run(safe)
+    else:
+        # Fallback: use the cell.text setter (clears and rewrites the cell)
+        cell.text = safe
+
+
+_SEVERITY_COLORS = {
+    "critical": "FFE6E6",
+    "high":     "FFF0E6",
+    "medium":   "FFFDE6",
+    "low":      "F5F5F5",
+    "info":     "E6F0FF",
+}
+
+
+def _set_cell_bg(cell, hex_color: str) -> None:
+    """Set table cell background fill using w:shd OOXML element."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    for existing in tcPr.findall(qn("w:shd")):
+        tcPr.remove(existing)
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), hex_color.upper())
+    tcPr.append(shd)
 
 
 def _find_next_paragraph(doc, start: int, exact_text: str) -> int | None:
@@ -402,12 +551,34 @@ def _find_next_paragraph(doc, start: int, exact_text: str) -> int | None:
 
 
 def _set_paragraph_text(paragraph, text: str) -> None:
+    from docx.oxml import OxmlElement
+
+    safe = _sanitize(str(text))
+    parts = safe.split("\n")
+
+    # Clear all runs first
     for run in paragraph.runs:
         run.text = ""
+
     if paragraph.runs:
-        paragraph.runs[0].text = str(text)
+        first_run = paragraph.runs[0]
+        first_run.text = parts[0]
+        # Insert line-break elements for subsequent parts
+        for part in parts[1:]:
+            br = OxmlElement("w:br")
+            first_run._r.append(br)
+            t = OxmlElement("w:t")
+            t.text = part
+            first_run._r.append(t)
     else:
-        paragraph.add_run(str(text))
+        run = paragraph.add_run(parts[0])
+        for part in parts[1:]:
+            from docx.oxml import OxmlElement as _OE
+            br = _OE("w:br")
+            run._r.append(br)
+            t = _OE("w:t")
+            t.text = part
+            run._r.append(t)
 
 
 def _deployment_sentence(readiness_level: str) -> str:
@@ -655,7 +826,7 @@ def _value(value: Any) -> str:
     if isinstance(value, bool):
         return "Yes" if value else "No"
     if isinstance(value, (str, int, float)):
-        return str(value)
+        return _sanitize(str(value))
     if isinstance(value, list):
         if not value:
             return "[]"
@@ -665,10 +836,10 @@ def _value(value: Any) -> str:
             return "{}"
         parts = []
         for key, item in list(value.items())[:8]:
-            label = str(key).replace("_", " ").title()
+            label = _sanitize(str(key)).replace("_", " ").title()
             parts.append(f"{label}: {_value(item)}")
         return "; ".join(parts)
-    return str(value)
+    return _sanitize(str(value))
 
 
 def _status_label(row: dict[str, Any]) -> str:

@@ -6,6 +6,7 @@ from app.core.exceptions import BusinessLogicException, DeploymentValidationErro
 from app.services import tenant_deployment_service
 from app.services.graph_app_registration_service import (
     build_redirect_uri,
+    build_spa_redirect_uri,
     create_application,
     ensure_application_redirect_uri,
     get_application_by_app_id,
@@ -42,10 +43,11 @@ def fake_permission_access_validation(monkeypatch: pytest.MonkeyPatch):
 
 
 class RecordingGraphClient:
-    def __init__(self, *, stored_redirect_uris=None):
+    def __init__(self, *, stored_redirect_uris=None, stored_spa_redirect_uris=None):
         self.posts = []
         self.patches = []
         self.stored_redirect_uris = stored_redirect_uris or []
+        self.stored_spa_redirect_uris = stored_spa_redirect_uris or []
 
     async def post(self, path, *, json=None):
         self.posts.append({"path": path, "json": json})
@@ -55,7 +57,7 @@ class RecordingGraphClient:
         if path == "/applications":
             if params == {
                 "$filter": "appId eq 'application-client-id'",
-                "$select": "id,appId,displayName,requiredResourceAccess,passwordCredentials,web",
+                "$select": "id,appId,displayName,requiredResourceAccess,passwordCredentials,web,spa",
             }:
                 return {
                     "value": [
@@ -63,6 +65,7 @@ class RecordingGraphClient:
                             "id": "application-object-id",
                             "appId": "application-client-id",
                             "web": {"redirectUris": self.stored_redirect_uris},
+                            "spa": {"redirectUris": self.stored_spa_redirect_uris},
                         }
                     ]
                 }
@@ -78,27 +81,32 @@ class RecordingGraphClient:
             "id": "application-object-id",
             "appId": "application-client-id",
             "web": {"redirectUris": self.stored_redirect_uris},
+            "spa": {"redirectUris": self.stored_spa_redirect_uris},
         }
 
     async def patch(self, path, *, json=None):
         self.patches.append({"path": path, "json": json})
         self.stored_redirect_uris = list((json.get("web") or {}).get("redirectUris") or [])
+        self.stored_spa_redirect_uris = list((json.get("spa") or {}).get("redirectUris") or [])
         return {}
 
 
 async def test_create_application_stores_supplied_redirect_uri():
     redirect_uri = "http://localhost:3000/tenant/deployment-success"
+    spa_redirect_uri = "http://localhost:3000/tenant/deployment-success"
     client = RecordingGraphClient()
 
     app = await create_application(
         client,
         required_resource_access=[],
         redirect_uri=redirect_uri,
+        spa_redirect_uri=spa_redirect_uri,
     )
 
     assert app["appId"] == "application-client-id"
     assert client.posts[0]["path"] == "/applications"
-    assert client.posts[0]["json"]["web"]["redirectUris"] == [redirect_uri]
+    assert "web" not in client.posts[0]["json"]
+    assert client.posts[0]["json"]["spa"]["redirectUris"] == [spa_redirect_uri]
 
 
 async def test_verify_application_redirect_uri_accepts_persisted_uri():
@@ -160,6 +168,7 @@ async def test_create_application_rejects_missing_redirect_uri():
 
 async def test_deployment_start_rejects_missing_redirect_uri_before_graph():
     assert build_redirect_uri("https://cra.example.com") == "https://cra.example.com/tenant/deployment-success"
+    assert build_spa_redirect_uri("https://cra.example.com") == "https://cra.example.com/tenant/deployment-success"
 
 
 async def test_verify_application_redirect_uri_rejects_missing_persisted_uri():
@@ -215,23 +224,30 @@ async def test_deployment_persists_verified_redirect_uri_and_generates_consent_u
     async def fake_build_required_resource_access(client):
         return []
 
-    async def fake_create_application(client, *, display_name, required_resource_access, redirect_uri):
+    async def fake_create_application(client, *, display_name, required_resource_access, redirect_uri, spa_redirect_uri=None):
         assert redirect_uri == expected_redirect_uri
+        assert spa_redirect_uri == expected_redirect_uri
         return {
             "id": "application-object-id",
             "appId": "application-client-id",
             "_graph_create_payload": {
                 "displayName": display_name,
-                "web": {"redirectUris": [redirect_uri]},
+                "spa": {"redirectUris": [spa_redirect_uri]},
             },
         }
 
-    async def fake_ensure_application_redirect_uri(client, *, application_object_id, redirect_uri):
+    async def fake_ensure_application_redirect_uri(client, *, application_object_id, redirect_uri, spa_redirect_uri=None):
         assert application_object_id == "application-object-id"
         assert redirect_uri == expected_redirect_uri
+        assert spa_redirect_uri == expected_redirect_uri
         return (
-            {"id": application_object_id, "appId": "application-client-id", "web": {"redirectUris": [redirect_uri]}},
-            {"payload": {"web": {"redirectUris": [redirect_uri]}}, "response": {}},
+            {
+                "id": application_object_id,
+                "appId": "application-client-id",
+                "web": {"redirectUris": []},
+                "spa": {"redirectUris": [spa_redirect_uri]},
+            },
+            {"payload": {"web": {"redirectUris": []}, "spa": {"redirectUris": [spa_redirect_uri]}}, "response": {}},
             2,
         )
 
@@ -291,11 +307,15 @@ async def test_deployment_persists_verified_redirect_uri_and_generates_consent_u
     assert consent_query["client_id"] != ["service-principal-id"]
     assert consent_query["client_id"] != ["secret-id"]
     assert result["deployment_diagnostics"]["redirect_uri_requested"] == expected_redirect_uri
+    assert result["deployment_diagnostics"]["spa_redirect_uri_requested"] == expected_redirect_uri
     assert result["deployment_diagnostics"]["redirect_uri_verified"] is True
-    assert result["deployment_diagnostics"]["graph_create_payload"]["web"]["redirectUris"] == [expected_redirect_uri]
-    assert result["deployment_diagnostics"]["graph_patch_payload"]["web"]["redirectUris"] == [expected_redirect_uri]
+    assert "web" not in result["deployment_diagnostics"]["graph_create_payload"]
+    assert result["deployment_diagnostics"]["graph_create_payload"]["spa"]["redirectUris"] == [expected_redirect_uri]
+    assert result["deployment_diagnostics"]["graph_patch_payload"]["web"]["redirectUris"] == []
+    assert result["deployment_diagnostics"]["graph_patch_payload"]["spa"]["redirectUris"] == [expected_redirect_uri]
     assert result["deployment_diagnostics"]["graph_patch_response"] == {}
-    assert result["deployment_diagnostics"]["graph_read_response"]["web"]["redirectUris"] == [expected_redirect_uri]
+    assert result["deployment_diagnostics"]["graph_read_response"]["web"]["redirectUris"] == []
+    assert result["deployment_diagnostics"]["graph_read_response"]["spa"]["redirectUris"] == [expected_redirect_uri]
     assert result["deployment_diagnostics"]["graph_consent_application_read_response"]["appId"] == "application-client-id"
     assert result["deployment_diagnostics"]["graph_consent_application_appid_lookup_response"]["appId"] == "application-client-id"
     assert result["deployment_diagnostics"]["CONSENT_CLIENT_ID"] == "application-client-id"
@@ -385,21 +405,28 @@ async def test_deployment_clears_stale_app_registration_and_creates_new_app(
             "web": {"redirectUris": [expected_redirect_uri]},
         }
 
-    async def fake_create_application(client, *, display_name, required_resource_access, redirect_uri):
+    async def fake_create_application(client, *, display_name, required_resource_access, redirect_uri, spa_redirect_uri=None):
         assert redirect_uri == expected_redirect_uri
+        assert spa_redirect_uri == expected_redirect_uri
         return {
             "id": "new-object-id",
             "appId": "new-client-id",
             "_graph_create_payload": {
                 "displayName": display_name,
-                "web": {"redirectUris": [redirect_uri]},
+                "spa": {"redirectUris": [spa_redirect_uri]},
             },
         }
 
-    async def fake_ensure_application_redirect_uri(client, *, application_object_id, redirect_uri):
+    async def fake_ensure_application_redirect_uri(client, *, application_object_id, redirect_uri, spa_redirect_uri=None):
         assert application_object_id == "new-object-id"
+        assert spa_redirect_uri == expected_redirect_uri
         return (
-            {"id": "new-object-id", "appId": "new-client-id", "web": {"redirectUris": [redirect_uri]}},
+            {
+                "id": "new-object-id",
+                "appId": "new-client-id",
+                "web": {"redirectUris": []},
+                "spa": {"redirectUris": [spa_redirect_uri]},
+            },
             None,
             1,
         )
@@ -556,30 +583,50 @@ def _install_validate_recovery_fakes(
 
     async def fake_get_application(client, *, application_object_id):
         if application_object_id == "new-object-id":
-            return {"id": "new-object-id", "appId": "new-client-id", "web": {"redirectUris": [expected_redirect_uri]}}
+            return {
+                "id": "new-object-id",
+                "appId": "new-client-id",
+                "web": {"redirectUris": []},
+                "spa": {"redirectUris": [expected_redirect_uri]},
+            }
         if isinstance(existing_app, Exception):
             raise existing_app
         return existing_app
 
     async def fake_get_application_by_app_id(client, *, application_client_id):
         if application_client_id == "new-client-id":
-            return {"id": "new-object-id", "appId": "new-client-id", "web": {"redirectUris": [expected_redirect_uri]}}
+            return {
+                "id": "new-object-id",
+                "appId": "new-client-id",
+                "web": {"redirectUris": []},
+                "spa": {"redirectUris": [expected_redirect_uri]},
+            }
         return existing_app_by_app_id
 
-    async def fake_create_application(client, *, display_name, required_resource_access, redirect_uri):
+    async def fake_create_application(client, *, display_name, required_resource_access, redirect_uri, spa_redirect_uri=None):
         assert redirect_uri == expected_redirect_uri
+        assert spa_redirect_uri == expected_redirect_uri
         return {
             "id": "new-object-id",
             "appId": "new-client-id",
-            "_graph_create_payload": {"displayName": display_name, "web": {"redirectUris": [redirect_uri]}},
+            "_graph_create_payload": {
+                "displayName": display_name,
+                "spa": {"redirectUris": [spa_redirect_uri]},
+            },
         }
 
-    async def fake_ensure_application_redirect_uri(client, *, application_object_id, redirect_uri):
+    async def fake_ensure_application_redirect_uri(client, *, application_object_id, redirect_uri, spa_redirect_uri=None):
         if application_object_id == "new-object-id":
             app_id = "new-client-id"
         else:
             app_id = "application-client-id"
-        return {"id": application_object_id, "appId": app_id, "web": {"redirectUris": [redirect_uri]}}, None, 1
+        assert spa_redirect_uri == expected_redirect_uri
+        return {
+            "id": application_object_id,
+            "appId": app_id,
+            "web": {"redirectUris": []},
+            "spa": {"redirectUris": [spa_redirect_uri]},
+        }, None, 1
 
     async def fake_get_service_principal(client, *, service_principal_id):
         if isinstance(existing_service_principal, Exception):
@@ -646,7 +693,12 @@ async def test_deployment_validate_recovers_stale_client_id(db_session, auth_con
     await db_session.commit()
     _install_validate_recovery_fakes(
         monkeypatch,
-        existing_app={"id": "old-object-id", "appId": "actual-client-id", "web": {"redirectUris": [tenant.redirect_uri]}},
+        existing_app={
+            "id": "old-object-id",
+            "appId": "actual-client-id",
+            "web": {"redirectUris": []},
+            "spa": {"redirectUris": [tenant.redirect_uri]},
+        },
         existing_app_by_app_id=None,
     )
 
@@ -669,7 +721,12 @@ async def test_deployment_validate_recovers_stale_object_id(db_session, auth_con
     await db_session.commit()
     _install_validate_recovery_fakes(
         monkeypatch,
-        existing_app={"id": "old-object-id", "appId": "application-client-id", "web": {"redirectUris": [tenant.redirect_uri]}},
+        existing_app={
+            "id": "old-object-id",
+            "appId": "application-client-id",
+            "web": {"redirectUris": []},
+            "spa": {"redirectUris": [tenant.redirect_uri]},
+        },
         existing_app_by_app_id={"id": "different-object-id", "appId": "application-client-id"},
     )
 
@@ -697,7 +754,8 @@ async def test_deployment_validate_recovers_deleted_service_principal(db_session
         existing_app={
             "id": "application-object-id",
             "appId": "application-client-id",
-            "web": {"redirectUris": [tenant.redirect_uri]},
+            "web": {"redirectUris": []},
+            "spa": {"redirectUris": [tenant.redirect_uri]},
         },
         existing_app_by_app_id={"id": "application-object-id", "appId": "application-client-id"},
         existing_service_principal=_not_found("/servicePrincipals/deleted-service-principal-id"),
@@ -728,7 +786,8 @@ async def test_deployment_validate_endpoint_returns_validation_payload(api_clien
         existing_app={
             "id": "application-object-id",
             "appId": "application-client-id",
-            "web": {"redirectUris": [tenant.redirect_uri]},
+            "web": {"redirectUris": []},
+            "spa": {"redirectUris": [tenant.redirect_uri]},
         },
         existing_app_by_app_id={"id": "application-object-id", "appId": "application-client-id"},
         existing_service_principal={"id": "service-principal-id", "appId": "application-client-id"},

@@ -273,6 +273,7 @@ def _render_out_template_reportlab(path: Path, report: dict[str, Any], template_
     styles.add(ParagraphStyle(name="TemplateHeading", parent=styles["Heading2"], fontSize=12, leading=15, spaceBefore=4, spaceAfter=6, textColor=_color("navy")))
     styles.add(ParagraphStyle(name="TemplateBody", parent=styles["BodyText"], fontSize=8.8, leading=11.5))
     styles.add(ParagraphStyle(name="TemplateSmall", parent=styles["BodyText"], fontSize=7.2, leading=9.2))
+    styles.add(ParagraphStyle(name="TemplateFine", parent=styles["BodyText"], fontSize=6.5, leading=8.5))
     styles.add(ParagraphStyle(name="TemplateMuted", parent=styles["BodyText"], fontSize=8, leading=10.5, textColor=_color("muted")))
     styles.add(ParagraphStyle(name="TemplateKpi", parent=styles["Heading1"], fontSize=17, leading=20, alignment=TA_CENTER, textColor=_color("navy")))
     styles.add(ParagraphStyle(name="TemplateKpiLabel", parent=styles["BodyText"], fontSize=7, leading=8.5, alignment=TA_CENTER, textColor=_color("muted")))
@@ -293,20 +294,182 @@ def _render_out_template_reportlab(path: Path, report: dict[str, Any], template_
     summary = report["summary"]
     rows = report.get("parameter_rows") or []
     story: list[Any] = []
+
+    # Page 1 — Cover
     _out_cover(story, styles, summary, template_dir)
     story.append(PageBreak())
-    _out_dashboard(story, styles, summary, rows)
+
+    # Page 2 — Table of Contents
+    _out_template_toc(story, styles, rows)
     story.append(PageBreak())
+
+    # Page 3 — Executive Summary (includes Purpose)
     _out_executive_summary(story, styles, summary, rows)
     story.append(PageBreak())
+
+    # Page 4 — Evaluation Summary (3 pillars, services, risk matrix)
+    _out_template_evaluation_summary(story, styles, rows)
+    story.append(PageBreak())
+
+    # Page 5 — Summary of Assessment (score + service breakdown)
+    _out_dashboard(story, styles, summary, rows)
+    story.append(PageBreak())
+
+    # Page 6 — Key Observations & Recommendations
     _out_key_observations(story, styles, summary, rows)
     story.append(PageBreak())
+
+    # Pages 7+ — Detailed Assessment (by service domain)
     _out_detailed_assessment(story, styles, rows, template_dir)
     story.append(PageBreak())
+
+    # Last page — Conclusion
     _out_conclusion(story, styles, summary, rows)
 
     doc.build(story)
     return path
+
+
+def _out_template_toc(story: list[Any], styles, rows: list[dict[str, Any]]) -> None:
+    from reportlab.lib.colors import HexColor
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+
+    _out_section(story, styles, "Table of Contents")
+
+    toc_entries = [
+        ("1", "Executive Summary"),
+        ("2", "Purpose & Evaluation Scope"),
+        ("3", "Evaluation Summary"),
+        ("4", "Summary of Assessment"),
+        ("5", "Key Observations"),
+        ("6", "Recommended Actions"),
+        ("7", "Detailed Assessment"),
+    ]
+    services = list(_rows_by_service(rows).keys())
+    sub_num = 8
+    for svc in services:
+        toc_entries.append((f"  {sub_num}", svc))
+        sub_num += 1
+    toc_entries.append((str(sub_num), "Conclusion"))
+
+    tbl_data = []
+    for num, title in toc_entries:
+        is_sub = title.startswith("  ") or num.strip() != num
+        style = styles["TemplateSmall"] if is_sub else styles["TemplateBody"]
+        dots = "." * 60
+        tbl_data.append([
+            Paragraph(f"<b>{num.strip()}</b>" if not is_sub else num.strip(), styles["TemplateSmall"]),
+            Paragraph(_escape(title.strip()), style),
+            Paragraph(dots, styles["TemplateFine"]),
+        ])
+
+    tbl = Table(tbl_data, colWidths=[24, 340, None])
+    tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#e2e8f0")),
+    ]))
+    story.append(tbl)
+
+
+def _out_template_evaluation_summary(story: list[Any], styles, rows: list[dict[str, Any]]) -> None:
+    from reportlab.lib.colors import HexColor
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+
+    _out_section(story, styles, "Evaluation Summary")
+
+    # 3 Pillars
+    story.append(Paragraph("<b>Assessment Pillars</b>", styles["TemplateHeading"]))
+    for pillar, desc in [
+        ("Security", "Identity management, authentication controls, privileged access, guest access, and threat protection policies."),
+        ("Governance", "Data lifecycle, compliance policies, information barriers, DLP configuration, and Teams governance."),
+        ("Best Practices", "Licensing coverage, service adoption, OneDrive/SharePoint configuration, and operational hygiene."),
+    ]:
+        story.append(Paragraph(f"<b>{pillar}</b>: {_escape(desc)}", styles["TemplateBody"], bulletText="•"))
+        story.append(Spacer(1, 4))
+
+    story.append(Spacer(1, 10))
+
+    # M365 Services evaluated
+    story.append(Paragraph("<b>M365 Services Evaluated</b>", styles["TemplateHeading"]))
+    for svc in [
+        "Entra ID — Identity, conditional access, MFA, guest accounts, privileged roles",
+        "Exchange Online — Mail flow, anti-phishing, DMARC/DKIM, mailbox auditing",
+        "Microsoft Teams — Meeting policies, external access, app governance",
+        "SharePoint Online — Sharing controls, external access, site policies",
+        "OneDrive for Business — Sync controls, sharing policies, activity",
+        "Microsoft Purview — Sensitivity labels, DLP policies, retention, compliance posture",
+    ]:
+        story.append(Paragraph(_escape(svc), styles["TemplateBody"], bulletText="•"))
+        story.append(Spacer(1, 3))
+
+    story.append(Spacer(1, 14))
+
+    # Risk Score Matrix table
+    story.append(Paragraph("<b>Risk Score Matrix</b>", styles["TemplateHeading"]))
+    story.append(Spacer(1, 4))
+
+    matrix_data = [
+        ["Rating", "Score Impact", "Description", "Action Required"],
+        ["Critical", "–20 to –30", "Immediate Copilot blocker; data exposure or access control failure", "Remediate before deployment"],
+        ["High",     "–10 to –20", "Significant gap; elevated risk during Copilot rollout",            "Remediate within 30 days"],
+        ["Medium",   "–5 to –10",  "Control gap that increases risk surface; may affect Copilot UX",  "Address within 60 days"],
+        ["Low",      "–1 to –5",   "Minor deviation; improvement recommended for best practice",       "Address within 90 days"],
+        ["Pass",     "0",          "Control meets the Copilot readiness requirement",                  "No action required"],
+    ]
+
+    row_colors = {
+        "Critical": "#fef2f2",
+        "High":     "#fff7ed",
+        "Medium":   "#fefce8",
+        "Low":      "#eff6ff",
+        "Pass":     "#f0fdf4",
+    }
+    text_colors = {
+        "Critical": "#991b1b",
+        "High":     "#c2410c",
+        "Medium":   "#854d0e",
+        "Low":      "#1e40af",
+        "Pass":     "#15803d",
+    }
+
+    tbl_data = []
+    hdr = matrix_data[0]
+    tbl_data.append([
+        Paragraph(f"<b>{c}</b>", styles["TemplateSmall"]) for c in hdr
+    ])
+    for row in matrix_data[1:]:
+        rating = row[0]
+        color = text_colors.get(rating, "#0f172a")
+        tbl_data.append([
+            Paragraph(f"<b><font color='{color}'>{_escape(row[0])}</font></b>", styles["TemplateSmall"]),
+            Paragraph(_escape(row[1]), styles["TemplateSmall"]),
+            Paragraph(_escape(row[2]), styles["TemplateSmall"]),
+            Paragraph(_escape(row[3]), styles["TemplateSmall"]),
+        ])
+
+    ts = [
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0f172a")),
+        ("TEXTCOLOR",  (0, 0), (-1, 0), HexColor("#ffffff")),
+        ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",   (0, 0), (-1, -1), 7.5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.4, HexColor("#e2e8f0")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(row_colors.get(r[0], "#ffffff")) for r in matrix_data[1:]]),
+    ]
+    for i, row in enumerate(matrix_data[1:], start=1):
+        rating = row[0]
+        if rating in row_colors:
+            ts.append(("BACKGROUND", (0, i), (-1, i), HexColor(row_colors[rating])))
+
+    tbl = Table(tbl_data, colWidths=[55, 65, 230, 120])
+    tbl.setStyle(TableStyle(ts))
+    story.append(tbl)
 
 
 def _out_cover(story: list[Any], styles, summary: dict[str, Any], template_dir: Path) -> None:

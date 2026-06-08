@@ -116,3 +116,12 @@ class TenantDeploymentValidationResponse(BaseModel):
     service_principal_exists: bool
     redirect_uri_valid: bool
     consent_url: str | None
+
+
+class TenantRepairResponse(BaseModel):
+    needs_reconsent: bool
+    consent_url: str
+    tenant_id: str
+    app_client_id: str | None
+    permissions_patched: bool
+    primary_domain: str | None

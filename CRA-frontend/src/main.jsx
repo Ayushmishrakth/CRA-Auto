@@ -5,7 +5,20 @@ import {
   createMsalInstance,
   registerMsalEventCallbacks,
 } from "./auth/msalInstance";
+import { CRA_AUTH_TENANT_ID } from "./auth/msalConfig";
 import "./index.css";
+
+function accountTenantId(account) {
+  return account?.tenantId || account?.idTokenClaims?.tid || account?.homeAccountId?.split(".")?.[1] || "";
+}
+
+const _MULTI_TENANT_MODES = new Set(["common", "organizations", ""]);
+
+function isConfiguredTenantAccount(account) {
+  // Multi-tenant / common authority: accept accounts from any tenant.
+  if (_MULTI_TENANT_MODES.has(CRA_AUTH_TENANT_ID.toLowerCase())) return true;
+  return accountTenantId(account).toLowerCase() === CRA_AUTH_TENANT_ID.toLowerCase();
+}
 
 async function bootstrap() {
   const msalInstance = createMsalInstance();
@@ -13,12 +26,14 @@ async function bootstrap() {
   registerMsalEventCallbacks(msalInstance);
 
   const redirectResult = await msalInstance.handleRedirectPromise();
-  if (redirectResult?.account) {
+  if (redirectResult?.account && isConfiguredTenantAccount(redirectResult.account)) {
     msalInstance.setActiveAccount(redirectResult.account);
   } else {
-    const accounts = msalInstance.getAllAccounts();
+    const accounts = msalInstance.getAllAccounts().filter(isConfiguredTenantAccount);
     if (accounts.length > 0) {
       msalInstance.setActiveAccount(accounts[0]);
+    } else {
+      msalInstance.setActiveAccount(null);
     }
   }
 

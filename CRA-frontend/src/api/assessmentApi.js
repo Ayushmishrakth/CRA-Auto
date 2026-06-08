@@ -70,7 +70,9 @@ export async function getTenantAssessments(tenantId, params = {}) {
 }
 
 export async function generateAssessmentReport(assessmentId) {
-  const response = await api.post(`/assessments/${assessmentId}/generate-report`);
+  const response = await api.post(`/assessments/${assessmentId}/generate-report`, undefined, {
+    timeout: 180000,
+  });
   return unwrapApiData(response);
 }
 
@@ -84,15 +86,39 @@ export async function getAssessmentReportDebug(assessmentId) {
   return unwrapApiData(response);
 }
 
+export async function getAssessmentResults(assessmentId) {
+  const response = await api.get(`/assessments/${assessmentId}/results`);
+  return unwrapApiData(response);
+}
+
+export async function getDashboardStats() {
+  const response = await api.get("/dashboard/stats");
+  return unwrapApiData(response);
+}
+
+export async function listAssessments(params = {}) {
+  const response = await api.get("/assessments", { params });
+  return unwrapApiData(response);
+}
+
+export async function deleteAssessment(assessmentId) {
+  const response = await api.delete(`/assessments/${assessmentId}`);
+  return unwrapApiData(response);
+}
+
 export function getAssessmentReportDownloadUrl(assessmentId, reportType = "pdf") {
   const baseURL = api.defaults.baseURL?.replace(/\/+$/, "") || "";
   return `${baseURL}/assessments/${assessmentId}/report/download?report_type=${reportType}`;
 }
 
-export async function downloadAssessmentReport(assessmentId, reportType = "pdf") {
+export async function downloadAssessmentReport(assessmentId) {
   const response = await api.get(`/assessments/${assessmentId}/report/download`, {
-    params: { report_type: reportType },
-    responseType: "blob",
+    params: { report_type: "pdf" },
+    responseType: "arraybuffer",
   });
-  return response.data;
+  const disposition = response.headers?.["content-disposition"] || "";
+  const match = disposition.match(/filename="?([^";\n]+)"?/i);
+  const filename = match?.[1] ?? "copilot-readiness-assessment.pdf";
+  const data = new Blob([response.data], { type: "application/pdf" });
+  return { data, filename };
 }

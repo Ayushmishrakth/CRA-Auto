@@ -56,7 +56,7 @@ def calculate_scores(findings: list[AssessmentFinding]) -> dict[str, Any]:
         parameter = registry.get_parameter_by_key(parameter_key) or {}
         if finding.status in {"fail", "warning"} and parameter.get("copilot_blocker"):
             blocker_count += 1
-        if finding.status in {"pass", "collection_error", "licensing_required", "manual_validation"}:
+        if finding.status in {"pass", "not_collected"}:
             continue
         multiplier = 1.0 if finding.status == "fail" else 0.45
         weight = float(parameter.get("scoring_weight") or 1.0)

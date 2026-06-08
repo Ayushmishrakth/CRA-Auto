@@ -1,16 +1,16 @@
 import { numberOrZero } from "./assessmentFormatters";
 
 const STATUS_LABELS = {
-  PASS: "Pass",
-  FAIL: "Fail",
-  FAILED: "Collection issue",
-  FAILED_COLLECTOR: "Collection issue",
-  COLLECTION_ERROR: "Collection error",
-  LICENSING_REQUIRED: "Licensing required",
-  MANUAL_VALIDATION: "Manual validation",
-  MANUAL_VALIDATION_REQUIRED: "Manual validation",
-  NOT_COLLECTED: "Not assessed",
-  WARNING: "Review",
+  PASS: "PASS",
+  FAIL: "FAIL",
+  FAILED: "COLLECTION ERROR",
+  FAILED_COLLECTOR: "COLLECTION ERROR",
+  COLLECTION_ERROR: "COLLECTION ERROR",
+  LICENSING_REQUIRED: "FAIL",
+  MANUAL_VALIDATION: "FAIL",
+  MANUAL_VALIDATION_REQUIRED: "FAIL",
+  NOT_COLLECTED: "NOT COLLECTED",
+  WARNING: "WARNING",
 };
 
 const DOMAIN_ALIASES = {
@@ -44,7 +44,7 @@ export function statusTone(status = "") {
   if (normalized === "PASS") return "success";
   if (normalized === "FAIL") return "critical";
   if (["FAILED", "FAILED_COLLECTOR", "COLLECTION_ERROR", "WARNING"].includes(normalized)) return "warning";
-  if (["LICENSING_REQUIRED", "MANUAL_VALIDATION", "MANUAL_VALIDATION_REQUIRED"].includes(normalized)) return "info";
+  if (["LICENSING_REQUIRED", "MANUAL_VALIDATION", "MANUAL_VALIDATION_REQUIRED"].includes(normalized)) return "critical";
   return "neutral";
 }
 

@@ -739,7 +739,7 @@ async def collect_admin_consent_workflow(tenant: ConnectedTenant) -> dict[str, A
         parameter_key=parameter_key,
         status=status,
         severity="high",
-        actual_value=policy,
+        actual_value={"isEnabled": is_enabled, "status_text": reasoning},
         expected_value="Admin consent request workflow configured",
         finding=reasoning,
         graph_endpoint="/policies/adminConsentRequestPolicy",
@@ -1697,7 +1697,20 @@ async def _teams_policy_limitation_result(
 
 
 async def collect_guest_access_enabled_disabled(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="guest_access_enabled_disabled", expected_value="Guest access disabled", pass_criteria="When it is disabled", fail_criteria="When it is enabled", severity="medium", scoring_weight=3.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="guest_access_enabled_disabled", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Guest access disabled",
+            pass_criteria="When it is disabled", fail_criteria="When it is enabled",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="guest_access_enabled_disabled", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Users > Guest access",
+        graph_endpoint="beta/teamwork", expected_value="Guest access disabled",
+        pass_criteria="When it is disabled", fail_criteria="When it is enabled",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def collect_teams_anonymous_users(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -1709,39 +1722,203 @@ async def collect_teams_external_unmanaged_user_communication(tenant: ConnectedT
 
 
 async def collect_teams_file_storage_option(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="teams_file_storage_option", expected_value="Files stored within Microsoft suite", pass_criteria="When the files are stored within the Microsoft suit", fail_criteria="When the files are stored outside the Microsoft suit", severity="medium", scoring_weight=3.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="teams_file_storage_option", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Files stored within Microsoft suite",
+            pass_criteria="When the files are stored within the Microsoft suite",
+            fail_criteria="When the files are stored outside the Microsoft suite",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="teams_file_storage_option", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Org-wide settings > Teams settings > Files",
+        graph_endpoint="beta/teamwork", expected_value="Files stored within Microsoft suite",
+        pass_criteria="When the files are stored within the Microsoft suite",
+        fail_criteria="When the files are stored outside the Microsoft suite",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def collect_copilot_integration_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="copilot_integration_enabled", expected_value="Copilot app integration enabled", pass_criteria="When it is enabled", fail_criteria="When it is disabled", severity="critical", scoring_weight=5.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="copilot_integration_enabled", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Copilot app integration enabled",
+            pass_criteria="When it is enabled", fail_criteria="When it is disabled",
+            severity="critical", scoring_weight=5.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="copilot_integration_enabled", service_name="Microsoft Teams",
+        portal_location="Microsoft 365 Admin Center > Settings > Copilot",
+        graph_endpoint="beta/teamwork", expected_value="Copilot app integration enabled",
+        pass_criteria="When it is enabled", fail_criteria="When it is disabled",
+        severity="critical", scoring_weight=5.0,
+    )
 
 
 async def collect_meeting_transcription_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="meeting_transcription_enabled", expected_value="Meeting transcription enabled", pass_criteria="When it is enabled", fail_criteria="When it is disabled", severity="high", scoring_weight=4.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="meeting_transcription_enabled", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Meeting transcription enabled",
+            pass_criteria="When it is enabled", fail_criteria="When it is disabled",
+            severity="high", scoring_weight=4.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="meeting_transcription_enabled", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Meetings > Meeting policies",
+        graph_endpoint="beta/teamwork", expected_value="Meeting transcription enabled",
+        pass_criteria="When it is enabled", fail_criteria="When it is disabled",
+        severity="high", scoring_weight=4.0,
+    )
 
 
 async def collect_meeting_recording_retention_policies(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="meeting_recording_retention_policies", expected_value="Meeting recording retention enabled", pass_criteria="When it is enabled", fail_criteria="When it is disabled", severity="medium", scoring_weight=3.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="meeting_recording_retention_policies", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Meeting recording retention enabled",
+            pass_criteria="When it is enabled", fail_criteria="When it is disabled",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="meeting_recording_retention_policies", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Meetings > Meeting policies",
+        graph_endpoint="beta/teamwork", expected_value="Meeting recording retention enabled",
+        pass_criteria="When it is enabled", fail_criteria="When it is disabled",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def collect_meeting_policies_configuration(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="meeting_policies_configuration", expected_value="Recommended Teams meeting policies configured", pass_criteria="When recommended settings are setup", fail_criteria="When recommended settings aren't setup", severity="high", scoring_weight=4.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="meeting_policies_configuration", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Recommended Teams meeting policies configured",
+            pass_criteria="When recommended settings are setup",
+            fail_criteria="When recommended settings aren't setup",
+            severity="high", scoring_weight=4.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="meeting_policies_configuration", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Meetings > Meeting policies",
+        graph_endpoint="beta/teamwork", expected_value="Recommended Teams meeting policies configured",
+        pass_criteria="When recommended settings are setup",
+        fail_criteria="When recommended settings aren't setup",
+        severity="high", scoring_weight=4.0,
+    )
 
 
 async def collect_teams_channel_email_addresses(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="teams_channel_email_addresses", expected_value="Restricted sender list configured for channel email", pass_criteria="This will restrict Teams channels to allow accepting channel emails only from these Restricted Domains", fail_criteria="This will not restrict Teams channels to allow accepting channel emails only from these Restricted Domains", severity="low", scoring_weight=2.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="teams_channel_email_addresses", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork",
+            expected_value="Restricted sender list configured for channel email",
+            pass_criteria="This will restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+            fail_criteria="This will not restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+            severity="low", scoring_weight=2.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="teams_channel_email_addresses", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Org-wide settings > Teams settings > Email integration",
+        graph_endpoint="beta/teamwork",
+        expected_value="Restricted sender list configured for channel email",
+        pass_criteria="This will restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+        fail_criteria="This will not restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
+        severity="low", scoring_weight=2.0,
+    )
 
 
 async def collect_teams_lobby_bypass(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="teams_lobby_bypass", expected_value="Lobby bypass set to Never", pass_criteria="Specifies whether participants can bypass the lobby when joining the meeting - Never", fail_criteria="Specifies whether participants can bypass the lobby when joining the meeting - Anyone", severity="medium", scoring_weight=3.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="teams_lobby_bypass", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Lobby bypass set to Never",
+            pass_criteria="Specifies whether participants can bypass the lobby when joining the meeting - Never",
+            fail_criteria="Specifies whether participants can bypass the lobby when joining the meeting - Anyone",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="teams_lobby_bypass", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Meetings > Meeting policies",
+        graph_endpoint="beta/teamwork", expected_value="Lobby bypass set to Never",
+        pass_criteria="Specifies whether participants can bypass the lobby when joining the meeting - Never",
+        fail_criteria="Specifies whether participants can bypass the lobby when joining the meeting - Anyone",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def collect_teams_meeting_chat(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="teams_meeting_chat", expected_value="Meeting chat enabled", pass_criteria="Enabled: Participants are allowed to use chat during and after the meeting.", fail_criteria="Disabled: Meeting chat is disabled", severity="medium", scoring_weight=3.0)
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="teams_meeting_chat", service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Meeting chat enabled",
+            pass_criteria="Enabled: Participants are allowed to use chat during and after the meeting.",
+            fail_criteria="Disabled: Meeting chat is disabled",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="teams_meeting_chat", service_name="Microsoft Teams",
+        portal_location="Teams Admin Center > Meetings > Meeting policies",
+        graph_endpoint="beta/teamwork", expected_value="Meeting chat enabled",
+        pass_criteria="Enabled: Participants are allowed to use chat during and after the meeting.",
+        fail_criteria="Disabled: Meeting chat is disabled",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def collect_third_party_apps_allowed(tenant: ConnectedTenant) -> dict[str, Any]:
-    return await _teams_policy_limitation_result(tenant, parameter_key="third_party_apps_allowed", expected_value="Third-party/custom apps disabled", pass_criteria="Disabled- custom apps are unavailable in the organization's app", fail_criteria="Enabled- custom apps are available in the organization's app", severity="high", scoring_weight=4.0)
+    parameter_key = "third_party_apps_allowed"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key=parameter_key, service_name="Microsoft Teams",
+            graph_endpoint="beta/teamwork", expected_value="Third-party/custom apps disabled",
+            pass_criteria="Disabled — custom apps are unavailable in the organization's app",
+            fail_criteria="Enabled — custom apps are available in the organization's app",
+            severity="high", scoring_weight=4.0,
+        )
+    endpoint = "beta/teamwork/teamsAppSettings"
+    response = await _graph_get_json_or_error(tenant, endpoint)
+    if not response.get("ok"):
+        return _governance_unverifiable_fail(
+            tenant, parameter_key=parameter_key, service_name="Microsoft Teams",
+            portal_location="Teams Admin Center > Teams apps > Permission policies",
+            graph_endpoint=endpoint, expected_value="Third-party/custom apps disabled",
+            pass_criteria="Disabled — custom apps are unavailable in the organization's app",
+            fail_criteria="Enabled — custom apps are available in the organization's app",
+            severity="high", scoring_weight=4.0,
+        )
+    settings = response.get("response") or {}
+    sideloading_enabled = settings.get("isSideloadingEnabledForOrg", True)
+    if sideloading_enabled:
+        status = "fail"
+        actual_msg = "Third-party app sideloading is enabled (isSideloadingEnabledForOrg=True) — custom apps can be installed"
+        finding = "Custom app sideloading enabled — disable to prevent unauthorized app installs"
+    else:
+        status = "pass"
+        actual_msg = "Third-party app sideloading is disabled (isSideloadingEnabledForOrg=False)"
+        finding = "Custom app sideloading disabled — recommended security posture"
+    evidence = _evaluation_evidence(
+        pass_criteria="Disabled — custom apps are unavailable in the organization's app",
+        fail_criteria="Enabled — custom apps are available in the organization's app",
+        reasoning=finding,
+        extra={"tenant_id": tenant.tenant_id, "isSideloadingEnabledForOrg": sideloading_enabled, "teams_app_settings": settings},
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status=status,
+        severity="high",
+        actual_value={"isSideloadingEnabledForOrg": sideloading_enabled, "message": actual_msg},
+        expected_value="Third-party/custom apps disabled",
+        finding=finding,
+        graph_endpoint=endpoint,
+        evidence=evidence,
+        raw_response={"teams_app_settings": settings},
+        graph_calls=2,
+        scoring_weight=4.0,
+    )
 
 
 def _powershell_limitation_result(
@@ -1834,6 +2011,92 @@ def _manual_validation_required_result(
     )
 
 
+async def _teams_service_available(tenant: ConnectedTenant) -> bool:
+    response = await _graph_get_json_or_error(tenant, "beta/teamwork")
+    return bool(response.get("ok"))
+
+
+async def _exchange_service_available(tenant: ConnectedTenant) -> bool:
+    response = await _graph_get_json_or_error(tenant, "beta/admin/exchange/settings")
+    return bool(response.get("ok"))
+
+
+def _service_unavailable_fail(
+    tenant: ConnectedTenant,
+    *,
+    parameter_key: str,
+    service_name: str,
+    graph_endpoint: str,
+    expected_value: str,
+    pass_criteria: str,
+    fail_criteria: str,
+    severity: str,
+    scoring_weight: float,
+) -> dict[str, Any]:
+    message = (
+        f"{service_name} is not available in this tenant — service must be provisioned and "
+        "licensed before M365 Copilot deployment. This is a readiness gap."
+    )
+    evidence = _evaluation_evidence(
+        pass_criteria=pass_criteria,
+        fail_criteria=fail_criteria,
+        reasoning=message,
+        extra={"tenant_id": tenant.tenant_id, "service_available": False, "service": service_name},
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status="fail",
+        severity=severity,
+        actual_value={"service_available": False, "service": service_name, "message": message},
+        expected_value=expected_value,
+        finding=f"{service_name} not available in tenant — readiness gap",
+        graph_endpoint=graph_endpoint,
+        evidence=evidence,
+        raw_response={"service_available": False, "service": service_name},
+        graph_calls=1,
+        scoring_weight=scoring_weight,
+    )
+
+
+def _governance_unverifiable_fail(
+    tenant: ConnectedTenant,
+    *,
+    parameter_key: str,
+    service_name: str,
+    portal_location: str,
+    graph_endpoint: str,
+    expected_value: str,
+    pass_criteria: str,
+    fail_criteria: str,
+    severity: str,
+    scoring_weight: float,
+) -> dict[str, Any]:
+    message = (
+        f"{service_name} is available but this governance setting is not exposed via "
+        f"app-only Graph API. Configure this setting at: {portal_location}. "
+        "Treating as not configured — readiness gap."
+    )
+    evidence = _evaluation_evidence(
+        pass_criteria=pass_criteria,
+        fail_criteria=fail_criteria,
+        reasoning=message,
+        extra={"tenant_id": tenant.tenant_id, "service_available": True, "governance_verified": False},
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status="fail",
+        severity=severity,
+        actual_value={"service_available": True, "governance_verified": False, "message": message},
+        expected_value=expected_value,
+        finding=f"{service_name} governance not verifiable via Graph API — treat as not configured",
+        graph_endpoint=graph_endpoint,
+        evidence=evidence,
+        raw_response={"service_available": True, "governance_verified": False},
+        graph_calls=1,
+        scoring_weight=scoring_weight,
+    )
+
+
 def _licensing_required_result(
     tenant: ConnectedTenant,
     *,
@@ -1850,7 +2113,11 @@ def _licensing_required_result(
     scoring_weight: float,
     graph_response: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    reasoning = f"{required_service} evidence requires {required_sku}, {required_role}, and Graph permission(s): {', '.join(required_permissions)}."
+    reasoning = (
+        f"{required_service} requires {required_sku} license and is not available in this tenant. "
+        f"Required role: {required_role}. Required permission(s): {', '.join(required_permissions)}. "
+        "This is a readiness gap — provision the required license to meet Copilot prerequisites."
+    )
     evidence = _evaluation_evidence(
         pass_criteria=pass_criteria,
         fail_criteria=fail_criteria,
@@ -1858,7 +2125,7 @@ def _licensing_required_result(
         extra={
             "tenant_id": tenant.tenant_id,
             "graph_endpoint": endpoint,
-            "collection_status": "LICENSING_REQUIRED",
+            "collection_status": "LICENSING_GAP",
             "required_sku": required_sku,
             "required_service": required_service,
             "required_role": required_role,
@@ -1868,20 +2135,21 @@ def _licensing_required_result(
     )
     return _collector_result(
         parameter_key=parameter_key,
-        status="licensing_required",
+        status="fail",
         severity=severity,
         actual_value={
-            "collection_status": "LICENSING_REQUIRED",
+            "collection_status": "LICENSING_GAP",
             "required_sku": required_sku,
             "required_service": required_service,
             "required_role": required_role,
             "required_permissions": required_permissions,
+            "message": f"Required license not available: {required_sku}",
         },
         expected_value=expected_value,
         finding=reasoning,
         graph_endpoint=endpoint,
         evidence=evidence,
-        raw_response={"graph_response": graph_response or {}, "licensing_required": True},
+        raw_response={"graph_response": graph_response or {}, "licensing_gap": True},
         graph_calls=1 if endpoint else 0,
         scoring_weight=scoring_weight,
     )
@@ -1902,7 +2170,7 @@ def _graph_limitation_result(
     error = response.get("error") or {}
     reasoning = error.get("message") or "Microsoft Graph did not return supported data for this control."
     lowered = reasoning.lower()
-    status = "licensing_required" if any(token in lowered for token in ["license", "subscription", "premium", "not available"]) else "collection_error"
+    status = "fail" if any(token in lowered for token in ["license", "subscription", "premium", "not available"]) else "collection_error"
     evidence = _evaluation_evidence(
         pass_criteria=pass_criteria,
         fail_criteria=fail_criteria,
@@ -1990,33 +2258,255 @@ async def collect_audit_logs_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
 async def collect_emergency_access_accounts(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "emergency_access_accounts"
     client = await _graph_client(tenant)
+    graph_calls = 0
+
+    # Primary heuristic: cloud-only accounts excluded from ALL enabled Conditional Access policies
+    cap_response = await _conditional_access_policies(tenant)
+    graph_calls += 1
+    all_policies = cap_response.get("value") or []
+    enabled_policies = [p for p in all_policies if str(p.get("state") or "").lower() == "enabled"]
+
+    excluded_from_all: set[str] | None = None
+    for pol in enabled_policies:
+        excluded = set((pol.get("conditions") or {}).get("users", {}).get("excludeUsers") or [])
+        excluded_from_all = excluded if excluded_from_all is None else excluded_from_all & excluded
+
+    cap_candidates: list[dict[str, Any]] = []
+    if excluded_from_all:
+        for user_id in excluded_from_all:
+            try:
+                user = await client.get(
+                    f"/users/{user_id}",
+                    params={"$select": "id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled"},
+                )
+                graph_calls += 1
+                if user.get("accountEnabled") and user.get("onPremisesSyncEnabled") is None:
+                    cap_candidates.append(user)
+            except httpx.HTTPStatusError:
+                graph_calls += 1
+
+    # Supplementary heuristic: Global Admin members whose name contains emergency keywords
     roles = await client.get("/directoryRoles", params={"$filter": "displayName eq 'Global Administrator'", "$select": "id,displayName"})
+    graph_calls += 1
     role = (roles.get("value") or [None])[0]
-    members_response = {"value": []}
+    members: list[dict[str, Any]] = []
     if role:
-        members_response = await client.get(f"/directoryRoles/{role['id']}/members", params={"$select": "id,displayName,userPrincipalName,mail"})
-    members = members_response.get("value") or []
+        members_resp = await client.get(
+            f"/directoryRoles/{role['id']}/members",
+            params={"$select": "id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled"},
+        )
+        graph_calls += 1
+        members = members_resp.get("value") or []
+
     emergency_markers = ("break", "glass", "emergency", "backup", "elevated")
-    emergency = [
-        item for item in members
-        if any(marker in str(item.get("displayName") or item.get("userPrincipalName") or "").lower() for marker in emergency_markers)
+    name_matches = [
+        u for u in members
+        if any(m in str(u.get("displayName") or u.get("userPrincipalName") or "").lower() for m in emergency_markers)
     ]
-    status = "pass" if emergency else "fail"
-    reasoning = f"{len(emergency)} emergency access account(s) identified among {len(members)} Global Administrator member(s)"
-    evidence = _evaluation_evidence(pass_criteria="When it is Present", fail_criteria="When not present", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "global_admin_members": members, "emergency_access_accounts": emergency, "matching_markers": emergency_markers})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"emergency_access_accounts": len(emergency), "global_admin_members": len(members)}, expected_value="At least one identifiable emergency access account", finding=reasoning, graph_endpoint="/directoryRoles + /directoryRoles/{id}/members", evidence=evidence, raw_response={"directoryRoles": roles, "members": members_response}, graph_calls=2 if role else 1, scoring_weight=5.0)
+
+    seen: set[str] = {u.get("id") or "" for u in cap_candidates}
+    combined = list(cap_candidates)
+    for u in name_matches:
+        if u.get("id") not in seen:
+            combined.append(u)
+            seen.add(u.get("id") or "")
+
+    count = len(combined)
+    status = "pass" if count >= 1 else "fail"
+
+    if enabled_policies and cap_candidates:
+        reasoning = (
+            f"{count} emergency access account(s): {len(cap_candidates)} cloud-only account(s) excluded from all "
+            f"{len(enabled_policies)} enabled CA polic{'y' if len(enabled_policies) == 1 else 'ies'}, "
+            f"plus {len(name_matches)} name-heuristic match(es) among {len(members)} Global Admins"
+        )
+    elif enabled_policies:
+        reasoning = (
+            f"{count} emergency access account(s) via name heuristic; "
+            f"no user excluded from all {len(enabled_policies)} enabled CA polic{'y' if len(enabled_policies) == 1 else 'ies'}"
+        )
+    else:
+        reasoning = (
+            f"{count} emergency access account(s) identified via name heuristic "
+            f"among {len(members)} Global Administrator member(s); no enabled CA policies to apply exclusion heuristic"
+        )
+
+    evidence = _evaluation_evidence(
+        pass_criteria="When it is Present",
+        fail_criteria="When not present",
+        reasoning=reasoning,
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "enabled_cap_policy_count": len(enabled_policies),
+            "cap_exclusion_candidates": cap_candidates,
+            "global_admin_members": members,
+            "emergency_access_accounts": combined,
+            "name_heuristic_markers": emergency_markers,
+        },
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status=status,
+        severity="critical",
+        actual_value={
+            "emergency_access_accounts": count,
+            "cap_exclusion_count": len(cap_candidates),
+            "name_heuristic_count": len(name_matches),
+            "global_admin_members": len(members),
+            "cap_policies_checked": len(enabled_policies),
+        },
+        expected_value="At least one identifiable emergency access account",
+        finding=reasoning,
+        graph_endpoint="/identity/conditionalAccess/policies + /directoryRoles/{id}/members + /users/{id}",
+        evidence=evidence,
+        raw_response={"conditionalAccessPolicies": cap_response, "cap_exclusion_candidates": cap_candidates, "global_admin_members": members},
+        graph_calls=graph_calls,
+        scoring_weight=5.0,
+    )
 
 
 async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[str, Any]:
+    """Collect Custom Banned Password List via Entra ID Directory Settings.
+
+    The correct Microsoft Graph endpoint is GET /v1.0/settings (or /beta/settings).
+    Look for the 'Password Rule Settings' entry (templateId 5cf42378-d67d-4f36-ba46-e8b86229381d).
+    If no such setting exists the feature has never been configured → fail.
+    If the setting exists, inspect EnableBannedPasswordCheck and CustomBannedPasswords values.
+    """
     parameter_key = "custom_banned_password_list"
-    endpoints = [
+    _PASS_CRITERIA = "Custom banned password list is configured with at least one custom term and enforcement is enabled."
+    _FAIL_CRITERIA = "Custom banned password list is not configured or contains no custom banned terms."
+    _PASSWORD_RULE_TEMPLATE_ID = "5cf42378-d67d-4f36-ba46-e8b86229381d"
+
+    # Primary: directory settings (v1.0 then beta)
+    settings_endpoints = [
+        "/settings",
+        "https://graph.microsoft.com/beta/settings",
+    ]
+    all_responses: list[dict[str, Any]] = []
+
+    for endpoint in settings_endpoints:
+        resp = await _graph_get_json_or_error(tenant, endpoint)
+        all_responses.append({"endpoint": endpoint, **resp})
+        if not resp.get("ok"):
+            continue
+
+        body = resp.get("response") or {}
+        settings_list: list[dict[str, Any]] = body.get("value") or []
+
+        # Find the Password Rule Settings entry
+        pwd_setting: dict[str, Any] | None = None
+        for s in settings_list:
+            if s.get("templateId") == _PASSWORD_RULE_TEMPLATE_ID or s.get("displayName") == "Password Rule Settings":
+                pwd_setting = s
+                break
+
+        if pwd_setting is None:
+            # Feature never configured in Entra — this is a definitive FAIL, not NOT_COLLECTED
+            reasoning = (
+                "No 'Password Rule Settings' directory setting was found in this tenant. "
+                "The Custom Banned Password List feature has not been configured. "
+                f"({len(settings_list)} directory settings exist; none match templateId {_PASSWORD_RULE_TEMPLATE_ID})."
+            )
+            evidence = _evaluation_evidence(
+                pass_criteria=_PASS_CRITERIA,
+                fail_criteria=_FAIL_CRITERIA,
+                reasoning=reasoning,
+                extra={
+                    "tenant_id": tenant.tenant_id,
+                    "graph_endpoint": endpoint,
+                    "enabled": False,
+                    "custom_word_count": 0,
+                    "directory_settings_found": len(settings_list),
+                    "password_rule_template_id": _PASSWORD_RULE_TEMPLATE_ID,
+                },
+            )
+            evidence["remediation"] = (
+                "In Entra admin center > Protection > Authentication methods > Password protection, "
+                "enable Custom banned password list and add your organization's custom banned terms."
+            )
+            return _collector_result(
+                parameter_key=parameter_key,
+                status="fail",
+                severity="critical",
+                actual_value={"enabled": False, "custom_word_count": 0, "configured": False},
+                expected_value="Custom banned password list configured with terms",
+                finding=reasoning,
+                graph_endpoint=endpoint,
+                evidence=evidence,
+                raw_response={"settings": settings_list, "endpoint_used": endpoint},
+                graph_calls=len(all_responses),
+                scoring_weight=5.0,
+            )
+
+        # Password Rule Settings found — extract the values array
+        values: list[dict[str, Any]] = pwd_setting.get("values") or []
+        val_map = {v.get("name", "").lower(): v.get("value", "") for v in values}
+
+        enabled_raw = val_map.get("enablebannedpasswordcheck", "False")
+        enabled = str(enabled_raw).strip().lower() in {"true", "1", "yes", "enabled"}
+
+        onprem_enabled_raw = val_map.get("enablebannedpasswordcheckonpremises", "False")
+        onprem_enabled = str(onprem_enabled_raw).strip().lower() in {"true", "1", "yes", "enabled"}
+
+        enforcement_mode = val_map.get("bannedpasswordcheckonpremisesmode", "Audit")
+
+        custom_passwords_raw = val_map.get("custombannedpasswords", "")
+        custom_words = [w.strip() for w in custom_passwords_raw.replace("\n", ",").split(",") if w.strip()] if custom_passwords_raw else []
+        custom_word_count = len(custom_words)
+
+        status = "pass" if enabled and custom_word_count > 0 else "fail"
+        reasoning = (
+            f"Custom banned password list enabled: {enabled}; "
+            f"on-premises enforcement: {onprem_enabled} (mode: {enforcement_mode}); "
+            f"custom banned terms configured: {custom_word_count}."
+        )
+        actual_value = {
+            "enabled": enabled,
+            "password_protection_enabled": enabled,
+            "enforcement_mode": enforcement_mode,
+            "custom_word_count": custom_word_count,
+            "custom_banned_password_count": custom_word_count,
+            "custom_words_present": custom_word_count > 0,
+            "on_premises_enforcement": onprem_enabled,
+        }
+        evidence = _evaluation_evidence(
+            pass_criteria=_PASS_CRITERIA,
+            fail_criteria=_FAIL_CRITERIA,
+            reasoning=reasoning,
+            extra={
+                "tenant_id": tenant.tenant_id,
+                "graph_endpoint": endpoint,
+                "setting_id": pwd_setting.get("id"),
+                **actual_value,
+            },
+        )
+        evidence["remediation"] = (
+            "Configure Microsoft Entra Password Protection: enable the custom banned password list "
+            "and add organization-specific terms in Entra admin center > Protection > Authentication methods > Password protection."
+        )
+        return _collector_result(
+            parameter_key=parameter_key,
+            status=status,
+            severity="critical",
+            actual_value=actual_value,
+            expected_value="Custom banned password list configured with at least one term",
+            finding=reasoning,
+            graph_endpoint=endpoint,
+            evidence=evidence,
+            raw_response={"password_rule_setting": pwd_setting, "endpoint_used": endpoint},
+            graph_calls=len(all_responses),
+            scoring_weight=5.0,
+        )
+
+    # Both directory settings endpoints failed — fall back to legacy policy endpoints
+    legacy_endpoints = [
         "https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/password",
         "https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy",
     ]
-    responses: list[dict[str, Any]] = []
-    for endpoint in endpoints:
+    for endpoint in legacy_endpoints:
         response = await _graph_get_json_or_error(tenant, endpoint)
-        responses.append({"endpoint": endpoint, **response})
+        all_responses.append({"endpoint": endpoint, **response})
         if not response.get("ok"):
             continue
         policy = response.get("response") or {}
@@ -2029,7 +2519,7 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
         status = "pass" if enabled and custom_word_count > 0 else "fail"
         reasoning = (
             f"Password protection enabled: {enabled}; enforcement mode: {parsed['enforcement_mode']}; "
-            f"custom banned password terms exposed: {custom_word_count}."
+            f"custom banned password terms: {custom_word_count}."
         )
         actual_value = {
             "enabled": enabled,
@@ -2038,28 +2528,12 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             "custom_word_count": custom_word_count,
             "custom_banned_password_count": custom_word_count,
             "custom_words_present": custom_word_count > 0,
-            "tenant_configuration_status": parsed["tenant_configuration_status"],
         }
-        evidence_payload = {
-            "password_protection_enabled": enabled,
-            "enforcement_mode": parsed["enforcement_mode"],
-            "custom_banned_password_count": custom_word_count,
-            "custom_words_present": custom_word_count > 0,
-            "custom_word_count": custom_word_count,
-            "tenant_configuration_status": parsed["tenant_configuration_status"],
-        }
-        if custom_words:
-            evidence_payload["custom_banned_password_terms"] = custom_words
         evidence = _evaluation_evidence(
-            pass_criteria="Custom banned password list is configured and contains one or more custom banned terms.",
-            fail_criteria="Custom banned password list is not configured or contains no custom banned terms.",
+            pass_criteria=_PASS_CRITERIA,
+            fail_criteria=_FAIL_CRITERIA,
             reasoning=reasoning,
-            extra={
-                "tenant_id": tenant.tenant_id,
-                "graph_endpoint": endpoint,
-                "evidence_source": "Microsoft Graph authentication methods policy",
-                **evidence_payload,
-            },
+            extra={"tenant_id": tenant.tenant_id, "graph_endpoint": endpoint, **actual_value},
         )
         evidence["remediation"] = (
             "Configure Microsoft Entra Password Protection custom banned password list and enforce password validation across all users."
@@ -2073,80 +2547,62 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             finding=reasoning,
             graph_endpoint=endpoint,
             evidence=evidence,
-            raw_response={
-                "password_protection_policy": policy,
-                "endpoint_attempts": responses,
-                "actual_values_only": True,
-            },
-            graph_calls=len(responses),
+            raw_response={"password_protection_policy": policy, "endpoint_attempts": all_responses},
+            graph_calls=len(all_responses),
             scoring_weight=5.0,
         )
 
-    terminal = _classify_custom_banned_password_failure(responses)
-    endpoint = terminal["endpoint"]
-    if terminal["status"] == "licensing_required":
-        return _licensing_required_result(
-            tenant,
-            parameter_key=parameter_key,
-            endpoint=endpoint,
-            required_sku="Microsoft Entra ID P1 or P2",
-            required_service="Entra ID Password Protection",
-            required_role="Authentication Policy Administrator or Global Administrator",
-            required_permissions=["Policy.Read.All"],
-            expected_value="Custom banned password list configured",
-            pass_criteria="Custom banned password list is configured and contains one or more custom banned terms.",
-            fail_criteria="Custom banned password list is not configured or contains no custom banned terms.",
-            severity="critical",
-            scoring_weight=5.0,
-            graph_response={"endpoint_attempts": responses, "reason": terminal["reason"]},
+    # All endpoints exhausted — definitively FAIL (not configured) rather than NOT_COLLECTED
+    # If Graph was reachable for any call, absence of the setting IS a finding
+    any_reachable = any(r.get("ok") for r in all_responses)
+    if any_reachable:
+        reasoning = (
+            "Microsoft Graph was reachable but no Custom Banned Password List configuration "
+            "was found in directory settings or authentication policy endpoints. "
+            "The feature appears to be unconfigured for this tenant."
         )
-
-    if terminal["status"] == "manual_validation_required":
         evidence = _evaluation_evidence(
-            pass_criteria="Custom banned password list is configured and contains one or more custom banned terms.",
-            fail_criteria="Custom banned password list is not configured or contains no custom banned terms.",
-            reasoning=terminal["reason"],
+            pass_criteria=_PASS_CRITERIA,
+            fail_criteria=_FAIL_CRITERIA,
+            reasoning=reasoning,
             extra={
                 "tenant_id": tenant.tenant_id,
-                "collection_status": "MANUAL_VALIDATION_REQUIRED",
-                "graph_endpoint_attempts": responses,
+                "enabled": False,
+                "custom_word_count": 0,
                 "portal_location": "Entra admin center > Protection > Authentication methods > Password protection",
-                "validation_procedure": "Review Password protection settings and confirm the custom banned password list contains at least one custom term.",
-                "expected_evidence": "Password Protection Enabled, Enforcement Mode, and Custom Banned Password Count.",
             },
+        )
+        evidence["remediation"] = (
+            "Configure Microsoft Entra Password Protection: enable the custom banned password list "
+            "and add custom terms in Entra admin center > Protection > Authentication methods > Password protection."
         )
         return _collector_result(
             parameter_key=parameter_key,
-            status="manual_validation_required",
+            status="fail",
             severity="critical",
-            actual_value={
-                "collection_status": "MANUAL_VALIDATION_REQUIRED",
-                "reason": terminal["reason"],
-                "enabled": None,
-                "custom_word_count": None,
-            },
-            expected_value="Custom banned password list configured",
-            finding=terminal["reason"],
-            graph_endpoint=", ".join(endpoints),
+            actual_value={"enabled": False, "custom_word_count": 0, "configured": False},
+            expected_value="Custom banned password list configured with at least one term",
+            finding=reasoning,
+            graph_endpoint=", ".join(settings_endpoints + legacy_endpoints),
             evidence=evidence,
-            raw_response={"endpoint_attempts": responses, "manual_validation_required": True},
-            graph_calls=len(responses),
+            raw_response={"endpoint_attempts": all_responses},
+            graph_calls=len(all_responses),
             scoring_weight=5.0,
         )
 
     return _collection_error_result(
         tenant,
         parameter_key=parameter_key,
-        endpoint=endpoint,
-        required_api="Microsoft Graph authentication methods policy",
-        required_permissions=["Policy.Read.All"],
+        endpoint=settings_endpoints[0],
+        required_api="Microsoft Graph Directory Settings (/v1.0/settings)",
+        required_permissions=["Policy.Read.All", "Directory.Read.All"],
         expected_value="Custom banned password list configured",
-        pass_criteria="Custom banned password list is configured and contains one or more custom banned terms.",
-        fail_criteria="Custom banned password list is not configured or contains no custom banned terms.",
+        pass_criteria=_PASS_CRITERIA,
+        fail_criteria=_FAIL_CRITERIA,
         severity="critical",
         scoring_weight=5.0,
-        response={"endpoint_attempts": responses, "reason": terminal["reason"]},
-        reason=terminal["reason"],
+        response={"endpoint_attempts": all_responses},
+        reason="All Microsoft Graph endpoints for password protection policy were unreachable.",
     )
 
 
@@ -2253,7 +2709,7 @@ def _classify_custom_banned_password_failure(responses: list[dict[str, Any]]) ->
     messages = " ".join(_error_message(item) for item in responses).lower()
     endpoint = str(responses[-1].get("endpoint") or "")
     if any(token in messages for token in ["license", "subscription", "premium", "requires azure ad premium", "requires microsoft entra id p"]):
-        return {"status": "licensing_required", "endpoint": endpoint, "reason": _error_message(responses[-1])}
+        return {"status": "licensing_gap", "endpoint": endpoint, "reason": _error_message(responses[-1])}
     if any(item.get("ok") for item in responses):
         return {
             "status": "manual_validation_required",
@@ -2415,16 +2871,64 @@ async def collect_getting_all_sites_with_sensitivity_keywords_on_a_tenant(tenant
 
 
 async def collect_compliance_score_overview(tenant: ConnectedTenant) -> dict[str, Any]:
-    return _manual_validation_required_result(
-        tenant,
-        parameter_key="compliance_score_overview",
-        portal_location="Microsoft Purview portal > Compliance Manager",
-        validation_procedure="Open Compliance Manager, export or capture the current compliance score overview, and attach the tenant score evidence to the assessment package.",
-        expected_evidence="Compliance Manager score overview export or screenshot showing current score and assessment date.",
-        expected_value="Compliance score >=80%",
+    parameter_key = "compliance_score_overview"
+    endpoint = "/security/secureScores"
+    client = await _graph_client(tenant)
+    try:
+        response = await client.get(endpoint, params={"$top": "1"})
+    except httpx.HTTPStatusError as exc:
+        try:
+            payload: dict[str, Any] = exc.response.json()
+        except ValueError:
+            payload = {"error": {"message": exc.response.text}}
+        return _graph_limitation_result(
+            tenant,
+            parameter_key=parameter_key,
+            endpoint=endpoint,
+            response={"ok": False, "status_code": exc.response.status_code, "error": payload.get("error") or payload},
+            expected_value="Compliance posture proxy >=80%",
+            pass_criteria="When it is more than or equal to 80%",
+            fail_criteria="When it is less than 80%",
+            severity="critical",
+            scoring_weight=5.0,
+        )
+    values = response.get("value") or []
+    latest = values[0] if values else {}
+    current = float(latest.get("currentScore") or 0)
+    maximum = float(latest.get("maxScore") or 0)
+    percentage = round(current / maximum * 100, 2) if maximum else 0.0
+    status = "pass" if percentage >= 80 else "fail"
+    reasoning = (
+        f"Compliance posture via Secure Score proxy: {percentage}% ({current}/{maximum}). "
+        "Microsoft Compliance Manager does not expose a public Graph API; Secure Score is used as the nearest automated proxy."
+    )
+    evidence = _evaluation_evidence(
         pass_criteria="When it is more than or equal to 80%",
         fail_criteria="When it is less than 80%",
+        reasoning=reasoning,
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "secure_score": latest,
+            "compliance_score_proxy_percentage": percentage,
+            "data_source": "Microsoft Graph /security/secureScores (Secure Score proxy — Compliance Manager API is not publicly available)",
+        },
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status=status,
         severity="critical",
+        actual_value={
+            "compliance_score_proxy": percentage,
+            "current_score": current,
+            "max_score": maximum,
+            "source": "Secure Score proxy",
+        },
+        expected_value="Compliance posture proxy >=80%",
+        finding=reasoning,
+        graph_endpoint="/security/secureScores?$top=1",
+        evidence=evidence,
+        raw_response={"secureScores": response},
+        graph_calls=1,
         scoring_weight=5.0,
     )
 
@@ -2534,15 +3038,66 @@ async def collect_dlp_rules_configured(tenant: ConnectedTenant) -> dict[str, Any
 
 
 async def collect_external_storage_providers_in_owa(tenant: ConnectedTenant) -> dict[str, Any]:
-    return _powershell_limitation_result(tenant, parameter_key="external_storage_providers_in_owa", command="Get-OwaMailboxPolicy | Select-Object Identity,AdditionalStorageProvidersAvailable", expected_value="External storage providers disabled in OWA", pass_criteria="When not enabled, users cannot connect third-party storage services to Outlook Web App", fail_criteria="When enabled, users can connect third-party storage services to Outlook Web App", severity="high", scoring_weight=4.0, reason="This control is fully automatable with Exchange Online PowerShell. The app-only Graph runtime cannot read OWA mailbox policy settings directly, so this collector must run through delegated Exchange automation.")
+    if not await _exchange_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="external_storage_providers_in_owa", service_name="Exchange Online",
+            graph_endpoint="beta/admin/exchange/settings",
+            expected_value="External storage providers disabled in OWA",
+            pass_criteria="When not enabled, users cannot connect third-party storage services to Outlook Web App",
+            fail_criteria="When enabled, users can connect third-party storage services to Outlook Web App",
+            severity="high", scoring_weight=4.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="external_storage_providers_in_owa", service_name="Exchange Online",
+        portal_location="Exchange Admin Center > Outlook Web App policies (Set-OwaMailboxPolicy -AdditionalStorageProvidersAvailable $false)",
+        graph_endpoint="beta/admin/exchange/settings",
+        expected_value="External storage providers disabled in OWA",
+        pass_criteria="When not enabled, users cannot connect third-party storage services to Outlook Web App",
+        fail_criteria="When enabled, users can connect third-party storage services to Outlook Web App",
+        severity="high", scoring_weight=4.0,
+    )
 
 
 async def collect_full_calendar_schedules_able_to_be_shared_externally(tenant: ConnectedTenant) -> dict[str, Any]:
-    return _powershell_limitation_result(tenant, parameter_key="full_calendar_schedules_able_to_be_shared_externally", command="Get-SharingPolicy | Format-List Domains,Enabled,Default", expected_value="External full calendar sharing disabled", pass_criteria="If False, calendar sharing is disabled across the organization", fail_criteria="If True, calendar sharing is enabled for the organization", severity="medium", scoring_weight=3.0, reason="This control is fully automatable with Exchange Online PowerShell sharing policies. The app-only Graph runtime cannot read this tenant sharing policy directly.")
+    if not await _exchange_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="full_calendar_schedules_able_to_be_shared_externally", service_name="Exchange Online",
+            graph_endpoint="beta/admin/exchange/settings",
+            expected_value="External full calendar sharing disabled",
+            pass_criteria="If False, calendar sharing is disabled across the organization",
+            fail_criteria="If True, calendar sharing is enabled for the organization",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="full_calendar_schedules_able_to_be_shared_externally", service_name="Exchange Online",
+        portal_location="Exchange Admin Center > Organization > Sharing policies",
+        graph_endpoint="beta/admin/exchange/settings",
+        expected_value="External full calendar sharing disabled",
+        pass_criteria="If False, calendar sharing is disabled across the organization",
+        fail_criteria="If True, calendar sharing is enabled for the organization",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def collect_customer_lockbox(tenant: ConnectedTenant) -> dict[str, Any]:
-    return _powershell_limitation_result(tenant, parameter_key="customer_lockbox", command="Get-OrganizationConfig | Select-Object CustomerLockBoxEnabled", expected_value="Customer Lockbox enabled", pass_criteria="Microsoft support staff cannot access your content without your explicit approval", fail_criteria="Microsoft support staff can access your content without your explicit approval", severity="medium", scoring_weight=3.0, reason="This control is fully automatable with Exchange Online PowerShell organization configuration. The app-only Graph runtime cannot read CustomerLockBoxEnabled directly.")
+    if not await _exchange_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant, parameter_key="customer_lockbox", service_name="Exchange Online",
+            graph_endpoint="beta/admin/exchange/settings",
+            expected_value="Customer Lockbox enabled",
+            pass_criteria="Microsoft support staff cannot access your content without your explicit approval",
+            fail_criteria="Microsoft support staff can access your content without your explicit approval",
+            severity="medium", scoring_weight=3.0,
+        )
+    return _governance_unverifiable_fail(
+        tenant, parameter_key="customer_lockbox", service_name="Exchange Online",
+        portal_location="Microsoft 365 Admin Center > Settings > Security & privacy > Customer Lockbox",
+        graph_endpoint="beta/admin/exchange/settings",
+        expected_value="Customer Lockbox enabled",
+        pass_criteria="Microsoft support staff cannot access your content without your explicit approval",
+        fail_criteria="Microsoft support staff can access your content without your explicit approval",
+        severity="medium", scoring_weight=3.0,
+    )
 
 
 async def _sharepoint_settings_or_status(
@@ -2758,36 +3313,118 @@ async def collect_inactive_site_policies(tenant: ConnectedTenant) -> dict[str, A
 
 
 async def collect_site_ownership_policies(tenant: ConnectedTenant) -> dict[str, Any]:
+    """Collect site ownership policies via M365 Groups (avoids SPO license requirement).
+
+    Uses /groups?$filter=groupTypes/any(x:x eq 'Unified') to enumerate M365 groups
+    (which back SharePoint team sites), then checks owner counts via /groups/{id}/owners.
+    Falls back to SharePoint admin settings endpoint if groups endpoint also fails.
+    """
     parameter_key = "site_ownership_policies"
+    _PASS_CRITERIA = "All Microsoft 365 Groups (team sites) have at least one owner assigned."
+    _FAIL_CRITERIA = "One or more Microsoft 365 Groups lack an assigned owner, creating ungoverned sites."
+
     client = await _graph_client(tenant)
-    try:
-        response = await _get_all(client, "/sites", params={"search": "*"})
-    except httpx.HTTPStatusError as exc:
-        try:
-            payload: dict[str, Any] = exc.response.json()
-        except ValueError:
-            payload = {"error": {"message": exc.response.text}}
+
+    # Use M365 Groups as proxy for SharePoint team sites — no SPO license required
+    groups_resp = await _graph_get_json_or_error(
+        tenant,
+        "/groups?$filter=groupTypes/any(x:x eq 'Unified')&$select=id,displayName,mail&$top=100",
+    )
+
+    if not groups_resp.get("ok"):
+        # Try SharePoint admin settings as a fallback signal
+        settings_resp = await _graph_get_json_or_error(tenant, "https://graph.microsoft.com/beta/admin/sharepoint/settings")
+        if settings_resp.get("ok"):
+            settings = settings_resp.get("response") or {}
+            # If we can read SharePoint settings, treat site governance as partially assessable
+            allow_guests = settings.get("isSharingEnabledForAllDomains") or settings.get("sharingCapability")
+            reasoning = (
+                f"Microsoft 365 Groups endpoint was unavailable (SPO license may be absent). "
+                f"SharePoint admin settings were readable: sharingCapability={allow_guests}. "
+                "Manual review of site ownership is recommended."
+            )
+            evidence = _evaluation_evidence(
+                pass_criteria=_PASS_CRITERIA,
+                fail_criteria=_FAIL_CRITERIA,
+                reasoning=reasoning,
+                extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings},
+            )
+            return _collector_result(
+                parameter_key=parameter_key,
+                status="fail",
+                severity="medium",
+                actual_value={"site_count": 0, "groups_with_no_owner": 0, "note": "SPO license not present; manual review needed"},
+                expected_value="All M365 Groups have at least one designated owner",
+                finding=reasoning,
+                graph_endpoint="https://graph.microsoft.com/beta/admin/sharepoint/settings",
+                evidence=evidence,
+                raw_response={"sharepoint_settings": settings},
+                graph_calls=2,
+                scoring_weight=3.0,
+            )
         return _collection_error_result(
             tenant,
             parameter_key=parameter_key,
-            endpoint="/sites?search=*",
-            required_api="Microsoft Graph Sites plus SharePoint Online PowerShell",
-            required_permissions=["Sites.Read.All", "Group.Read.All"],
-            expected_value="Site ownership policies are configured and sites have accountable owners",
-            pass_criteria="Site ownership policies are configured and sites have accountable owners",
-            fail_criteria="Site ownership policies are not configured or sites lack accountable ownership",
+            endpoint="/groups?$filter=groupTypes/any(x:x eq 'Unified')",
+            required_api="Microsoft Graph Groups API (Group.Read.All)",
+            required_permissions=["Group.Read.All"],
+            expected_value="All M365 Groups have at least one designated owner",
+            pass_criteria=_PASS_CRITERIA,
+            fail_criteria=_FAIL_CRITERIA,
             severity="medium",
             scoring_weight=3.0,
-            response={"ok": False, "status_code": exc.response.status_code, "error": payload.get("error") or payload},
-            command="Get-SPOSite -Limit All; Get-SPOUser -Site <url> or Get-MgGroupOwner",
+            response=groups_resp,
+            command="Get-MgGroup -Filter \"groupTypes/any(x:x eq 'Unified')\" | Get-MgGroupOwner",
         )
-    sites = response.get("value") or []
-    missing_owner = [site for site in sites if not (site.get("createdBy") or site.get("owner") or site.get("lastModifiedBy"))]
-    ratio = _percent(len(missing_owner), len(sites))
-    status = "pass" if ratio < 5 else "fail"
-    reasoning = f"{len(missing_owner)} site(s) lack owner/creator metadata out of {len(sites)} enumerated sites ({ratio}%)"
-    evidence = _evaluation_evidence(pass_criteria="Site ownership policies are configured and sites have accountable owners", fail_criteria="Site ownership policies are not configured or sites lack accountable ownership", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sites": sites[:50], "sites_missing_owner_metadata": missing_owner[:50], "required_powershell_command": "Get-SPOSite -Limit All; Get-SPOUser -Site <url> or Get-MgGroupOwner"})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="medium", actual_value={"site_count": len(sites), "sites_missing_owner_metadata": len(missing_owner), "missing_owner_percent": ratio}, expected_value="Site ownership policies are configured and sites have accountable owners", finding=reasoning, graph_endpoint="/sites?search=*", evidence=evidence, raw_response={"sites": response}, graph_calls=1, scoring_weight=3.0)
+
+    groups: list[dict[str, Any]] = (groups_resp.get("response") or {}).get("value") or []
+    groups_without_owner: list[str] = []
+
+    # Check owner count for each group (sample up to 50 to avoid throttling)
+    for group in groups[:50]:
+        gid = group.get("id")
+        if not gid:
+            continue
+        owners_resp = await _graph_get_json_or_error(tenant, f"/groups/{gid}/owners?$select=id&$top=1")
+        if owners_resp.get("ok"):
+            owners = (owners_resp.get("response") or {}).get("value") or []
+            if not owners:
+                groups_without_owner.append(group.get("displayName") or gid)
+        # If owner endpoint fails we skip that group (don't penalise on permission gap)
+
+    total = len(groups)
+    no_owner_count = len(groups_without_owner)
+    ratio = _percent(no_owner_count, total) if total else 0
+    status = "pass" if no_owner_count == 0 else "fail"
+    reasoning = (
+        f"{no_owner_count} of {total} Microsoft 365 Groups (team sites) have no assigned owner "
+        f"({ratio}% ungoverned). "
+        + (f"Groups without owner: {', '.join(groups_without_owner[:10])}." if groups_without_owner else "All sampled groups have at least one owner.")
+    )
+    evidence = _evaluation_evidence(
+        pass_criteria=_PASS_CRITERIA,
+        fail_criteria=_FAIL_CRITERIA,
+        reasoning=reasoning,
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "total_groups_enumerated": total,
+            "groups_without_owner": groups_without_owner[:20],
+            "ungoverned_percent": ratio,
+        },
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status=status,
+        severity="medium",
+        actual_value={"site_count": total, "groups_with_no_owner": no_owner_count, "ungoverned_percent": ratio},
+        expected_value="All M365 Groups have at least one designated owner",
+        finding=reasoning,
+        graph_endpoint="/groups?$filter=groupTypes/any(x:x eq 'Unified')",
+        evidence=evidence,
+        raw_response={"groups_sample": groups[:20]},
+        graph_calls=1 + len(groups[:50]),
+        scoring_weight=3.0,
+    )
 
 
 GRAPH_COLLECTORS = {

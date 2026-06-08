@@ -29,6 +29,32 @@ class PowerShellCollectorResolver:
         self.root = root
         self._manifest = self._load_manifest()
 
+    def _candidate_script_paths(self, script: str) -> list[Path]:
+        script_path = Path(script)
+        if script_path.is_absolute():
+            return [script_path]
+
+        candidates: list[Path] = []
+        try:
+            project_root = self.root.resolve().parents[1]
+            candidates.append(project_root / script_path)
+        except IndexError:
+            pass
+        candidates.append(Path.cwd() / script_path)
+        candidates.append(self.root / script_path)
+
+        unique: list[Path] = []
+        seen: set[Path] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                resolved = candidate
+            if resolved not in seen:
+                seen.add(resolved)
+                unique.append(candidate)
+        return unique
+
     @staticmethod
     def _load_manifest() -> dict[str, dict[str, Any]]:
         if not MANIFEST_PATH.exists():
@@ -46,13 +72,14 @@ class PowerShellCollectorResolver:
 
         script = str(manifest_entry.get("script") or "").strip()
         if script:
-            script_path = Path(script)
-            if not script_path.is_absolute():
-                script_path = Path.cwd() / script_path
-            if script_path.exists() and script_path.is_file():
-                return script_path
+            checked_paths = self._candidate_script_paths(script)
+            for script_path in checked_paths:
+                if script_path.exists() and script_path.is_file():
+                    return script_path
             raise CollectorScriptNotFoundError(
-                f"Collector manifest script does not exist for parameter '{parameter_key}': {script}"
+                f"Collector manifest script does not exist for parameter "
+                f"'{parameter_key}': {script}; checked "
+                f"{', '.join(str(item) for item in checked_paths)}"
             )
 
         slug = collector_slug(collector, parameter)

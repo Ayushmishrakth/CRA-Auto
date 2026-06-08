@@ -19,6 +19,7 @@ from app.services.graph.graph_client import GraphClient
 from app.services.graph_app_registration_service import (
     CRA_APPLICATION_DISPLAY_NAME,
     build_redirect_uri,
+    build_spa_redirect_uri,
     create_application,
     create_client_secret,
     ensure_application_required_resource_access,
@@ -39,7 +40,11 @@ from app.utils.datetime_utils import parse_graph_datetime
 from app.utils.logger import logger
 
 
-DEPLOYMENT_SERVICE_VERSION = "2026-05-30.runtime-consent-audit.v2-stale-record-repair"
+DEPLOYMENT_SERVICE_VERSION = "2026-06-08.exchange-teams-app-auth.v4"
+
+# Exchange Administrator built-in Azure AD role — grants the service principal Exchange Online admin rights.
+# Required so Connect-ExchangeOnline with an app-only token can run Exchange cmdlets (Get-EXOMailbox, etc.).
+EXCHANGE_ADMIN_ROLE_ID = "29232cdf-9323-42fd-ade2-1d097af3e4de"
 
 TENANT_STATUS_NOT_DEPLOYED = "NOT_DEPLOYED"
 TENANT_STATUS_DEPLOYING = "DEPLOYING"
@@ -81,6 +86,10 @@ def _deployment_redirect_uri(request_redirect_uri: str | None) -> str:
             details={"redirect_uri_requested": requested, "redirect_uri_expected": expected},
         )
     return expected
+
+
+def _deployment_spa_redirect_uri() -> str:
+    return build_spa_redirect_uri(settings.cra_frontend_url)
 
 
 def _update_diagnostics(tenant: ConnectedTenant, **values: Any) -> None:
@@ -416,9 +425,15 @@ async def get_deployment_debug(
 
     diagnostics = tenant.deployment_diagnostics or {}
     read_response = diagnostics.get("graph_read_response") or {}
-    actual = list((read_response.get("web") or {}).get("redirectUris") or [])
+    actual = [
+        *list((read_response.get("web") or {}).get("redirectUris") or []),
+        *list((read_response.get("spa") or {}).get("redirectUris") or []),
+    ]
     if not actual:
-        actual = list(diagnostics.get("graph_verified_redirect_uris") or [])
+        actual = [
+            *list(diagnostics.get("graph_verified_redirect_uris") or []),
+            *list(diagnostics.get("graph_verified_spa_redirect_uris") or []),
+        ]
     return {
         "tenant_id": tenant.tenant_id,
         "application_client_id": tenant.app_client_id,
@@ -478,6 +493,48 @@ async def get_deployment_runtime_debug(
     }
 
 
+def _extract_primary_domain(organization: dict[str, Any]) -> str | None:
+    """Return the tenant's primary .onmicrosoft.com domain from the Graph /organization object."""
+    domains = organization.get("verifiedDomains") or []
+    # Prefer the isInitial domain (always the *.onmicrosoft.com one) — required by Connect-ExchangeOnline -Organization
+    initial = next((d.get("name") for d in domains if d.get("isInitial") and d.get("name")), None)
+    if initial:
+        return initial
+    # Fallback: any .onmicrosoft.com domain
+    ms_domain = next((d.get("name") for d in domains if ".onmicrosoft.com" in (d.get("name") or "").lower()), None)
+    if ms_domain:
+        return ms_domain
+    # Last resort: the default domain
+    return next((d.get("name") for d in domains if d.get("isDefault") and d.get("name")), None)
+
+
+async def _assign_exchange_admin_role(
+    client: GraphClient,
+    *,
+    service_principal_id: str,
+) -> dict[str, Any]:
+    """
+    Assign the Exchange Administrator Azure AD directory role to the CRA service principal.
+    This grants Exchange Online admin rights so app-only auth via access token can run Exchange cmdlets.
+    409 = already assigned — treated as success.
+    """
+    payload = {
+        "@odata.type": "#microsoft.graph.unifiedRoleAssignment",
+        "roleDefinitionId": EXCHANGE_ADMIN_ROLE_ID,
+        "principalId": service_principal_id,
+        "directoryScopeId": "/",
+    }
+    try:
+        result = await client.post("/roleManagement/directory/roleAssignments", json=payload)
+        _deployment_log("EXCHANGE_ADMIN_ROLE_ASSIGNED", service_principal_id=service_principal_id)
+        return {"status": "assigned", "result": result}
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 409:
+            _deployment_log("EXCHANGE_ADMIN_ROLE_ALREADY_ASSIGNED", service_principal_id=service_principal_id)
+            return {"status": "already_assigned"}
+        raise
+
+
 async def deploy_tenant_access(
     db: AsyncSession,
     *,
@@ -489,6 +546,7 @@ async def deploy_tenant_access(
     if tenant_id != current_user.microsoft_tid:
         raise TenantAccessException("Tenant is not available to the current user")
     resolved_redirect_uri = _deployment_redirect_uri(redirect_uri)
+    spa_redirect_uri = _deployment_spa_redirect_uri()
 
     client = GraphClient(access_token=graph_access_token)
     tenant = await _get_or_create_tenant(db, tenant_id=tenant_id, tenant_name=tenant_id)
@@ -497,6 +555,7 @@ async def deploy_tenant_access(
     _update_diagnostics(
         tenant,
         redirect_uri_requested=resolved_redirect_uri,
+        spa_redirect_uri_requested=spa_redirect_uri,
         redirect_uri_verified=False,
         stale_consent_url_cleared=True,
         tenant_id_requested=tenant_id,
@@ -509,6 +568,10 @@ async def deploy_tenant_access(
         organization = validation["organization"]
         _update_diagnostics(tenant, tenant_id_graph_organization=organization.get("id"))
         tenant.tenant_name = organization.get("displayName") or tenant.tenant_name
+        # Store primary .onmicrosoft.com domain — needed by Exchange PS app-only auth at assessment runtime.
+        primary_domain = _extract_primary_domain(organization)
+        if primary_domain:
+            _update_diagnostics(tenant, primary_domain=primary_domain)
         _mark_deployment(tenant, step=STEP_PERMISSION_ASSIGNMENT, status=TENANT_STATUS_DEPLOYING)
         await db.commit()
 
@@ -552,6 +615,7 @@ async def deploy_tenant_access(
                 display_name=CRA_APPLICATION_DISPLAY_NAME,
                 required_resource_access=required_access,
                 redirect_uri=resolved_redirect_uri,
+                spa_redirect_uri=spa_redirect_uri,
             )
             _deployment_log("Application Created", application_id=app.get("id"), client_id=app.get("appId"))
             _update_diagnostics(
@@ -581,6 +645,7 @@ async def deploy_tenant_access(
             client,
             application_object_id=app["id"],
             redirect_uri=resolved_redirect_uri,
+            spa_redirect_uri=spa_redirect_uri,
         )
         if patch_result:
             _deployment_log("Patching Redirect URI", application_id=app["id"], redirect_uri=resolved_redirect_uri)
@@ -593,6 +658,7 @@ async def deploy_tenant_access(
             graph_patch_response=(patch_result or {}).get("response"),
             graph_read_response=verified_app,
             graph_verified_redirect_uris=(verified_app.get("web") or {}).get("redirectUris") or [],
+            graph_verified_spa_redirect_uris=(verified_app.get("spa") or {}).get("redirectUris") or [],
         )
         _mark_deployment(tenant, step=STEP_SERVICE_PRINCIPAL, status=TENANT_STATUS_DEPLOYING)
         await db.commit()
@@ -728,6 +794,7 @@ async def validate_tenant_deployment(
     )
 
     expected_redirect_uri = tenant.redirect_uri or build_redirect_uri(settings.cra_frontend_url)
+    expected_spa_redirect_uri = _deployment_spa_redirect_uri()
     tenant.redirect_uri = expected_redirect_uri
     app = await _resolve_verified_application(
         client,
@@ -747,6 +814,7 @@ async def validate_tenant_deployment(
             display_name=CRA_APPLICATION_DISPLAY_NAME,
             required_resource_access=required_access,
             redirect_uri=expected_redirect_uri,
+            spa_redirect_uri=expected_spa_redirect_uri,
         )
         tenant.app_registration_id = app["id"]
         tenant.app_client_id = app["appId"]
@@ -768,6 +836,7 @@ async def validate_tenant_deployment(
         client,
         application_object_id=app["id"],
         redirect_uri=expected_redirect_uri,
+        spa_redirect_uri=expected_spa_redirect_uri,
     )
     permissions_app, permission_patch_result = await ensure_application_required_resource_access(
         client,
@@ -778,10 +847,14 @@ async def validate_tenant_deployment(
     tenant.app_registration_id = verified_app["id"]
     tenant.app_client_id = verified_app["appId"]
     redirect_uris = list((verified_app.get("web") or {}).get("redirectUris") or [])
-    redirect_uri_valid = expected_redirect_uri in redirect_uris
+    spa_redirect_uris = list((verified_app.get("spa") or {}).get("redirectUris") or [])
+    web_redirect_valid = expected_spa_redirect_uri == expected_redirect_uri or expected_redirect_uri in redirect_uris
+    spa_redirect_valid = expected_spa_redirect_uri in spa_redirect_uris
+    redirect_uri_valid = web_redirect_valid and spa_redirect_valid
     _update_diagnostics(
         tenant,
         validation_redirect_uri=expected_redirect_uri,
+        validation_spa_redirect_uri=expected_spa_redirect_uri,
         validation_redirect_uri_valid=redirect_uri_valid,
         validation_redirect_uri_attempts=redirect_attempts,
         validation_patch_result=patch_result,
@@ -910,6 +983,22 @@ async def validate_admin_consent(
     _mark_deployment(tenant, step=STEP_DEPLOYMENT_VALIDATION, status=TENANT_STATUS_ACTIVE)
     tenant.consent_granted_by = current_user.email
     tenant.consent_granted_at = datetime.utcnow()
+
+    # Assign the Exchange Administrator Azure AD directory role to the service principal so that
+    # Exchange PS app-only auth (Connect-ExchangeOnline -AccessToken) can run Exchange cmdlets.
+    # Non-fatal: if the admin's token lacks RoleManagement.ReadWrite.Directory this will 403 and we log only.
+    if tenant.service_principal_id:
+        try:
+            role_result = await _assign_exchange_admin_role(client, service_principal_id=tenant.service_principal_id)
+            _update_diagnostics(tenant, exchange_admin_role_assignment=role_result)
+        except Exception as role_exc:
+            logger.warning(
+                "[DEPLOYMENT] Exchange Admin role assignment failed (non-fatal): %s",
+                role_exc,
+                extra={"tenant_id": tenant_id, "service_principal_id": tenant.service_principal_id},
+            )
+            _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": str(role_exc)})
+
     await audit_service.log_event(
         db,
         tenant_id=tenant_id,
@@ -922,6 +1011,74 @@ async def validate_admin_consent(
     await db.commit()
     await db.refresh(tenant)
     return deployment_payload(tenant)
+
+
+async def repair_tenant_deployment(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    graph_access_token: str,
+) -> dict[str, Any]:
+    """
+    Patch the existing app registration to include Exchange + Teams permissions,
+    attempt to assign the Exchange Admin role, and return a fresh admin consent URL.
+    Used by tenants that were connected before Exchange/Teams permissions were added.
+    """
+    tenant_id = current_user.microsoft_tid
+    result = await db.execute(select(ConnectedTenant).where(ConnectedTenant.tenant_id == tenant_id))
+    tenant = result.scalars().first()
+    if tenant is None or not tenant.app_registration_id or not tenant.app_client_id:
+        raise BusinessLogicException("Tenant deployment has not been completed — run the full deployment first")
+
+    client = GraphClient(access_token=graph_access_token)
+    validation = await _assert_graph_token(client, access_token=graph_access_token, tenant_id=tenant_id)
+    organization = validation["organization"]
+
+    # Refresh primary domain in case it was missing from an older deployment
+    primary_domain = _extract_primary_domain(organization)
+    if primary_domain:
+        _update_diagnostics(tenant, primary_domain=primary_domain)
+
+    required_access = await build_required_resource_access(client)
+    _permissions_app, patch_result = await ensure_application_required_resource_access(
+        client,
+        application_object_id=tenant.app_registration_id,
+        required_resource_access=required_access,
+    )
+    if patch_result:
+        _deployment_log("REPAIR_PERMISSIONS_PATCHED", application_id=tenant.app_registration_id)
+        _update_diagnostics(tenant, repair_permission_patch=True)
+    else:
+        _deployment_log("REPAIR_PERMISSIONS_ALREADY_CURRENT", application_id=tenant.app_registration_id)
+
+    # Try role assignment with the admin's delegated token
+    if tenant.service_principal_id:
+        try:
+            role_result = await _assign_exchange_admin_role(client, service_principal_id=tenant.service_principal_id)
+            _update_diagnostics(tenant, exchange_admin_role_assignment=role_result)
+        except Exception as role_exc:
+            logger.warning("[DEPLOYMENT] Repair: Exchange Admin role assignment failed (non-fatal): %s", role_exc)
+            _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": str(role_exc)})
+
+    expected_redirect_uri = tenant.redirect_uri or build_redirect_uri(settings.cra_frontend_url)
+    consent_url = build_admin_consent_url(
+        tenant_id=tenant_id,
+        client_id=tenant.app_client_id,
+        redirect_uri=expected_redirect_uri,
+    )
+    tenant.admin_consent_url = consent_url
+    tenant.consent_status = "pending_admin_consent"
+    _update_diagnostics(tenant, repair_consent_url_regenerated=True)
+    await db.commit()
+    await db.refresh(tenant)
+    return {
+        "needs_reconsent": True,
+        "consent_url": consent_url,
+        "tenant_id": tenant_id,
+        "app_client_id": tenant.app_client_id,
+        "permissions_patched": bool(patch_result),
+        "primary_domain": primary_domain,
+    }
 
 
 def deployment_payload(tenant: ConnectedTenant) -> dict[str, Any]:

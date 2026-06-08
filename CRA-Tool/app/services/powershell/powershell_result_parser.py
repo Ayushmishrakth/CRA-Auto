@@ -25,10 +25,19 @@ def parse_collector_contract(stdout: str) -> dict[str, Any]:
     if not text:
         raise PowerShellResultParseError("PowerShell collector returned empty stdout")
 
+    # Some PS modules (e.g. ExchangeOnlineManagement) print diagnostic text to stdout
+    # before the script writes the JSON contract.  Extract the last JSON object.
     try:
         payload = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise PowerShellResultParseError("PowerShell collector stdout is not valid JSON") from exc
+    except json.JSONDecodeError:
+        last_brace = text.rfind("{")
+        if last_brace > 0:
+            try:
+                payload = json.loads(text[last_brace:])
+            except json.JSONDecodeError as exc:
+                raise PowerShellResultParseError("PowerShell collector stdout is not valid JSON") from exc
+        else:
+            raise PowerShellResultParseError("PowerShell collector stdout is not valid JSON")
 
     if not isinstance(payload, dict):
         raise PowerShellResultParseError("PowerShell collector JSON must be an object")
@@ -98,14 +107,16 @@ def contract_to_collector_result(
     status = (finding.get("status") or contract.get("status") or "fail").lower()
     if status == "success":
         status = "pass"
-    if status not in {"pass", "warning", "fail", "not_collected"}:
+    if status == "service_unavailable":
+        status = "skipped"  # Exchange/module unavailable — excluded from scoring
+    elif status not in {"pass", "warning", "fail", "not_collected", "skipped"}:
         status = "fail" if contract.get("errors") else "warning"
 
     finding_severity = (finding.get("severity") or severity).lower()
     score_contribution = finding.get("score_contribution")
     if score_contribution is None:
         score_contribution = float(SEVERITY_RANK.get(finding_severity, 1))
-        if status in {"pass", "not_collected"}:
+        if status in {"pass", "not_collected", "skipped"}:
             score_contribution = 0.0
         elif status == "warning":
             score_contribution = round(score_contribution * 0.45, 2)

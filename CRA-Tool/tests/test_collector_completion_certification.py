@@ -7,6 +7,9 @@ from app.services.runtime_assessment_service import POWERSHELL_REQUIRED_PARAMETE
 
 ROOT = Path(__file__).resolve().parents[1]
 
+POWERSHELL_FOCUS_PARAMETERS: set[str] = set()
+# All parameters now route to Graph collectors.
+
 
 def _load_json(relative: str):
     return json.loads((ROOT / relative).read_text(encoding="utf-8"))
@@ -85,6 +88,29 @@ def test_powershell_required_parameters_do_not_route_to_graph_shims():
             parameter_key=key,
             manifest_entry=manifest.get(key),
         ) == "powershell"
+
+
+def test_powershell_required_parameters_have_real_script_and_csv_contract():
+    manifest = {
+        item["parameter_key"]: item
+        for item in _load_json("app/config/collector_manifest.json")
+    }
+    assert POWERSHELL_FOCUS_PARAMETERS == POWERSHELL_REQUIRED_PARAMETERS
+
+    missing_script = []
+    missing_csv = []
+    for key in sorted(POWERSHELL_FOCUS_PARAMETERS):
+        entry = manifest[key]
+        script = ROOT / entry["script"]
+        if not script.exists():
+            missing_script.append((key, entry["script"]))
+            continue
+        script_text = script.read_text(encoding="utf-8")
+        if entry["output_file"] not in script_text:
+            missing_csv.append((key, entry["script"], entry["output_file"]))
+
+    assert missing_script == []
+    assert missing_csv == []
 
 
 def test_no_collector_notimplemented_errors_in_backend_app():

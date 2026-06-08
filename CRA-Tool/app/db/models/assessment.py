@@ -6,10 +6,10 @@ import uuid
 from sqlalchemy import Float, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.models.base_model import Base, TenantMixin, TimestampMixin, UUIDMixin
+from app.db.models.base_model import Base, SoftDeleteMixin, TenantMixin, TimestampMixin, UUIDMixin
 
 
-class Assessment(Base, UUIDMixin, TimestampMixin, TenantMixin):
+class Assessment(Base, UUIDMixin, TimestampMixin, TenantMixin, SoftDeleteMixin):
     __tablename__ = "assessments"
     __table_args__ = (
         Index("ix_assessments_tenant_status_created_at", "tenant_id", "status", "created_at"),

@@ -19,12 +19,14 @@ async def create_application(
     display_name: str = CRA_APPLICATION_DISPLAY_NAME,
     required_resource_access: list[dict[str, Any]],
     redirect_uri: str,
+    spa_redirect_uri: str | None = None,
 ) -> dict[str, Any]:
     redirect_uri = _validate_redirect_uri(redirect_uri)
     payload = build_application_create_payload(
         display_name=display_name,
         required_resource_access=required_resource_access,
         redirect_uri=redirect_uri,
+        spa_redirect_uri=spa_redirect_uri,
     )
     response = await client.post("/applications", json=payload)
     response["_graph_create_payload"] = payload
@@ -36,19 +38,31 @@ def build_application_create_payload(
     display_name: str,
     required_resource_access: list[dict[str, Any]],
     redirect_uri: str,
+    spa_redirect_uri: str | None = None,
 ) -> dict[str, Any]:
     redirect_uri = _validate_redirect_uri(redirect_uri)
-    return {
+    spa_redirect_uri = _validate_redirect_uri(spa_redirect_uri) if spa_redirect_uri else None
+    payload = {
         "displayName": display_name,
         "signInAudience": "AzureADMyOrg",
         "requiredResourceAccess": required_resource_access,
-        "web": {"redirectUris": [redirect_uri]},
     }
+    if spa_redirect_uri:
+        payload["spa"] = {"redirectUris": [spa_redirect_uri]}
+        if spa_redirect_uri != redirect_uri:
+            payload["web"] = {"redirectUris": [redirect_uri]}
+    else:
+        payload["web"] = {"redirectUris": [redirect_uri]}
+    return payload
 
 
 def build_redirect_uri(frontend_url: str) -> str:
     frontend_url = _validate_frontend_url(frontend_url)
     return f"{frontend_url.rstrip('/')}/tenant/deployment-success"
+
+
+def build_spa_redirect_uri(frontend_url: str) -> str:
+    return build_redirect_uri(frontend_url)
 
 
 def _validate_frontend_url(frontend_url: str | None) -> str:
@@ -64,9 +78,25 @@ async def patch_application_redirect_uri(
     *,
     application_object_id: str,
     redirect_uri: str,
+    spa_redirect_uri: str | None = None,
 ) -> dict[str, Any]:
     redirect_uri = _validate_redirect_uri(redirect_uri)
-    payload = {"web": {"redirectUris": [redirect_uri]}}
+    spa_redirect_uri = _validate_redirect_uri(spa_redirect_uri) if spa_redirect_uri else None
+    application = await get_application(client, application_object_id=application_object_id)
+    configured_web = list((application.get("web") or {}).get("redirectUris") or [])
+    if spa_redirect_uri == redirect_uri:
+        web_redirect_uris = _remove_redirect_uri(configured_web, redirect_uri)
+    else:
+        web_redirect_uris = _append_redirect_uri(configured_web, redirect_uri)
+
+    payload = {"web": {"redirectUris": web_redirect_uris}}
+    if spa_redirect_uri:
+        payload["spa"] = {
+            "redirectUris": _append_redirect_uri(
+                list((application.get("spa") or {}).get("redirectUris") or []),
+                spa_redirect_uri,
+            )
+        }
     response = await client.patch(f"/applications/{application_object_id}", json=payload)
     return {"payload": payload, "response": response}
 
@@ -129,30 +159,48 @@ async def ensure_application_redirect_uri(
     *,
     application_object_id: str,
     redirect_uri: str,
+    spa_redirect_uri: str | None = None,
     max_attempts: int = 10,
     initial_delay_seconds: float = 0.25,
 ) -> tuple[dict[str, Any], dict[str, Any] | None, int]:
     expected = _validate_redirect_uri(redirect_uri)
+    expected_spa = _validate_redirect_uri(spa_redirect_uri) if spa_redirect_uri else None
     patch_result: dict[str, Any] | None = None
     delay = initial_delay_seconds
 
     for attempt in range(1, max_attempts + 1):
         application = await get_application(client, application_object_id=application_object_id)
-        configured = list((application.get("web") or {}).get("redirectUris") or [])
-        if expected in configured:
-            logger.info("[DEPLOYMENT] Redirect URI Verified %s", {"application_id": application_object_id, "redirect_uri": expected})
+        configured_web = list((application.get("web") or {}).get("redirectUris") or [])
+        configured_spa = list((application.get("spa") or {}).get("redirectUris") or [])
+        web_valid = expected_spa == expected or expected in configured_web
+        spa_valid = expected_spa is None or expected_spa in configured_spa
+        if web_valid and spa_valid:
+            logger.info(
+                "[DEPLOYMENT] Redirect URI Verified %s",
+                {"application_id": application_object_id, "redirect_uri": expected, "spa_redirect_uri": expected_spa},
+            )
             return application, patch_result, attempt
 
         if patch_result is None:
             logger.info(
                 "[DEPLOYMENT] Redirect URI Missing %s",
-                {"application_id": application_object_id, "redirect_uri": expected, "configured_redirect_uris": configured},
+                {
+                    "application_id": application_object_id,
+                    "redirect_uri": expected,
+                    "spa_redirect_uri": expected_spa,
+                    "configured_web_redirect_uris": configured_web,
+                    "configured_spa_redirect_uris": configured_spa,
+                },
             )
-            logger.info("[DEPLOYMENT] Patching Redirect URI %s", {"application_id": application_object_id, "redirect_uri": expected})
+            logger.info(
+                "[DEPLOYMENT] Patching Redirect URI %s",
+                {"application_id": application_object_id, "redirect_uri": expected, "spa_redirect_uri": expected_spa},
+            )
             patch_result = await patch_application_redirect_uri(
                 client,
                 application_object_id=application_object_id,
                 redirect_uri=expected,
+                spa_redirect_uri=expected_spa,
             )
 
         if attempt < max_attempts:
@@ -160,11 +208,19 @@ async def ensure_application_redirect_uri(
             delay = min(delay * 2, 5.0)
 
     application = await get_application(client, application_object_id=application_object_id)
-    configured = list((application.get("web") or {}).get("redirectUris") or [])
-    if expected not in configured:
+    configured_web = list((application.get("web") or {}).get("redirectUris") or [])
+    configured_spa = list((application.get("spa") or {}).get("redirectUris") or [])
+    web_valid = expected_spa == expected or expected in configured_web
+    spa_valid = expected_spa is None or expected_spa in configured_spa
+    if not web_valid or not spa_valid:
         raise BusinessLogicException(
             "Azure App Registration redirect URI configuration failed",
-            details={"redirect_uri": expected, "configured_redirect_uris": configured},
+            details={
+                "redirect_uri": expected,
+                "spa_redirect_uri": expected_spa,
+                "configured_web_redirect_uris": configured_web,
+                "configured_spa_redirect_uris": configured_spa,
+            },
         )
     return application, patch_result, max_attempts
 
@@ -186,7 +242,7 @@ async def verify_application_redirect_uri(
 async def get_application(client: GraphClient, *, application_object_id: str) -> dict[str, Any]:
     return await client.get(
         f"/applications/{application_object_id}",
-        params={"$select": "id,appId,displayName,requiredResourceAccess,passwordCredentials,web"},
+        params={"$select": "id,appId,displayName,requiredResourceAccess,passwordCredentials,web,spa"},
     )
 
 
@@ -195,7 +251,7 @@ async def get_application_by_app_id(client: GraphClient, *, application_client_i
         "/applications",
         params={
             "$filter": f"appId eq '{application_client_id}'",
-            "$select": "id,appId,displayName,requiredResourceAccess,passwordCredentials,web",
+            "$select": "id,appId,displayName,requiredResourceAccess,passwordCredentials,web,spa",
         },
     )
     values = response.get("value") or []
@@ -214,6 +270,17 @@ def _validate_redirect_uri(redirect_uri: str | None) -> str:
             details={"redirect_uri": value},
         )
     return value
+
+
+def _append_redirect_uri(configured: list[str], redirect_uri: str) -> list[str]:
+    values = [value for value in configured if value]
+    if redirect_uri not in values:
+        values.append(redirect_uri)
+    return values
+
+
+def _remove_redirect_uri(configured: list[str], redirect_uri: str) -> list[str]:
+    return [value for value in configured if value and value != redirect_uri]
 
 
 async def create_client_secret(

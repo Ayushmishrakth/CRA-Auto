@@ -16,6 +16,17 @@ import { formatApiError } from "../utils/authErrors";
 
 const AuthContext = createContext(null);
 const SESSION_RESTORE_TIMEOUT_MS = 8000;
+const LOGIN_IN_PROGRESS_FLAG = "__CRA_LOGIN_IN_PROGRESS__";
+
+function setLoginInProgress(value) {
+  if (typeof window !== "undefined") {
+    window[LOGIN_IN_PROGRESS_FLAG] = value;
+  }
+}
+
+function isLoginInProgress() {
+  return Boolean(typeof window !== "undefined" && window[LOGIN_IN_PROGRESS_FLAG]);
+}
 
 function withTimeout(promise, message) {
   if (typeof window === "undefined") return promise;
@@ -77,11 +88,24 @@ export function AuthProvider({ children }) {
     bootstrap();
   }, [bootstrap]);
 
+  useEffect(() => {
+    const handleAuthExpired = (event) => {
+      if (isLoginInProgress()) return;
+      tokenStorage.clear();
+      setUser(null);
+      setError(event.detail?.message || "Your sign-in session has expired. Please sign in again.");
+      setLoading(false);
+    };
+    window.addEventListener("cra:auth-expired", handleAuthExpired);
+    return () => window.removeEventListener("cra:auth-expired", handleAuthExpired);
+  }, []);
+
   const loginWithMicrosoft = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
+      setLoginInProgress(true);
       tokenStorage.clear();
       setUser(null);
 
@@ -103,6 +127,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       throw err;
     } finally {
+      setLoginInProgress(false);
       setLoading(false);
     }
   }, [instance]);

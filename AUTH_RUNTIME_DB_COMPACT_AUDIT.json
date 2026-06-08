@@ -1,0 +1,234 @@
+{
+  "connected_tenants": [
+    {
+      "id": "e2489cea0e1840d89d4327076a330f5f",
+      "tenant_id": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "tenant_name": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": null,
+      "deployment_status": "NOT_DEPLOYED",
+      "consent_status": "pending",
+      "status": "NOT_DEPLOYED",
+      "created_at": "2026-05-28 18:05:05.853423",
+      "updated_at": "2026-05-28 18:05:05.853423"
+    },
+    {
+      "id": "0e09dc320cb1441895ef5b74610bc528",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "tenant_name": "Nexora Innovations Private Limited",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": "93ca96ef-cf90-4649-9ee9-cebeef46d70a",
+      "deployment_status": "ACTIVE",
+      "consent_status": "connected",
+      "status": "ACTIVE",
+      "created_at": "2026-05-28 19:49:45.054678",
+      "updated_at": "2026-06-02 15:50:26.112415"
+    },
+    {
+      "id": "8e3e905cd63c435ba20bfe79184bab4c",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "tenant_name": "WealthScape",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": "535abf5d-0c19-4e13-b96e-eb3a402acc99",
+      "deployment_status": "ACTIVE",
+      "consent_status": "connected",
+      "status": "ACTIVE",
+      "created_at": "2026-06-01 13:10:03.049805",
+      "updated_at": "2026-06-04 19:14:44.583699"
+    },
+    {
+      "id": "b985ce4480b8497a834bbc2c0d5c2247",
+      "tenant_id": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "tenant_name": "Infra Nimbus Tech",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": "4d665768-093e-43b2-8092-558dce255546",
+      "deployment_status": "ACTIVE",
+      "consent_status": "connected",
+      "status": "ACTIVE",
+      "created_at": "2026-06-04 15:02:12.138756",
+      "updated_at": "2026-06-04 15:04:11.084954"
+    }
+  ],
+  "users": [
+    {
+      "id": "2a6b008531d34125bbd0161065ce0fd3",
+      "microsoft_tid": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "email": "ayush.mishra@techplustalent.com",
+      "display_name": "Ayush Mishra",
+      "created_at": "2026-05-28 18:05:05.829399",
+      "updated_at": "2026-06-04 19:12:46.702224"
+    },
+    {
+      "id": "6e051c1e91f34d158dcf2d59c34186e2",
+      "microsoft_tid": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "email": "akhilnautiyal@nexorainn.onmicrosoft.com",
+      "display_name": "Akhil Nautiyal",
+      "created_at": "2026-05-28 19:49:45.030048",
+      "updated_at": "2026-06-02 15:49:10.447549"
+    },
+    {
+      "id": "92207583c2f4450eb56407d97a64f94e",
+      "microsoft_tid": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "email": "deep@wealthscape.in",
+      "display_name": "deep",
+      "created_at": "2026-06-01 13:10:02.858222",
+      "updated_at": "2026-06-05 14:27:27.866284"
+    },
+    {
+      "id": "6b86ab2d5dab4ad9bba136a13a540907",
+      "microsoft_tid": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "email": "vivan.s@infranimbustech.com",
+      "display_name": "Vivaan Singh",
+      "created_at": "2026-06-04 15:02:12.117493",
+      "updated_at": "2026-06-04 15:02:12.117493"
+    }
+  ],
+  "assessment_counts_by_tenant": [
+    {
+      "tenant_id": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "status": "incomplete",
+      "count": 1,
+      "first_created": "2026-05-28 18:05:12.438835",
+      "last_created": "2026-05-28 18:05:12.438835"
+    },
+    {
+      "tenant_id": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "status": "completed",
+      "count": 1,
+      "first_created": "2026-06-04 15:05:42.053822",
+      "last_created": "2026-06-04 15:05:42.053822"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "count": 6,
+      "first_created": "2026-05-31 15:46:04.107906",
+      "last_created": "2026-06-02 15:50:29.813978"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "failed",
+      "count": 3,
+      "first_created": "2026-05-28 19:49:53.098025",
+      "last_created": "2026-05-29 15:00:33.990429"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "incomplete",
+      "count": 8,
+      "first_created": "2026-05-31 09:01:19.429962",
+      "last_created": "2026-05-31 15:20:35.286762"
+    },
+    {
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "count": 16,
+      "first_created": "2026-06-03 19:59:36.583563",
+      "last_created": "2026-06-05 14:27:33.084989"
+    },
+    {
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "failed",
+      "count": 1,
+      "first_created": "2026-06-05 14:10:37.080271",
+      "last_created": "2026-06-05 14:10:37.080271"
+    },
+    {
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "count": 5,
+      "first_created": "2026-06-03 20:32:48.284022",
+      "last_created": "2026-06-03 21:13:18.042165"
+    }
+  ],
+  "latest_assessments": [
+    {
+      "id": "4e29cb25d1514679a56967c35ee7c7ad",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 14:27:33.084989",
+      "updated_at": "2026-06-05 14:28:55.532886"
+    },
+    {
+      "id": "068e222a2ab447b9830d31b1617078ff",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "failed",
+      "created_at": "2026-06-05 14:10:37.080271",
+      "updated_at": "2026-06-05 14:25:35.120773"
+    },
+    {
+      "id": "14f6ba34781743c19074f785d1aeb8d9",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:31:45.511956",
+      "updated_at": "2026-06-05 13:33:42.654053"
+    },
+    {
+      "id": "80c7decf9d9449748160e295e87dbfe0",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:18:10.766605",
+      "updated_at": "2026-06-05 13:19:21.574043"
+    },
+    {
+      "id": "01b64581ea0241419367d8952bedcb41",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:11:58.192972",
+      "updated_at": "2026-06-05 13:13:32.960718"
+    },
+    {
+      "id": "188872d6a2fa4065a7810237ceddc65b",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 20:22:21.934844",
+      "updated_at": "2026-06-04 20:23:42.759642"
+    },
+    {
+      "id": "cab684f9417c4bb6af817eab9c8f32b4",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 19:48:34.646473",
+      "updated_at": "2026-06-04 19:49:51.275306"
+    },
+    {
+      "id": "c15bf80ddb2b42af9939b7c49ffe0cac",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 19:15:02.246420",
+      "updated_at": "2026-06-04 19:16:29.641360"
+    },
+    {
+      "id": "ba98c39187524dd1ac1ccaac060ad8f4",
+      "tenant_id": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "status": "completed",
+      "created_at": "2026-06-04 15:05:42.053822",
+      "updated_at": "2026-06-04 15:07:12.556773"
+    },
+    {
+      "id": "e712ac78d618448986567430e258aff9",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 14:23:03.149885",
+      "updated_at": "2026-06-04 14:24:37.998240"
+    },
+    {
+      "id": "19e1366f61044c79bc9f40906aeed370",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 13:34:32.835628",
+      "updated_at": "2026-06-04 13:35:47.388049"
+    },
+    {
+      "id": "2bbbf23c114c43609f1f8220f59598f8",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 13:20:46.912805",
+      "updated_at": "2026-06-04 13:22:19.401424"
+    }
+  ]
+}

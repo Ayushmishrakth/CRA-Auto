@@ -15,7 +15,37 @@ $collector = $CollectorJson | ConvertFrom-Json
 $out = Initialize-CraArtifactDirectory -OutputRoot $OutputRoot -AssessmentId $AssessmentId -Domain "exchange"
 $files = New-Object System.Collections.Generic.List[string]
 
-Connect-CraExchange -Collector $collector
+# Attempt Exchange connection — emit a clean skipped contract if Exchange Online
+# is disabled in the tenant (AADSTS500014 / ServicePrincipalDisabled) rather than
+# crashing the entire assessment.
+try {
+  Connect-CraExchange -Collector $collector
+} catch {
+  $errMsg = $_.Exception.Message
+  if ($errMsg -match 'AADSTS500014|ServicePrincipalDisabled|SubscriptionNotFound|InvalidResource|service principal.*disabled|CRA_EXCHANGE_SKIP|automated runs|no active.*session') {
+    [ordered]@{
+      status           = "success"
+      collector        = $CollectorName
+      tenant_id        = $TenantId
+      timestamp        = (Get-Date).ToUniversalTime().ToString("o")
+      findings         = @(
+        [ordered]@{
+          parameter_key     = $ParameterKey
+          status            = "service_unavailable"
+          severity          = "info"
+          value             = "exchange_unavailable"
+          message           = "Exchange Online is not available in this tenant (service principal disabled or subscription lapsed). This module is skipped and excluded from scoring."
+          score_contribution = 0
+        }
+      )
+      metrics          = [ordered]@{ generated_files = @(); generated_file_count = 0 }
+      warnings         = @("EXCHANGE_UNAVAILABLE: $errMsg")
+      errors           = @()
+    } | ConvertTo-Json -Depth 8 -Compress
+    exit 0
+  }
+  throw  # Re-raise unexpected errors
+}
 
 $mailboxes = Get-EXOMailbox -ResultSize Unlimited -Properties AuditEnabled,ForwardingSmtpAddress,DeliverToMailboxAndForward,RecipientTypeDetails |
   Select-Object ExternalDirectoryObjectId,DisplayName,UserPrincipalName,RecipientTypeDetails,AuditEnabled

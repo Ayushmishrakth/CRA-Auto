@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 from typing import Any
@@ -49,41 +50,31 @@ async def generate_report_bundle(
     assessment = report_data["assessment"]
     target_dir = REPORT_ROOT / str(assessment.id)
     tenant_name = _safe_report_filename(report_data["summary"].get("tenant_name") or report_data["summary"].get("customer_name") or assessment.tenant_id)
-    pdf_path = render_pdf(target_dir / "copilot-readiness-assessment.pdf", report_data)
-    docx_path = render_word_report(
+    docx_path = await asyncio.to_thread(
+        render_word_report,
         target_dir / f"Copilot_Readiness_Assessment_{tenant_name}.docx",
         report_data,
     )
+    pdf_path = await _convert_docx_to_pdf_async(docx_path, target_dir / f"Copilot_Readiness_Assessment_{tenant_name}.pdf", report_data)
 
     await db.execute(delete(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id))
-    artifacts = [
-        AssessmentReport(
-            assessment_id=assessment.id,
-            report_type="pdf",
-            report_status="generated",
-            storage_path=str(pdf_path),
-            generated_by=current_user.id,
-            metadata_json=report_data["metadata"],
-        ),
-        AssessmentReport(
-            assessment_id=assessment.id,
-            report_type="docx",
-            report_status="generated",
-            storage_path=str(docx_path),
-            generated_by=current_user.id,
-            metadata_json=report_data["metadata"],
-        ),
-    ]
-    db.add_all(artifacts)
+    pdf_artifact = AssessmentReport(
+        assessment_id=assessment.id,
+        report_type="pdf",
+        report_status="generated",
+        storage_path=str(pdf_path),
+        generated_by=current_user.id,
+        metadata_json=report_data["metadata"],
+    )
+    db.add(pdf_artifact)
     assessment.report_path = str(pdf_path)
     await db.commit()
-    for artifact in artifacts:
-        await db.refresh(artifact)
+    await db.refresh(pdf_artifact)
 
     return {
         "assessment_id": assessment.id,
         "status": "generated",
-        "artifacts": [_artifact_payload(item) for item in artifacts],
+        "artifacts": [_artifact_payload(pdf_artifact)],
         "summary": report_data["summary"],
         "analytics": report_data["analytics"],
     }
@@ -688,3 +679,17 @@ def _artifact_payload(item: AssessmentReport) -> dict[str, Any]:
 def _safe_report_filename(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip())
     return cleaned.strip("._") or "tenant"
+
+
+async def _convert_docx_to_pdf_async(docx_path: Path, pdf_path: Path, report_data: dict[str, Any]) -> Path:
+    """Convert DOCX to PDF using Word (via docx2pdf). Falls back to ReportLab renderer."""
+    try:
+        from docx2pdf import convert
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(convert, str(docx_path), str(pdf_path))
+        if pdf_path.exists() and pdf_path.stat().st_size > 1000:
+            return pdf_path
+    except Exception:
+        pass
+    # Fallback: use ReportLab renderer
+    return await asyncio.to_thread(render_pdf, pdf_path.parent / "copilot-readiness-assessment.pdf", report_data)

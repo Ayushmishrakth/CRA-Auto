@@ -394,12 +394,16 @@ def _status_label(status: str | None) -> str:
         return "COLLECTION_ERROR"
     if normalized in {"COLLECTION_ERROR", "COLLECTION_FAILED"}:
         return "COLLECTION_ERROR"
-    if normalized == "LICENSING_LIMITATION":
-        return "LICENSING_REQUIRED"
-    if normalized in {"EVIDENCE_COLLECTED", "NOT_COLLECTED", "MANUAL_VALIDATION", "MANUAL_VALIDATION_REQUIRED"}:
-        return "MANUAL_VALIDATION"
+    if normalized in {"LICENSING_REQUIRED", "LICENSING_LIMITATION", "LICENSING_GAP"}:
+        return "FAIL"
+    if normalized in {"MANUAL_VALIDATION", "MANUAL_VALIDATION_REQUIRED", "EVIDENCE_COLLECTED"}:
+        return "FAIL"
+    if normalized == "NOT_COLLECTED":
+        return "NOT_COLLECTED"
     if normalized in {"NOT_SUPPORTED", "POWERSHELL_REQUIRED", "GRAPH_LIMITATION"}:
-        return "MANUAL_VALIDATION"
+        return "COLLECTION_ERROR"
+    if normalized in {"SERVICE_UNAVAILABLE", "SKIPPED"}:
+        return "FAIL"
     return normalized
 
 
@@ -608,12 +612,12 @@ async def get_evidence(
             failed += 1
             if status == "COLLECTION_ERROR":
                 collection_error += 1
-        elif status == "LICENSING_REQUIRED":
-            licensing_required += 1
-        elif status == "MANUAL_VALIDATION":
-            manual_validation += 1
         elif status == "NOT_COLLECTED":
             not_collected += 1
+        else:
+            # Legacy statuses (licensing_required, manual_validation) now map to FAIL above,
+            # but count any unexpected status as collected to avoid coverage gaps.
+            collected += 1
         reason = "Finding and artifact exist." if finding and artifact else (
             "Finding exists; collector artifact row is missing." if finding else (
                 f"Artifact exists with status={artifact.status}; no finding was created." if artifact else

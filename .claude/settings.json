@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show *)",
+      "Bash(pip list *)",
+      "Bash(xargs cat)",
+      "Bash(python -c ' *)",
+      "Bash(venvScriptspython.exe -c ' *)",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/reporting/cra_pdf_renderer.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(Test-Path \"c:\\\\Users\\\\Admin\\\\Desktop\\\\final\\\\README.md\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Admin\\\\Desktop\\\\final\\\\CRA-Tool\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20 FullName)",
+      "Bash(powershell -Command \"Get-ChildItem app/powershell -Recurse -Filter '*.ps1' | Measure-Object | Select-Object -ExpandProperty Count\")",
+      "Bash(powershell -Command \"cd 'c:\\\\Users\\\\Admin\\\\Desktop\\\\final\\\\CRA-Tool'; Get-ChildItem app/powershell -Recurse -Filter '*.ps1' | Select-Object -ExpandProperty Name\")",
+      "Bash('$_.Name')",
+      "Bash(powershell -Command ' *)",
+      "PowerShell($content = Get-Content 'c:\\\\Users\\\\Admin\\\\Desktop\\\\final\\\\CRA-Tool\\\\app\\\\config\\\\assessment_registry\\\\parameters.json' -Raw | ConvertFrom-Json; $content | Group-Object -Property collection_method | ForEach-Object { Write-Host \"$\\($_.Name\\): $\\($_.Count\\)\" })",
+      "PowerShell($content = Get-Content 'c:\\\\Users\\\\Admin\\\\Desktop\\\\final\\\\CRA-Tool\\\\app\\\\config\\\\assessment_registry\\\\collectors.json' -Raw | ConvertFrom-Json; Write-Host \"Total Collectors: $\\($content.Count\\)\"; $content | Group-Object -Property collection_method | ForEach-Object { Write-Host \"$\\($_.Name\\): $\\($_.Count\\)\" })",
+      "Bash(git clone *)",
+      "Bash(find /tmp/ms-ara -name \"*.py\" 2>/dev/null | head -60)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/health)",
+      "Bash(curl -s http://localhost:8000/api/v1/health)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/v1/health\" -TimeoutSec 3 -ErrorAction Stop; $r.StatusCode } catch { \"NOT_RUNNING: $_\" })"
+    ]
+  }
+}

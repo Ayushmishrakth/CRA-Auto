@@ -1,412 +1,362 @@
-# Microsoft 365 Copilot Readiness Assessment Backend
+# CRA Tool — Copilot Readiness Assessment
 
-FastAPI backend for the Microsoft 365 Copilot Readiness Assessment (CRA) platform. It handles Microsoft login, tenant onboarding, registry-driven assessment execution, Graph and PowerShell collectors, findings, recommendations, scoring, and report generation.
+Automated platform that audits a Microsoft 365 tenant against 65 security and productivity parameters and produces a scored **Copilot Readiness Report** with prioritised remediation steps.
 
-## What This Repository Contains
+---
 
-- FastAPI API under `/api/v1`
-- Microsoft Entra ID login validation
-- CRA JWT access and refresh tokens
-- Tenant-scoped assessment data
-- SQLAlchemy models and Alembic migrations
-- 65-parameter CRA assessment registry
-- Graph collectors and PowerShell collector runtime
-- CSV evidence ingestion
-- Findings, recommendations, and readiness scoring
-- PDF and DOCX report generation
-- Pytest test suite
+## What it does
 
-The React/Vite frontend lives separately in `CRA-frontend`.
+The CRA Tool connects to a customer's Microsoft 365 tenant using app-only Graph API calls (and optionally delegated PowerShell sessions), collects real-time configuration data across Entra ID, Security, Compliance, Collaboration, and Licensing domains, applies a weighted scoring model, and generates a PDF / Word report that tells the customer whether they are ready to deploy Microsoft 365 Copilot — and what must be fixed first.
 
-## Requirements
+---
 
-- Python 3.11+
-- Redis 5+ for Celery and runtime events
-- PowerShell 7+ (`pwsh`) for Microsoft 365 collectors
-- PostgreSQL for production, or SQLite for local development
-- Microsoft 365 PowerShell modules for live tenant collection
-- Microsoft Entra app registration with required Graph permissions
+## Architecture
 
-## Laptop Transfer Summary
-
-When moving this backend to another laptop, copy the source code and recreate local runtime state.
-
-Copy:
-
-```text
-app/
-migrations/
-scripts/
-tests/
-.env.example
-.gitignore
-alembic.ini
-pytest.ini
-README.md
-requirements.txt
+```
+┌────────────────────────────────────────────────────┐
+│  React / Vite  Frontend  (port 3000)               │
+│  MSAL SPA auth  →  Axios  →  WebSocket progress   │
+└──────────────────────┬─────────────────────────────┘
+                       │ HTTP / WS
+┌──────────────────────▼─────────────────────────────┐
+│  FastAPI  Backend  (port 8000)                     │
+│  ┌───────────────┐  ┌───────────────────────────┐  │
+│  │  REST API     │  │  Celery Task (async)      │  │
+│  │  /api/v1      │  │  assessment_tasks.py      │  │
+│  └───────────────┘  └──────────┬────────────────┘  │
+│                                │                   │
+│  ┌─────────────────────────────▼──────────────┐   │
+│  │  Assessment Engine                          │   │
+│  │  Graph Collector  (9 params, app-only)     │   │
+│  │  PowerShell Collector  (56 params)         │   │
+│  │  Findings Engine  →  Scoring Engine        │   │
+│  │  Report Generator  (PDF + DOCX)            │   │
+│  └─────────────────────────────────────────────┘  │
+│                                                    │
+│  SQLite / PostgreSQL        Redis (Celery broker)  │
+└────────────────────────────────────────────────────┘
+                       │
+          Microsoft 365 tenant (Graph API + PowerShell)
 ```
 
-Do not copy:
+**Key libraries:** FastAPI, SQLAlchemy (async), Celery, MSAL, Microsoft Graph SDK, ReportLab (PDF), python-docx, React 18, Vite, Tailwind CSS, Recharts.
 
-```text
-.env
-venv/
-cra.db
-tmp-routing-debug.db
-artifacts/
-storage/
-out/
-tmp/
-*.log
-*.docx
-*.pdf
-```
+---
 
-Create a fresh `.env` from `.env.example` on the new laptop.
+## Quick Start
 
-## Project Structure
+### Prerequisites
 
-```text
-app/
-  api/v1/                     API routers
-  config/assessment_registry/ Parameters, collectors, rules, recommendations
-  core/                       Settings, auth, security, middleware
-  db/                         SQLAlchemy models, session, repositories
-  powershell/                 Domain collector scripts
-  schemas/                    Pydantic schemas
-  services/                   Runtime, Graph, reporting, scoring, recommendations
-  tasks/                      Celery task entry points
-migrations/                   Alembic migrations
-scripts/                      Utility scripts
-tests/                        Pytest tests
-requirements.txt              Backend Python dependencies
-.env.example                  Example local configuration
-```
+| Requirement | Minimum version | Notes |
+|---|---|---|
+| Python | 3.11 | `python --version` |
+| Node.js | 18 | `node --version` |
+| Redis | 7 | Required even with `CELERY_TASK_ALWAYS_EAGER=True` for WebSocket pub/sub |
+| PowerShell | 7 (pwsh) | For Exchange / Teams / Purview collectors |
+| PS module: ExchangeOnlineManagement | 3.x | `Install-Module ExchangeOnlineManagement` |
+| PS module: MicrosoftTeams | 6.x | `Install-Module MicrosoftTeams` |
+| Azure App Registration | — | See Azure Setup below |
 
-## Setup
-
-Create a virtual environment:
+### Setup
 
 ```bash
+# 1 — Clone and enter repo
+git clone <repo-url> && cd CRA
+
+# 2 — Backend
+cd CRA-Tool
 python -m venv venv
-```
-
-Activate it on Windows PowerShell:
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-Or activate it on macOS/Linux:
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-python -m pip install --upgrade pip
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux / Mac
 pip install -r requirements.txt
-```
+cp .env.example .env           # then fill in .env
 
-Create local environment configuration:
+# 3 — Initialise database
+python -m alembic upgrade head
 
-```bash
-cp .env.example .env
-```
-
-Update `.env` with your own values:
-
-- `SECRET_KEY`
-- `DATABASE_URL`
-- `REDIS_URL`
-- `CELERY_BROKER_URL`
-- `CELERY_RESULT_BACKEND`
-- `AZURE_CLIENT_ID`
-- `AZURE_LOGIN_CLIENT_ID`
-- `AZURE_TENANT_ID`
-- `AZURE_CLIENT_SECRET` when server-side Graph app access is required
-- `CRA_FRONTEND_URL`
-- `CORS_ORIGINS`
-
-Never commit `.env` or tenant secrets.
-
-## Redis And Celery
-
-Redis is required for normal assessment execution. It is used for:
-
-- Celery assessment jobs
-- Celery result storage
-- runtime assessment events
-- WebSocket progress updates
-
-Recommended local values:
-
-```text
-REDIS_URL=redis://localhost:6379/0
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-CELERY_TASK_ALWAYS_EAGER=False
-```
-
-Start Redis before starting the API and Celery worker:
-
-```bash
-redis-server
-```
-
-On Windows, Docker is a simple option:
-
-```powershell
-docker run --name cra-redis -p 6379:6379 -d redis:7
-```
-
-For basic local testing without Redis, set:
-
-```text
-CELERY_TASK_ALWAYS_EAGER=True
-```
-
-Use Redis for real assessments.
-
-## Database
-
-Run migrations:
-
-```bash
-alembic upgrade head
-```
-
-Local SQLite is supported through `.env`:
-
-```text
-DATABASE_URL=sqlite:///./cra.db
-```
-
-For production, use PostgreSQL:
-
-```text
-DATABASE_URL=postgresql+asyncpg://user:password@host:5432/database
-```
-
-## Run Locally
-
-Start Redis:
-
-```bash
-redis-server
-```
-
-Start the API:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Start the Celery worker:
-
-```bash
-celery -A app.core.celery_app.celery_app worker --loglevel=info
-```
-
-Optional Flower dashboard:
-
-```bash
-celery -A app.core.celery_app.celery_app flower
-```
-
-Swagger UI:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-## Local Development Without Redis
-
-For simple local testing, set this in `.env`:
-
-```text
-CELERY_TASK_ALWAYS_EAGER=True
-```
-
-This runs assessment tasks inline instead of sending them to a Celery worker.
-
-## New Laptop Startup Order
-
-Use separate terminals:
-
-1. Redis
-
-```bash
-redis-server
-```
-
-2. Backend API
-
-```bash
-cd CRA-Tool
-.\venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload
-```
-
-3. Celery worker
-
-```bash
-cd CRA-Tool
-.\venv\Scripts\Activate.ps1
-celery -A app.core.celery_app.celery_app worker --loglevel=info
-```
-
-4. Frontend from the sibling `CRA-frontend` folder
-
-```bash
-npm run dev
-```
-
-## Microsoft 365 Collector Prerequisites
-
-Install PowerShell 7 and the Microsoft 365 modules required by the collector scripts:
-
-```powershell
-pwsh ./scripts/install_m365_modules.ps1
-```
-
-Live assessment collection requires tenant admin consent and workload permissions for Microsoft Graph, Exchange Online, Teams, SharePoint Online, and Purview where applicable.
-
-## Microsoft Entra Configuration
-
-Required backend `.env` values:
-
-```text
-AZURE_CLIENT_ID=your-backend-or-shared-app-client-id
-AZURE_LOGIN_CLIENT_ID=your-frontend-spa-client-id
-AZURE_TENANT_ID=common
-CRA_FRONTEND_URL=http://localhost:3000
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-```
-
-If server-side Microsoft Graph collection uses a confidential app, also configure:
-
-```text
-AZURE_CLIENT_SECRET=your-client-secret
-AZURE_CLIENT_SECRET_ID=your-secret-id
-AZURE_AUTHORITY=https://login.microsoftonline.com/common
-AZURE_REDIRECT_URI=http://localhost:3000/auth/callback
-```
-
-The frontend SPA redirect URI in Microsoft Entra must match:
-
-```text
-http://localhost:3000
-```
-
-## Main API Areas
-
-| Area | Endpoint |
-| --- | --- |
-| Auth | `/api/v1/auth/*` |
-| Tenants | `/api/v1/tenants/*` |
-| Assessments | `/api/v1/assessments/*` |
-| Findings | `/api/v1/assessments/{assessment_id}/findings` |
-| Recommendations | `/api/v1/assessments/{assessment_id}/recommendations` |
-| Reports | `/api/v1/assessments/{assessment_id}/report/*` |
-| Registry | `/api/v1/registry/*` |
-| Admin | `/api/v1/admin/*` |
-
-## Assessment Runtime
-
-The assessment engine is registry-driven. Parameter definitions, collector mappings, rules, and recommendations are loaded from:
-
-```text
-app/config/assessment_registry/parameters.json
-app/config/assessment_registry/collectors.json
-app/config/assessment_registry/rules.json
-app/config/assessment_registry/recommendations.json
-app/config/collector_manifest.json
-```
-
-The official CRA catalog contains 65 parameters across:
-
-- Entra ID
-- Exchange Online
-- Microsoft Purview
-- Microsoft Teams
-- OneDrive for Business
-- SharePoint Online
-
-## Reports
-
-Generated reports are written under:
-
-```text
-storage/reports/{assessment_id}/
-```
-
-Generated reports, local artifacts, local databases, logs, and tenant evidence are ignored by git.
-
-## Tests
-
-Run the full test suite:
-
-```bash
-pytest -q
-```
-
-Useful targeted checks:
-
-```bash
-pytest -q tests/test_phase8_reports.py
-pytest -q tests/test_custom_banned_password_collector.py
-pytest -q tests/test_collector_completion_certification.py
-```
-
-## Before Pushing To A New Repository
-
-Commit source and configuration templates:
-
-```text
-app/
-migrations/
-scripts/
-tests/
-.env.example
-.gitignore
-alembic.ini
-pytest.ini
-README.md
-requirements.txt
-```
-
-Do not commit local/generated files:
-
-```text
-.env
-venv/
-cra.db
-tmp-routing-debug.db
-artifacts/
-storage/
-out/
-tmp/
-*.log
-*.docx
-*.pdf
-```
-
-Also avoid committing tenant evidence, generated reports, Redis state, local databases, token caches, and PowerShell transcript logs.
-
-## Frontend
-
-The frontend is a separate React/Vite app. From `CRA-frontend`:
-
-```bash
+# 4 — Frontend
+cd ../CRA-frontend
 npm install
-npm run dev
+cp .env.example .env
+
+# 5 — Start services (see start.bat / start.sh in project root)
 ```
 
-The backend CORS settings must include the frontend URL, usually:
+### One-command start (Windows)
 
-```text
-http://localhost:3000
+```bat
+start.bat
+```
+
+### One-command start (Linux / Mac)
+
+```bash
+bash start.sh
+```
+
+Both scripts start Redis, the FastAPI backend, Celery worker, and the React dev server.
+
+---
+
+## Azure App Registration
+
+1. **New registration** — any name, supported account types: *Accounts in any organizational directory (Any Azure AD directory — Multitenant)*.
+2. **Authentication** → Add a platform → **Single-page application** → Redirect URI: `http://localhost:3000`.
+3. **API permissions** → Microsoft Graph → Application permissions → add all permissions below → Grant admin consent.
+4. **Certificates & secrets** → New client secret → copy value to `AZURE_CLIENT_SECRET`.
+5. Copy the **Application (client) ID** → `AZURE_CLIENT_ID`.
+
+### Required Graph Permissions
+
+| Permission | Type | Used for |
+|---|---|---|
+| `User.Read.All` | Application | User count, MFA status, guest users |
+| `Policy.Read.All` | Application | Conditional Access, SSPR, password policy |
+| `AuditLog.Read.All` | Application | Audit log retention, sign-in logs |
+| `SecurityEvents.Read.All` | Application | Secure Score |
+| `Reports.Read.All` | Application | SharePoint / Teams usage reports |
+| `Directory.Read.All` | Application | Tenant settings, admin centre access |
+| `IdentityRiskEvent.Read.All` | Application | Risky sign-in policies |
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env`. Key variables:
+
+### Backend (`CRA-Tool/.env`)
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SECRET_KEY` | Yes | — | JWT signing key (`openssl rand -hex 32`) |
+| `DATABASE_URL` | Yes | `sqlite:///./cra.db` | SQLAlchemy URL |
+| `REDIS_URL` | Yes | `redis://localhost:6379/0` | Redis connection |
+| `CELERY_TASK_ALWAYS_EAGER` | No | `False` | `True` = no Celery worker needed (dev mode) |
+| `AZURE_CLIENT_ID` | Yes | — | App registration client ID |
+| `AZURE_CLIENT_SECRET` | Yes | — | App registration secret |
+| `AZURE_TENANT_ID` | No | `common` | `common` for multi-tenant |
+| `AZURE_LOGIN_CLIENT_ID` | No | = `AZURE_CLIENT_ID` | Frontend SPA client ID if different |
+| `ORGANIZATION_NAME` | No | — | Shown on generated reports |
+| `CRA_EXCHANGE_AUTH_MODE` | No | `skip` | `skip` / `device` / `token` |
+| `CRA_TEAMS_AUTH_MODE` | No | `skip` | `skip` / `device` / `token` |
+| `CRA_PURVIEW_AUTH_MODE` | No | `skip` | `skip` / `device` / `token` |
+
+### Frontend (`CRA-frontend/.env`)
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `VITE_API_BASE_URL` | Yes | `http://localhost:8000` | Backend URL |
+| `VITE_AZURE_CLIENT_ID` | Yes | — | MSAL client ID (same as backend) |
+| `VITE_AZURE_TENANT_ID` | No | `common` | Azure tenant ID |
+| `VITE_AZURE_REDIRECT_URI` | No | `http://localhost:3000` | Must match Azure portal |
+
+---
+
+## Assessment Coverage
+
+65 parameters across 5 scored domains.
+
+### Entra ID / Identity Access — 19 parameters
+
+| Parameter | Method | Severity | Copilot Blocker |
+|---|---|---|---|
+| Users without MFA | PowerShell | Critical | No |
+| CAP policies for risky sign-ins | PowerShell | Critical | No |
+| Conditional Access Policies (Exclusion) | PowerShell | High | No |
+| Global Administrator Accounts | PowerShell | High | No |
+| Authentication methods enabled | PowerShell | High | No |
+| Emergency Access Accounts | Graph | High | No |
+| Devices without Compliance Policies | PowerShell | High | No |
+| User Consent For Applications | Graph | Medium | No |
+| Self-Service Password Reset Auth Method | Graph | Medium | No |
+| Restricted Access to Entra Admin Centre | Graph | Medium | No |
+| Admin Consent Workflow | PowerShell | Medium | No |
+| Guest Invite Settings | PowerShell | Medium | No |
+| Tenant Collaboration Invitations | PowerShell | Medium | No |
+| Entra – Third Party App Integrations | PowerShell | Medium | No |
+| Account Enabled | PowerShell | Medium | No |
+| Custom Banned Password List | Graph | Low | No |
+| Entra – Tenant Creation By Non-Admin | PowerShell | Low | No |
+| Guest Users Count | PowerShell | Low | No |
+| User Information | PowerShell | Info | No |
+
+### Security — 3 parameters
+
+| Parameter | Method | Severity |
+|---|---|---|
+| Permission Settings for Anyone links | PowerShell | High |
+| Auto-expiration policy for M365 Groups | PowerShell | Medium |
+| Expiration Policy for Anyone links | PowerShell | Medium |
+
+### Compliance / Purview — 8 parameters
+
+| Parameter | Method | Severity |
+|---|---|---|
+| Audit Logs Enabled | PowerShell | Critical |
+| Secure Score Percentage | Graph | High |
+| DLP Rules Configured | PowerShell | High |
+| Information Protection Labels Applied | PowerShell | High |
+| Sensitivity Labels Configured and Applied | PowerShell | High |
+| Audit Log Retention Duration | Graph | High |
+| Sensitivity Labels Applied to Teams | PowerShell | Medium |
+| Compliance Score Overview | Graph | Info |
+
+### Collaboration — Teams, SharePoint, OneDrive, Exchange — 31 parameters
+
+| Parameter | Method | Severity | Copilot Blocker |
+|---|---|---|---|
+| Copilot Integration Enabled | PowerShell | Critical | **Yes** |
+| Teams – Lobby Bypass | PowerShell | High | No |
+| Teams with External Guest as Owner | PowerShell | High | No |
+| External Sharing Settings | PowerShell | High | No |
+| Sharing Settings (External / Internal) | PowerShell | High | No |
+| SharePoint – Modern Authentication | PowerShell | High | No |
+| Full Calendar Schedules Shareable Externally | PowerShell | High | No |
+| Active / Inactive Teams | PowerShell | High | No |
+| Meeting Transcription Enabled | PowerShell | High | No |
+| Meeting Policies Configuration | PowerShell | Medium | No |
+| Meeting Recording Retention Policies | PowerShell | Medium | No |
+| Teams – Meeting Chat | PowerShell | Medium | No |
+| Teams – File Storage Option | PowerShell | Medium | No |
+| Teams with External Users | PowerShell | Medium | No |
+| Active/Inactive Teams Users | PowerShell | Medium | No |
+| Orphan Teams | PowerShell | Medium | No |
+| Minimum Number of Owners | PowerShell | Medium | No |
+| Third-party Apps Allowed | PowerShell | Medium | No |
+| Guest Access Enabled / Disabled | PowerShell | Medium | No |
+| SharePoint & OneDrive Guest Access Expiry | PowerShell | Medium | No |
+| Getting All Sites with Sensitivity Keywords | PowerShell | Medium | No |
+| Active Sites Count | Graph | Medium | No |
+| Active Users on SharePoint | PowerShell | Medium | No |
+| Total Active Users on OneDrive | PowerShell | Medium | No |
+| Mailboxes Status (Active / Inactive) | PowerShell | Medium | No |
+| External Storage Providers in OWA | PowerShell | Medium | No |
+| Teams – Channel Email Addresses | PowerShell | Low | No |
+| Storage Quota Consumption | PowerShell | Low | No |
+| Mailbox Storage Usage | PowerShell | Low | No |
+| Number of Emails Read / Received | PowerShell | Info | No |
+| Number of Emails Sent | PowerShell | Info | No |
+
+### Governance + Other — 4 parameters
+
+| Parameter | Domain | Method | Severity |
+|---|---|---|---|
+| Customer Lockbox | Unclassified | PowerShell | High |
+| Days to Retain Deleted User's OneDrive | Governance | PowerShell | Medium |
+| Site Ownership Policies | Governance | PowerShell | Medium |
+| Inactive Site Policies | Best Practice | PowerShell | Low |
+
+---
+
+## Enabling Exchange / Teams / Purview
+
+By default all three service collectors are set to `skip` — they are omitted silently and their domain scores show **N/A** in results. This prevents browser login popups during automated runs.
+
+To collect real data from these services:
+
+### Device Code Flow (recommended)
+
+Run the following in a separate PowerShell 7 terminal **before** starting the backend, then leave the session open:
+
+```powershell
+Connect-ExchangeOnline -Device -ShowBanner:$false
+Connect-MicrosoftTeams -UseDeviceAuthentication
+```
+
+Then in `.env`:
+
+```env
+CRA_EXCHANGE_AUTH_MODE=device
+CRA_TEAMS_AUTH_MODE=device
+CRA_PURVIEW_AUTH_MODE=device
+```
+
+Restart the backend. Collectors will reuse the authenticated session.
+
+### Install required PowerShell modules
+
+```powershell
+# Run once as Administrator
+Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
+Install-Module MicrosoftTeams -Scope CurrentUser -Force
+Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser -Force
+Install-Module PnP.PowerShell -Scope CurrentUser -Force
+```
+
+> If you see `AADSTS500014`, the tenant's Exchange Online service principal is disabled. Contact the Exchange admin or keep `CRA_EXCHANGE_AUTH_MODE=skip`.
+
+---
+
+## Scoring
+
+Scores are calculated using a **weighted domain average with per-parameter severity deductions** model.
+
+### Domain Weights
+
+| Domain | Display Name | Weight |
+|---|---|---|
+| `collaboration` | Teams / SharePoint / OneDrive / Exchange | 43.4% |
+| `identity_access` | Entra ID | 28.9% |
+| `compliance` | Purview | 11.8% |
+| `security` | Security | 7.9% |
+| `governance` | Governance | 4.0% |
+| `best_practice` | Best Practices | 1.3% |
+| `unclassified` | Other | 2.6% |
+
+### Severity Deductions (per failing parameter)
+
+| Severity | Full Fail | Warning (×0.45) |
+|---|---|---|
+| Critical | −25 pts | −11.25 pts |
+| High | −15 pts | −6.75 pts |
+| Medium | −8 pts | −3.6 pts |
+| Low | −3 pts | −1.35 pts |
+| Info | −1 pt | −0.45 pts |
+
+Each domain starts at 100. Deductions are applied per failing finding, scaled by the parameter's `scoring_weight`. All findings within a domain are averaged, then combined using domain weights.
+
+**Blocker cap:** if any `copilot_blocker: true` parameter fails with a critical finding, the overall score is capped at 59/100.
+
+### Readiness Tiers
+
+| Score | Tier | Meaning |
+|---|---|---|
+| ≥ 85 | Ready | Safe to deploy Copilot |
+| 70 – 84 | Mostly Ready | Minor remediation recommended |
+| 50 – 69 | Partially Ready | Remediation required before deployment |
+| < 50 | Not Ready | Significant issues must be resolved |
+
+---
+
+## API Reference
+
+Interactive API docs: `http://localhost:8000/docs`
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/microsoft` | Exchange Microsoft ID token for CRA JWT |
+| `GET` | `/api/v1/dashboard/stats` | Aggregate stats for the dashboard cards |
+| `GET` | `/api/v1/assessments` | Paginated assessment list |
+| `POST` | `/api/v1/assessments/start` | Start a new assessment |
+| `GET` | `/api/v1/assessments/{id}/results` | Full results with findings and recommendations |
+| `DELETE` | `/api/v1/assessments/{id}` | Soft-delete an assessment |
+| `GET` | `/api/v1/assessments/{id}/report` | Download PDF or DOCX report |
+| `WS` | `/ws/assessments/{id}` | Real-time progress updates |
+
+---
+
+## Development Tips
+
+```bash
+# Backend with auto-reload
+cd CRA-Tool && uvicorn app.main:app --reload --port 8000
+
+# Frontend dev server
+cd CRA-frontend && npm run dev
+
+# Skip Celery worker (tasks run synchronously in dev)
+# .env:  CELERY_TASK_ALWAYS_EAGER=True
+
+# Interactive API docs
+open http://localhost:8000/docs
 ```

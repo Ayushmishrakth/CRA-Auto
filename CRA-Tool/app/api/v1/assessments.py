@@ -24,8 +24,12 @@ from app.schemas.assessment import (
     AssessmentScoreResponse,
     AssessmentStartRequest,
 )
+from app.schemas.dashboard import (
+    AssessmentListResponse,
+    AssessmentResultsResponse,
+)
 from app.schemas.report import GenerateReportResponse, ReportBundleResponse
-from app.services import assessment_service
+from app.services import assessment_service, dashboard_service
 from app.services.reporting import cra_report_service
 
 router = APIRouter(tags=["Assessments"])
@@ -48,6 +52,35 @@ async def start_assessment(
     return success_response(
         message="Assessment queued",
         data=AssessmentResponse.model_validate(assessment),
+        request_id=request.state.request_id,
+    )
+
+
+@router.get(
+    "/assessments",
+    response_model=SuccessResponse[AssessmentListResponse],
+    summary="List assessments for the current user's tenant",
+)
+async def list_assessments(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=10, ge=1, le=200),
+    status: str | None = Query(default=None),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|score_asc|score_desc)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> SuccessResponse[AssessmentListResponse]:
+    data = await dashboard_service.list_assessments(
+        db,
+        current_user=current_user,
+        page=page,
+        per_page=per_page,
+        status=status,
+        sort=sort,  # type: ignore[arg-type]
+    )
+    return success_response(
+        message="Assessments retrieved",
+        data=data,
         request_id=request.state.request_id,
     )
 
@@ -352,10 +385,16 @@ async def download_assessment_report(
         if report_type == "pdf"
         else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+    import re
+    from pathlib import Path as _Path
+    artifact_path = _Path(artifact.storage_path)
+    # Use the stored filename (already has tenant name) or fall back
+    safe_filename = artifact_path.name if artifact_path.name.endswith(f".{report_type}") else f"copilot-readiness-assessment.{report_type}"
     return FileResponse(
         artifact.storage_path,
         media_type=media_type,
-        filename=f"copilot-readiness-assessment.{report_type}",
+        filename=safe_filename,
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
 
 
@@ -376,5 +415,47 @@ async def list_tenant_assessments(
     return success_response(
         message="Tenant assessments retrieved",
         data=[AssessmentResponse.model_validate(item) for item in assessments],
+        request_id=request.state.request_id,
+    )
+
+
+@router.delete(
+    "/assessments/{assessment_id}",
+    response_model=SuccessResponse[dict],
+    summary="Soft-delete an assessment",
+)
+async def delete_assessment(
+    assessment_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> SuccessResponse[dict]:
+    deleted_id = await dashboard_service.delete_assessment(
+        db, current_user=current_user, assessment_id=assessment_id
+    )
+    return success_response(
+        message="Assessment deleted",
+        data={"success": True, "id": str(deleted_id)},
+        request_id=request.state.request_id,
+    )
+
+
+@router.get(
+    "/assessments/{assessment_id}/results",
+    response_model=SuccessResponse[AssessmentResultsResponse],
+    summary="Combined results for ResultsPage",
+)
+async def get_assessment_results(
+    assessment_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> SuccessResponse[AssessmentResultsResponse]:
+    data = await dashboard_service.get_assessment_results(
+        db, current_user=current_user, assessment_id=assessment_id
+    )
+    return success_response(
+        message="Assessment results retrieved",
+        data=data,
         request_id=request.state.request_id,
     )

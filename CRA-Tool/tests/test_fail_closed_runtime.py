@@ -45,3 +45,14 @@ def test_collector_manifest_explicitly_lists_all_registry_parameters():
     parameter_keys = {item["parameter_key"] for item in parameters}
     assert manifest_keys == parameter_keys
     assert all("script" in item and "parser" in item for item in manifest)
+
+
+def test_manifest_script_resolution_is_independent_of_worker_cwd(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    resolver = PowerShellCollectorResolver()
+    script = resolver.resolve_script(
+        collector={"collector_name": "powershell.copilot_integration_enabled"},
+        parameter={"parameter_key": "copilot_integration_enabled"},
+    )
+    assert script.name == "teams_master.ps1"
+    assert script.exists()

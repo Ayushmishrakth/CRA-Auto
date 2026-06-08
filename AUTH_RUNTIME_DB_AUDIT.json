@@ -1,0 +1,1898 @@
+{
+  "tables": [
+    "alembic_version",
+    "assessment_artifacts",
+    "assessment_events",
+    "assessment_findings",
+    "assessment_jobs",
+    "assessment_parameters",
+    "assessment_recommendations",
+    "assessment_reports",
+    "assessment_rules",
+    "assessments",
+    "audit_logs",
+    "connected_tenants",
+    "cra_assessment_results",
+    "cra_parameter_evidence",
+    "cra_parameter_versions",
+    "cra_parameters",
+    "refresh_tokens",
+    "user_sessions",
+    "users"
+  ],
+  "assessment_artifacts": [
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.473891",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.550350",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.633176",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.701579",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.792053",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.864520",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.934417",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:20.999633",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.100957",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.206115",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.265669",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.332267",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.384088",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.455105",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.532286",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.600477",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.673755",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.740367",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.808909",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.868198",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.923939",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:21.982980",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.042229",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.105656",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.162798",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.216107",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.273986",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.333505",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.398963",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.462335",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.607246",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.657298",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.732703",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.797054",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.861522",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:22.933760",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.000553",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.067578",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.132435",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.189518",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.249030",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.316108",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.382039",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.448099",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.515765",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.588804",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.649064",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.713236",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.776378",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-31 09:01:23.832455",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    }
+  ],
+  "assessment_events": [
+    {
+      "created_at": "2026-05-29 16:44:59.372016",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.410053",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.486471",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.533802",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.559083",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.586495",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.623999",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.648048",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-29 16:44:59.680664",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.076033",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.208686",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.404588",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.482280",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.507110",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.557253",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.591994",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.640331",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.665544",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.708713",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.735305",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.796749",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.823526",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.868107",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.892511",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.940878",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:20.957093",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.010171",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.038744",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.116153",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.151563",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.211076",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.232276",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.274887",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.299095",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.336462",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.349453",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.392687",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.422865",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.466053",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.487343",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.538467",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.562756",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.604143",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.631839",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.682021",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.698902",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.744048",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.774530",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.813047",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 09:01:21.836355",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    }
+  ],
+  "assessment_jobs": [
+    {
+      "status": "failed",
+      "created_at": "2026-05-28 19:49:53.167413",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-28 20:41:41.787978",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-29 15:00:34.084414",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:01:19.472380",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:10:04.777242",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:10:55.973772",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:11:48.029515",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:11:57.495485",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:12:22.454965",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 15:07:37.999821",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 15:20:35.321221",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 15:46:04.205425",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 16:23:27.968564",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 16:54:11.556198",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 17:02:30.863310",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-02 15:49:13.409215",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-02 15:50:29.843181",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 19:59:36.615637",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:11:03.971313",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 20:32:48.289392",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:43:05.501568",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 20:46:59.885154",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 20:51:10.684171",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:55:20.534855",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:58:18.642249",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 21:01:33.407338",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 21:12:10.233985",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 21:13:18.249785",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 13:20:46.922916",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 13:34:32.863269",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 14:23:03.201617",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 19:15:02.300893",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 19:48:34.712453",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 20:22:21.969532",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 13:11:58.243382",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 13:18:10.786950",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 13:31:45.625047",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-06-05 14:10:37.084473",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 14:27:33.112826",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    }
+  ],
+  "assessment_recommendations": [
+    {
+      "created_at": "2026-05-31 15:46:06.695634",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 16:23:32.591468",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 16:54:14.966276",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-05-31 17:02:34.098845",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "created_at": "2026-06-02 15:50:27.226002",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    }
+  ],
+  "assessments": [
+    {
+      "status": "failed",
+      "created_at": "2026-05-28 19:49:53.098025",
+      "updated_at": "2026-05-29 16:44:59.486471",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-28 20:41:41.747483",
+      "updated_at": "2026-05-29 16:44:59.586495",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-05-29 15:00:33.990429",
+      "updated_at": "2026-05-29 16:44:59.681277",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:01:19.429962",
+      "updated_at": "2026-05-31 09:01:24.884067",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:10:04.717968",
+      "updated_at": "2026-05-31 09:10:10.696015",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:10:55.920702",
+      "updated_at": "2026-05-31 09:11:01.166935",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:11:47.976339",
+      "updated_at": "2026-05-31 09:11:53.582573",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:11:57.458947",
+      "updated_at": "2026-05-31 09:12:11.568115",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 09:12:22.429626",
+      "updated_at": "2026-05-31 09:12:27.659688",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 15:07:37.950994",
+      "updated_at": "2026-05-31 15:07:56.662582",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "incomplete",
+      "created_at": "2026-05-31 15:20:35.286762",
+      "updated_at": "2026-05-31 15:21:25.894012",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 15:46:04.107906",
+      "updated_at": "2026-05-31 15:46:07.670381",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 16:23:27.852090",
+      "updated_at": "2026-05-31 16:23:34.484885",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 16:54:11.501896",
+      "updated_at": "2026-05-31 16:54:17.222259",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-05-31 17:02:30.787825",
+      "updated_at": "2026-05-31 17:02:36.992829",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-02 15:49:13.390338",
+      "updated_at": "2026-06-02 15:50:29.157795",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-02 15:50:29.813978",
+      "updated_at": "2026-06-02 15:51:35.526966",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 19:59:36.583563",
+      "updated_at": "2026-06-03 19:59:49.984051",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:11:03.938670",
+      "updated_at": "2026-06-03 20:11:17.586572",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 20:32:48.284022",
+      "updated_at": "2026-06-03 20:40:10.876311",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:43:05.460073",
+      "updated_at": "2026-06-03 20:43:30.154608",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 20:46:59.874227",
+      "updated_at": "2026-06-03 20:48:15.152195",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 20:51:10.677672",
+      "updated_at": "2026-06-03 20:57:03.190492",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:55:20.501354",
+      "updated_at": "2026-06-03 20:55:53.747793",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 20:58:18.609512",
+      "updated_at": "2026-06-03 20:58:44.945253",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-03 21:01:33.315749",
+      "updated_at": "2026-06-03 21:05:57.977701",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 21:12:10.233985",
+      "updated_at": "2026-06-03 21:12:10.317217",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "running",
+      "created_at": "2026-06-03 21:13:18.042165",
+      "updated_at": "2026-06-03 21:18:56.125773",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 13:20:46.912805",
+      "updated_at": "2026-06-04 13:22:19.401424",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 13:34:32.835628",
+      "updated_at": "2026-06-04 13:35:47.388049",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 14:23:03.149885",
+      "updated_at": "2026-06-04 14:24:37.998240",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 19:15:02.246420",
+      "updated_at": "2026-06-04 19:16:29.641360",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 19:48:34.646473",
+      "updated_at": "2026-06-04 19:49:51.275306",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-04 20:22:21.934844",
+      "updated_at": "2026-06-04 20:23:42.759642",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 13:11:58.192972",
+      "updated_at": "2026-06-05 13:13:32.960718",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 13:18:10.766605",
+      "updated_at": "2026-06-05 13:19:21.574043",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 13:31:45.511956",
+      "updated_at": "2026-06-05 13:33:42.654053",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "failed",
+      "created_at": "2026-06-05 14:10:37.080271",
+      "updated_at": "2026-06-05 14:25:35.120773",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    },
+    {
+      "status": "completed",
+      "created_at": "2026-06-05 14:27:33.084989",
+      "updated_at": "2026-06-05 14:28:55.532886",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2"
+    }
+  ],
+  "audit_logs": [
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:46:07.692853"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 16:23:34.514400"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 16:54:17.253235"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 17:02:37.017008"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-06-02 15:50:29.157795"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-06-02 15:51:35.526966"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 16:44:59.510159"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 16:44:59.605146"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 16:44:59.688884"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:01:24.912027"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:10:10.727683"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:11:01.189902"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:11:53.600409"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:12:02.712568"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:12:27.684719"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:07:42.845533"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:20:39.858801"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-28 19:49:53.180580"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-28 20:41:41.794974"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 15:00:34.095045"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:01:19.481765"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:10:04.783342"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:10:55.982235"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:11:48.033577"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:11:57.500175"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:12:22.463020"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:07:38.010617"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:20:35.326862"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:46:04.212449"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 16:23:27.976025"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 16:54:11.564678"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 17:02:30.880588"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-06-02 15:49:13.414734"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-06-02 15:50:27.159479"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-06-02 15:50:29.861008"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-06-02 15:51:33.614735"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-28 19:49:45.100123"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-28 20:41:36.880003"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 15:00:29.959865"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 16:45:15.709846"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 17:18:34.442174"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 18:06:54.875994"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 19:01:55.495964"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-29 19:37:28.485647"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:00:09.627369"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 09:11:43.947174"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:07:33.880329"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 15:43:46.077370"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 16:23:21.407546"
+    },
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "created_at": "2026-05-31 16:53:50.280800"
+    }
+  ],
+  "connected_tenants": [
+    {
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "tenant_name": "Nexora Innovations Private Limited",
+      "app_registration_id": null,
+      "status": "ACTIVE",
+      "created_at": "2026-05-28 19:49:45.054678",
+      "updated_at": "2026-06-02 15:50:26.112415",
+      "app_client_id": null,
+      "service_principal_id": "93ca96ef-cf90-4649-9ee9-cebeef46d70a",
+      "deployment_status": "ACTIVE",
+      "application_client_id": "976c7fa8-4af1-48d4-8bdf-c6df2a35ebbd",
+      "application_object_id": "c174b307-1c33-4f28-a9f9-c542589a4a32"
+    },
+    {
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "tenant_name": "WealthScape",
+      "app_registration_id": null,
+      "status": "ACTIVE",
+      "created_at": "2026-06-01 13:10:03.049805",
+      "updated_at": "2026-06-04 19:14:44.583699",
+      "app_client_id": null,
+      "service_principal_id": "535abf5d-0c19-4e13-b96e-eb3a402acc99",
+      "deployment_status": "ACTIVE",
+      "application_client_id": "33688cf5-d33b-4483-992a-d3e2ce6e1b15",
+      "application_object_id": "0ee93cc1-d128-4989-ba52-e12336616048"
+    }
+  ],
+  "users": [
+    {
+      "microsoft_tid": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "email": "akhilnautiyal@nexorainn.onmicrosoft.com",
+      "created_at": "2026-05-28 19:49:45.030048",
+      "updated_at": "2026-06-02 15:49:10.447549"
+    },
+    {
+      "microsoft_tid": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "email": "deep@wealthscape.in",
+      "created_at": "2026-06-01 13:10:02.858222",
+      "updated_at": "2026-06-05 14:27:27.866284"
+    }
+  ],
+  "connected_tenants_sample": [
+    {
+      "id": "b985ce4480b8497a834bbc2c0d5c2247",
+      "tenant_id": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "tenant_name": "Infra Nimbus Tech",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": "4d665768-093e-43b2-8092-558dce255546",
+      "deployment_status": "ACTIVE",
+      "consent_status": "connected",
+      "status": "ACTIVE",
+      "created_at": "2026-06-04 15:02:12.138756",
+      "updated_at": "2026-06-04 15:04:11.084954"
+    },
+    {
+      "id": "8e3e905cd63c435ba20bfe79184bab4c",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "tenant_name": "WealthScape",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": "535abf5d-0c19-4e13-b96e-eb3a402acc99",
+      "deployment_status": "ACTIVE",
+      "consent_status": "connected",
+      "status": "ACTIVE",
+      "created_at": "2026-06-01 13:10:03.049805",
+      "updated_at": "2026-06-04 19:14:44.583699"
+    },
+    {
+      "id": "0e09dc320cb1441895ef5b74610bc528",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "tenant_name": "Nexora Innovations Private Limited",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": "93ca96ef-cf90-4649-9ee9-cebeef46d70a",
+      "deployment_status": "ACTIVE",
+      "consent_status": "connected",
+      "status": "ACTIVE",
+      "created_at": "2026-05-28 19:49:45.054678",
+      "updated_at": "2026-06-02 15:50:26.112415"
+    },
+    {
+      "id": "e2489cea0e1840d89d4327076a330f5f",
+      "tenant_id": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "tenant_name": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "app_registration_id": null,
+      "app_client_id": null,
+      "service_principal_id": null,
+      "deployment_status": "NOT_DEPLOYED",
+      "consent_status": "pending",
+      "status": "NOT_DEPLOYED",
+      "created_at": "2026-05-28 18:05:05.853423",
+      "updated_at": "2026-05-28 18:05:05.853423"
+    }
+  ],
+  "users_sample": [
+    {
+      "id": "6b86ab2d5dab4ad9bba136a13a540907",
+      "microsoft_tid": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "email": "vivan.s@infranimbustech.com",
+      "display_name": "Vivaan Singh",
+      "created_at": "2026-06-04 15:02:12.117493",
+      "updated_at": "2026-06-04 15:02:12.117493"
+    },
+    {
+      "id": "92207583c2f4450eb56407d97a64f94e",
+      "microsoft_tid": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "email": "deep@wealthscape.in",
+      "display_name": "deep",
+      "created_at": "2026-06-01 13:10:02.858222",
+      "updated_at": "2026-06-05 14:27:27.866284"
+    },
+    {
+      "id": "6e051c1e91f34d158dcf2d59c34186e2",
+      "microsoft_tid": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "email": "akhilnautiyal@nexorainn.onmicrosoft.com",
+      "display_name": "Akhil Nautiyal",
+      "created_at": "2026-05-28 19:49:45.030048",
+      "updated_at": "2026-06-02 15:49:10.447549"
+    },
+    {
+      "id": "2a6b008531d34125bbd0161065ce0fd3",
+      "microsoft_tid": "2522b752-1926-4ccb-89a4-c465b37367f8",
+      "email": "ayush.mishra@techplustalent.com",
+      "display_name": "Ayush Mishra",
+      "created_at": "2026-05-28 18:05:05.829399",
+      "updated_at": "2026-06-04 19:12:46.702224"
+    }
+  ],
+  "assessments_sample": [
+    {
+      "id": "4e29cb25d1514679a56967c35ee7c7ad",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 14:27:33.084989",
+      "updated_at": "2026-06-05 14:28:55.532886"
+    },
+    {
+      "id": "068e222a2ab447b9830d31b1617078ff",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "failed",
+      "created_at": "2026-06-05 14:10:37.080271",
+      "updated_at": "2026-06-05 14:25:35.120773"
+    },
+    {
+      "id": "14f6ba34781743c19074f785d1aeb8d9",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:31:45.511956",
+      "updated_at": "2026-06-05 13:33:42.654053"
+    },
+    {
+      "id": "80c7decf9d9449748160e295e87dbfe0",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:18:10.766605",
+      "updated_at": "2026-06-05 13:19:21.574043"
+    },
+    {
+      "id": "01b64581ea0241419367d8952bedcb41",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:11:58.192972",
+      "updated_at": "2026-06-05 13:13:32.960718"
+    },
+    {
+      "id": "188872d6a2fa4065a7810237ceddc65b",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 20:22:21.934844",
+      "updated_at": "2026-06-04 20:23:42.759642"
+    },
+    {
+      "id": "cab684f9417c4bb6af817eab9c8f32b4",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 19:48:34.646473",
+      "updated_at": "2026-06-04 19:49:51.275306"
+    },
+    {
+      "id": "c15bf80ddb2b42af9939b7c49ffe0cac",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 19:15:02.246420",
+      "updated_at": "2026-06-04 19:16:29.641360"
+    },
+    {
+      "id": "ba98c39187524dd1ac1ccaac060ad8f4",
+      "tenant_id": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "status": "completed",
+      "created_at": "2026-06-04 15:05:42.053822",
+      "updated_at": "2026-06-04 15:07:12.556773"
+    },
+    {
+      "id": "e712ac78d618448986567430e258aff9",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 14:23:03.149885",
+      "updated_at": "2026-06-04 14:24:37.998240"
+    },
+    {
+      "id": "19e1366f61044c79bc9f40906aeed370",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 13:34:32.835628",
+      "updated_at": "2026-06-04 13:35:47.388049"
+    },
+    {
+      "id": "2bbbf23c114c43609f1f8220f59598f8",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 13:20:46.912805",
+      "updated_at": "2026-06-04 13:22:19.401424"
+    },
+    {
+      "id": "4a679e90e2064b2baefff2f569f98778",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 21:13:18.042165",
+      "updated_at": "2026-06-03 21:18:56.125773"
+    },
+    {
+      "id": "daf569f2a3494baa8af4746d6c7e45d4",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 21:12:10.233985",
+      "updated_at": "2026-06-03 21:12:10.317217"
+    },
+    {
+      "id": "cf07d3b25b7544b79b73a5a4166cc2e1",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 21:01:33.315749",
+      "updated_at": "2026-06-03 21:05:57.977701"
+    },
+    {
+      "id": "0047cced6f164dd2953eb2d164bfd604",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:58:18.609512",
+      "updated_at": "2026-06-03 20:58:44.945253"
+    },
+    {
+      "id": "218f82cf7d4c465cb649f6685cb5d46c",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:55:20.501354",
+      "updated_at": "2026-06-03 20:55:53.747793"
+    },
+    {
+      "id": "e635c23bdd4949acacf4a159e9ff285b",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 20:51:10.677672",
+      "updated_at": "2026-06-03 20:57:03.190492"
+    },
+    {
+      "id": "efcccbca93074a1eb7f0416084b6b8d7",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 20:46:59.874227",
+      "updated_at": "2026-06-03 20:48:15.152195"
+    },
+    {
+      "id": "cf643ef93b6f4bdeb1e5f6a7777c7498",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:43:05.460073",
+      "updated_at": "2026-06-03 20:43:30.154608"
+    },
+    {
+      "id": "da29c6f84a534fbeb70f4739f85ac240",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 20:32:48.284022",
+      "updated_at": "2026-06-03 20:40:10.876311"
+    },
+    {
+      "id": "8ffdc20970e94b6799e1857d9f7fde4f",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:11:03.938670",
+      "updated_at": "2026-06-03 20:11:17.586572"
+    },
+    {
+      "id": "5eaa7bfbf6ab4a489408a2d9470b1f16",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 19:59:36.583563",
+      "updated_at": "2026-06-03 19:59:49.984051"
+    },
+    {
+      "id": "71fd7075b4344a44b843f52485170498",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-06-02 15:50:29.813978",
+      "updated_at": "2026-06-02 15:51:35.526966"
+    },
+    {
+      "id": "49f92148973d496e95b74a51b9939f34",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-06-02 15:49:13.390338",
+      "updated_at": "2026-06-02 15:50:29.157795"
+    },
+    {
+      "id": "7d789679e026458d8d3d2a038b8db5a4",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 17:02:30.787825",
+      "updated_at": "2026-05-31 17:02:36.992829"
+    },
+    {
+      "id": "987b517ba018467eb43caf6335738748",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 16:54:11.501896",
+      "updated_at": "2026-05-31 16:54:17.222259"
+    },
+    {
+      "id": "a4a881eaf6a04d258e462c144ce4678e",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 16:23:27.852090",
+      "updated_at": "2026-05-31 16:23:34.484885"
+    },
+    {
+      "id": "ab7ce31d1d0649c9b51ce5762ba633e9",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 15:46:04.107906",
+      "updated_at": "2026-05-31 15:46:07.670381"
+    },
+    {
+      "id": "d4ca9d8f3f7e4221a7e04cf887b91edf",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "incomplete",
+      "created_at": "2026-05-31 15:20:35.286762",
+      "updated_at": "2026-05-31 15:21:25.894012"
+    }
+  ],
+  "assessment_jobs_sample": [
+    {
+      "id": "aa1e789102964d6b912d2789d8bf8481",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 14:27:33.112826",
+      "started_at": "2026-06-05 14:27:33.888983",
+      "completed_at": "2026-06-05 14:28:55.532886"
+    },
+    {
+      "id": "c333501da477430aa8b1c301c31f17c0",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "failed",
+      "created_at": "2026-06-05 14:10:37.084473",
+      "started_at": "2026-06-05 14:10:37.102376",
+      "completed_at": "2026-06-05 14:25:35.118766"
+    },
+    {
+      "id": "03fedb19ee634373b9c3c60e7aa41a61",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:31:45.625047",
+      "started_at": "2026-06-05 13:31:45.871663",
+      "completed_at": "2026-06-05 13:33:42.653020"
+    },
+    {
+      "id": "ddc41096145945a28c3a61e4732ee3e1",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:18:10.786950",
+      "started_at": "2026-06-05 13:18:11.028912",
+      "completed_at": "2026-06-05 13:19:21.574043"
+    },
+    {
+      "id": "02eb5d827fa54a278971a42c0c72f8ab",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-05 13:11:58.243382",
+      "started_at": "2026-06-05 13:11:59.392507",
+      "completed_at": "2026-06-05 13:13:32.959173"
+    },
+    {
+      "id": "d1ebeba28e154bae81e7232a577d0cb3",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 20:22:21.969532",
+      "started_at": "2026-06-04 20:22:22.402434",
+      "completed_at": "2026-06-04 20:23:42.759642"
+    },
+    {
+      "id": "46684cca6a634b44b87b58cc3dfbff40",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 19:48:34.712453",
+      "started_at": "2026-06-04 19:48:34.996757",
+      "completed_at": "2026-06-04 19:49:51.275306"
+    },
+    {
+      "id": "66e114b26d6e47afa870a91dd53733f9",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 19:15:02.300893",
+      "started_at": "2026-06-04 19:15:03.410598",
+      "completed_at": "2026-06-04 19:16:29.640367"
+    },
+    {
+      "id": "64052079e33444dbbb345d6837e2c7d1",
+      "tenant_id": "7aa280d0-4a2c-4438-8dee-ec4646f1e5d4",
+      "status": "completed",
+      "created_at": "2026-06-04 15:05:42.087061",
+      "started_at": "2026-06-04 15:05:42.589611",
+      "completed_at": "2026-06-04 15:07:12.546705"
+    },
+    {
+      "id": "3e1594a754324f4e8a48654c8f97928a",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 14:23:03.201617",
+      "started_at": "2026-06-04 14:23:03.737699",
+      "completed_at": "2026-06-04 14:24:37.996597"
+    },
+    {
+      "id": "ace1743845e74e83a613833e54529774",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 13:34:32.863269",
+      "started_at": "2026-06-04 13:34:33.147168",
+      "completed_at": "2026-06-04 13:35:47.388049"
+    },
+    {
+      "id": "5e10b50e69554521b12934f32bcd95d4",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-04 13:20:46.922916",
+      "started_at": "2026-06-04 13:20:46.951578",
+      "completed_at": "2026-06-04 13:22:19.401424"
+    },
+    {
+      "id": "891ac4c2ff034eaa880128e3e892b4f8",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 21:13:18.249785",
+      "started_at": "2026-06-03 21:13:20.138194",
+      "completed_at": null
+    },
+    {
+      "id": "29fe14bcba4d4dc1a40875df230d94fb",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 21:12:10.233985",
+      "started_at": "2026-06-03 21:12:10.256973",
+      "completed_at": null
+    },
+    {
+      "id": "1a42c591b29941f2a8ea29231268cc72",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 21:01:33.407338",
+      "started_at": "2026-06-03 21:01:34.411128",
+      "completed_at": "2026-06-03 21:03:14.477535"
+    },
+    {
+      "id": "f0ab2d01bd904e239e24d226c3e97113",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:58:18.642249",
+      "started_at": "2026-06-03 20:58:18.869990",
+      "completed_at": "2026-06-03 20:58:44.943091"
+    },
+    {
+      "id": "acc777400e634e78848594e0a9b98428",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:55:20.534855",
+      "started_at": "2026-06-03 20:55:20.997767",
+      "completed_at": "2026-06-03 20:55:53.746855"
+    },
+    {
+      "id": "1f67ddff10904642b67757135b16dd2d",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 20:51:10.684171",
+      "started_at": "2026-06-03 20:51:10.714964",
+      "completed_at": null
+    },
+    {
+      "id": "10e35aa2700740c7b23ce6284573d7a5",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 20:46:59.885154",
+      "started_at": "2026-06-03 20:46:59.907078",
+      "completed_at": null
+    },
+    {
+      "id": "19d52fcb81ab4175b4bd10450a2a40f1",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:43:05.501568",
+      "started_at": "2026-06-03 20:43:05.971173",
+      "completed_at": "2026-06-03 20:43:30.154608"
+    },
+    {
+      "id": "791c5c1f9ae344ccacda1f03f2ec99cd",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "running",
+      "created_at": "2026-06-03 20:32:48.289392",
+      "started_at": "2026-06-03 20:32:48.306041",
+      "completed_at": null
+    },
+    {
+      "id": "94d487577df342e58914a5a81df56c67",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 20:11:03.971313",
+      "started_at": "2026-06-03 20:11:04.386019",
+      "completed_at": "2026-06-03 20:11:17.586572"
+    },
+    {
+      "id": "ae288760303a46f89c6aaa86b7f2f663",
+      "tenant_id": "fe4eff9a-f69c-48c0-921d-8006a6d5beb2",
+      "status": "completed",
+      "created_at": "2026-06-03 19:59:36.615637",
+      "started_at": "2026-06-03 19:59:36.889181",
+      "completed_at": "2026-06-03 19:59:49.984051"
+    },
+    {
+      "id": "b04e80db84cf455ca2cd817012eca9aa",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-06-02 15:50:29.843181",
+      "started_at": "2026-06-02 15:50:29.892584",
+      "completed_at": "2026-06-02 15:51:35.526438"
+    },
+    {
+      "id": "be07ca5b9731471eb5284123515187bb",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-06-02 15:49:13.409215",
+      "started_at": "2026-06-02 15:49:13.453500",
+      "completed_at": "2026-06-02 15:50:29.157795"
+    },
+    {
+      "id": "926bd46ccf894fbdaeccbda1f4954496",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 17:02:30.863310",
+      "started_at": "2026-05-31 17:02:31.488757",
+      "completed_at": "2026-05-31 17:02:36.990815"
+    },
+    {
+      "id": "c9f61d8c6c004d1d9cc7b77ed103da2b",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 16:54:11.556198",
+      "started_at": "2026-05-31 16:54:12.222139",
+      "completed_at": "2026-05-31 16:54:17.222259"
+    },
+    {
+      "id": "7c203c591b42478db3a7cc8d31d762fc",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 16:23:27.968564",
+      "started_at": "2026-05-31 16:23:28.504609",
+      "completed_at": "2026-05-31 16:23:34.484885"
+    },
+    {
+      "id": "e8b82694046447baa817c143f39e9f52",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "completed",
+      "created_at": "2026-05-31 15:46:04.205425",
+      "started_at": "2026-05-31 15:46:04.633285",
+      "completed_at": "2026-05-31 15:46:07.666128"
+    },
+    {
+      "id": "12467000a04a4651873ecb44cbf73a62",
+      "tenant_id": "fa060b6a-b4c6-46c2-a25b-591646e5c90c",
+      "status": "incomplete",
+      "created_at": "2026-05-31 15:20:35.321221",
+      "started_at": "2026-05-31 15:20:35.480834",
+      "completed_at": "2026-05-31 15:20:39.835147"
+    }
+  ]
+}

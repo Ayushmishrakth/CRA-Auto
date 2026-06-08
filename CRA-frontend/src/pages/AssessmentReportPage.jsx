@@ -20,7 +20,7 @@ import { businessDomain, businessName, executiveStatus, foundText, riskRating, s
 const REPORT_STATUS_COPY = {
   generated: {
     title: "Report generated",
-    message: "PDF and DOCX downloads are available for this assessment.",
+    message: "PDF download is available for this assessment.",
   },
   not_generated: {
     title: "Report not generated",

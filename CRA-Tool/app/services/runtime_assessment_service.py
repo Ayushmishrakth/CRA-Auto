@@ -8,6 +8,7 @@ PowerShell runtime. Microsoft Graph collectors plug into this lifecycle later.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import traceback
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from app.db.models.user import User
 from app.db.session import AsyncSessionLocal
 from app.services.audit_service import AuditEvent, audit_service
 from app.services.event_bus import emit_event
+from app.services.exchange_token_service import get_exchange_access_token
 from app.services.graph_cra_collector_service import GRAPH_COLLECTORS
 from app.services.powershell import PowerShellExecutionEngine
 from app.services.registry_service import get_registry
@@ -43,21 +45,9 @@ RUNTIME_STAGES = {
     "completed": ("completed", 100.0),
 }
 
-POWERSHELL_REQUIRED_PARAMETERS = {
-    "copilot_integration_enabled",
-    "customer_lockbox",
-    "external_storage_providers_in_owa",
-    "full_calendar_schedules_able_to_be_shared_externally",
-    "guest_access_enabled_disabled",
-    "meeting_policies_configuration",
-    "meeting_recording_retention_policies",
-    "meeting_transcription_enabled",
-    "teams_channel_email_addresses",
-    "teams_file_storage_option",
-    "teams_lobby_bypass",
-    "teams_meeting_chat",
-    "third_party_apps_allowed",
-}
+POWERSHELL_REQUIRED_PARAMETERS: set[str] = set()
+# All parameters now route to Graph collectors that return fail when the service
+# is unavailable, rather than requiring PowerShell delegation.
 
 
 def _utc_now() -> datetime:
@@ -106,6 +96,49 @@ def _collector_failure_details(
             "attempts": telemetry.get("attempts"),
         },
         "graph_error": graph_error,
+    }
+
+
+def _non_empty_error_message(exc: Exception) -> str:
+    message = str(exc).strip()
+    return message or type(exc).__name__
+
+
+def _collector_debug_payload(
+    *,
+    parameter_key: str,
+    collector: dict[str, Any],
+    runtime_name: str,
+    progress: float,
+    manifest_entry: dict[str, Any] | None = None,
+    collector_result: dict[str, Any] | None = None,
+    exception: Exception | None = None,
+) -> dict[str, Any]:
+    telemetry = (collector_result or {}).get("telemetry") or {}
+    raw_value = (collector_result or {}).get("raw_value") or {}
+    contract = raw_value.get("collector_contract") if isinstance(raw_value, dict) else {}
+    contract = contract if isinstance(contract, dict) else {}
+    errors = (collector_result or {}).get("errors") or contract.get("errors") or []
+    return {
+        "parameter_key": parameter_key,
+        "collector": collector.get("collector_name"),
+        "runtime": runtime_name,
+        "script_path": telemetry.get("source_script") or (manifest_entry or {}).get("script"),
+        "command": collector.get("powershell_script"),
+        "stdout": telemetry.get("stdout") or telemetry.get("stdout_preview"),
+        "stderr": telemetry.get("stderr"),
+        "exit_code": telemetry.get("exit_code"),
+        "attempts": telemetry.get("attempts"),
+        "retries": telemetry.get("retries"),
+        "duration_ms": telemetry.get("duration_ms"),
+        "generated_files": telemetry.get("generated_files") or contract.get("metrics", {}).get("generated_files"),
+        "errors": errors,
+        "exception_type": type(exception).__name__ if exception is not None else None,
+        "exception_message": _non_empty_error_message(exception) if exception is not None else None,
+        "stack_trace": traceback.format_exception(type(exception), exception, exception.__traceback__)[-8:]
+        if exception is not None
+        else None,
+        "progress_pct": progress,
     }
 
 
@@ -325,7 +358,19 @@ def _reconciled_collector_result(
 def _classified_dependency_status(message: str | None) -> str:
     text = str(message or "").lower()
     if any(token in text for token in ["license", "licence", "e5", "premium feature"]):
-        return "licensing_required"
+        return "service_unavailable"
+    if any(
+        token in text
+        for token in [
+            "aadsts500014",
+            "serviceprincipaldisabled",
+            "exchange_unavailable",
+            "exchange online is not available",
+            "service principal.*disabled",
+            "subscriptionnotfound",
+        ]
+    ):
+        return "service_unavailable"
     if any(
         token in text
         for token in [
@@ -340,20 +385,24 @@ def _classified_dependency_status(message: str | None) -> str:
             "timeout",
         ]
     ):
-        return "manual_validation"
+        return "collection_error"
     if any(token in text for token in ["not supported", "unsupported", "not available through graph"]):
         return "collection_error"
     return "collection_error"
 
 
 def _canonical_finding_status(status: str | None) -> str:
-    normalized = str(status or "manual_validation").lower().replace(" ", "_")
-    if normalized in {"manual_validation_required", "not_collected", "evidence_collected"}:
-        return "manual_validation"
+    normalized = str(status or "fail").lower().replace(" ", "_")
+    if normalized == "not_collected":
+        return "not_collected"
+    if normalized in {"manual_validation_required", "manual_validation", "evidence_collected"}:
+        return "fail"
     if normalized in {"failed", "error", "execution_failed", "collector_failed", "failed_collector"}:
         return "collection_error"
-    if normalized == "licensing_limitation":
-        return "licensing_required"
+    if normalized in {"licensing_required", "licensing_limitation", "licensing_gap"}:
+        return "fail"
+    if normalized in {"service_unavailable", "skipped"}:
+        return "fail"
     return normalized
 
 
@@ -551,11 +600,27 @@ async def _collect_findings(
     )
     collector_environment: dict[str, str] = {}
     if tenant and tenant.app_client_id and tenant.encrypted_client_secret:
+        client_secret = decrypt_client_secret(tenant)
         collector_environment = {
             "CRA_GRAPH_AUTH_MODE": "app",
             "CRA_GRAPH_CLIENT_ID": tenant.app_client_id,
-            "CRA_GRAPH_CLIENT_SECRET": decrypt_client_secret(tenant),
+            "CRA_GRAPH_CLIENT_SECRET": client_secret,
+            "CRA_TEAMS_AUTH_MODE": "app",
         }
+        # Acquire an Exchange Online access token so Exchange PS collectors can use app-only auth.
+        # The token is for https://outlook.office365.com/.default via client_credentials.
+        # primary_domain is stored in deployment_diagnostics during tenant deployment.
+        primary_domain: str | None = (tenant.deployment_diagnostics or {}).get("primary_domain")
+        if primary_domain:
+            exchange_token = await get_exchange_access_token(tenant.tenant_id, tenant.app_client_id, client_secret)
+            if exchange_token:
+                collector_environment["CRA_EXCHANGE_AUTH_MODE"] = "app"
+                collector_environment["CRA_EXCHANGE_ACCESS_TOKEN"] = exchange_token
+                collector_environment["CRA_EXCHANGE_ORGANIZATION"] = primary_domain
+            else:
+                logger.warning("[ASSESSMENT] Exchange Online token not available for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
+        else:
+            logger.warning("[ASSESSMENT] primary_domain not found in deployment_diagnostics for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
     await db.execute(delete(AssessmentFinding).where(AssessmentFinding.assessment_id == assessment.id))
     await db.execute(delete(AssessmentArtifact).where(AssessmentArtifact.assessment_id == assessment.id))
     await db.commit()
@@ -681,13 +746,14 @@ async def _collect_findings(
                 )
                 db_parameter = parameter_by_key[key]
                 db_rule = rule_by_key.get(key)
+                _dep_status = _classified_dependency_status(error_message)
                 reconciled_result = _reconciled_collector_result(
                     parameter_key=key,
                     parameter=parameter_config,
-                    status=_classified_dependency_status(error_message),
+                    status=_dep_status,
                     evaluated_value=(
-                        "Collector dependency requires manual validation before producing validated CRA evidence."
-                        if _classified_dependency_status(error_message) == "manual_validation"
+                        "Service is not available in the tenant — this is a readiness gap."
+                        if _dep_status == "service_unavailable"
                         else "Collector failed before producing validated CRA evidence."
                     ),
                     collector_result=collector_result,
@@ -701,6 +767,23 @@ async def _collect_findings(
                 )
                 findings.append(finding)
                 telemetry_summary["findings_created"] += 1
+                debug_payload = _collector_debug_payload(
+                    parameter_key=key,
+                    collector=collector,
+                    runtime_name=runtime_name,
+                    progress=progress,
+                    manifest_entry=manifest_entry,
+                    collector_result=collector_result,
+                )
+                _runtime_log("COLLECTOR_FAILURE_DEBUG", **debug_payload)
+                await emit_event(
+                    db,
+                    assessment_id=assessment.id,
+                    tenant_id=assessment.tenant_id,
+                    event_type="collector.failure_debug",
+                    severity="warning",
+                    payload=debug_payload,
+                )
                 await emit_event(
                     db,
                     assessment_id=assessment.id,
@@ -722,6 +805,42 @@ async def _collect_findings(
                 )
                 await db.commit()
                 continue
+            if collector_result.get("status") == "skipped":
+                await _persist_artifact(
+                    db,
+                    assessment=assessment,
+                    job=job,
+                    parameter_key=key,
+                    collector=collector,
+                    parameter=parameter_config,
+                    collector_result=collector_result,
+                    status="skipped",
+                )
+                db_parameter = parameter_by_key[key]
+                db_rule = rule_by_key.get(key)
+                finding = await _persist_finding(
+                    db,
+                    assessment=assessment,
+                    parameter=db_parameter,
+                    rule=db_rule,
+                    collector_result=collector_result,
+                )
+                findings.append(finding)
+                telemetry_summary["findings_created"] += 1
+                await emit_event(
+                    db,
+                    assessment_id=assessment.id,
+                    tenant_id=assessment.tenant_id,
+                    event_type="collector.skipped",
+                    payload={
+                        "parameter_key": key,
+                        "collector": collector.get("collector_name"),
+                        "reason": (collector_result.get("warnings") or ["Service unavailable"])[0],
+                        "progress_pct": progress,
+                    },
+                )
+                await db.commit()
+                continue
             if collector_result.get("status") == "not_collected":
                 telemetry_summary["collector_failures"] += 1
                 await _persist_artifact(
@@ -739,8 +858,8 @@ async def _collect_findings(
                 reconciled_result = _reconciled_collector_result(
                     parameter_key=key,
                     parameter=parameter_config,
-                    status="manual_validation",
-                    evaluated_value="Evidence was not collected automatically; manual validation is required.",
+                    status="not_collected",
+                    evaluated_value="No automated API is available for this control — not included in scoring.",
                     collector_result=collector_result,
                 )
                 finding = await _persist_finding(
@@ -832,8 +951,9 @@ async def _collect_findings(
             )
             await db.commit()
         except Exception as exc:
+            error_message = _non_empty_error_message(exc)
             telemetry_summary["collector_failures"] += 1
-            telemetry_summary["failures"].append({"parameter_key": key, "error": str(exc)})
+            telemetry_summary["failures"].append({"parameter_key": key, "error": error_message})
             await _persist_artifact(
                 db,
                 assessment=assessment,
@@ -842,21 +962,22 @@ async def _collect_findings(
                 collector=collector,
                 parameter=parameter_config,
                 status="failed",
-                error=str(exc),
+                error=error_message,
                 exception=exc,
             )
             db_parameter = parameter_by_key[key]
             db_rule = rule_by_key.get(key)
+            _exc_dep_status = _classified_dependency_status(error_message)
             reconciled_result = _reconciled_collector_result(
                 parameter_key=key,
                 parameter=parameter_config,
-                status=_classified_dependency_status(str(exc)),
+                status=_exc_dep_status,
                 evaluated_value=(
-                    "Collector dependency requires manual validation before producing validated CRA evidence."
-                    if _classified_dependency_status(str(exc)) == "manual_validation"
+                    "Service is not available in the tenant — this is a readiness gap."
+                    if _exc_dep_status == "service_unavailable"
                     else "Collector execution raised an exception before producing validated CRA evidence."
                 ),
-                error=str(exc),
+                error=error_message,
             )
             finding = await _persist_finding(
                 db,
@@ -867,6 +988,23 @@ async def _collect_findings(
             )
             findings.append(finding)
             telemetry_summary["findings_created"] += 1
+            debug_payload = _collector_debug_payload(
+                parameter_key=key,
+                collector=collector,
+                runtime_name=runtime_name,
+                progress=progress,
+                manifest_entry=manifest_entry,
+                exception=exc,
+            )
+            _runtime_log("COLLECTOR_FAILURE_DEBUG", **debug_payload)
+            await emit_event(
+                db,
+                assessment_id=assessment.id,
+                tenant_id=assessment.tenant_id,
+                event_type="collector.failure_debug",
+                severity="warning",
+                payload=debug_payload,
+            )
             await emit_event(
                 db,
                 assessment_id=assessment.id,
@@ -876,7 +1014,8 @@ async def _collect_findings(
                 payload={
                     "parameter_key": key,
                     "collector": collector.get("collector_name"),
-                    "error": str(exc),
+                    "error": error_message,
+                    "exception_type": type(exc).__name__,
                     "progress_pct": progress,
                 },
             )

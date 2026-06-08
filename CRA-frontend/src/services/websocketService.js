@@ -52,7 +52,7 @@ export class AssessmentWebSocket {
     };
 
     this.socket.onerror = () => {
-      this.handlers.onStatus?.("error");
+      this.handlers.onStatus?.("disconnected");
     };
 
     this.socket.onclose = () => {

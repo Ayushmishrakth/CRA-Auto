@@ -1,5 +1,7 @@
 import axios from "axios";
 import { tokenStorage } from "../utils/tokenStorage";
+import { extractApiError } from "../utils/apiErrors";
+import { publishBackendError } from "../utils/backendErrors";
 
 const baseURL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") ||
@@ -13,6 +15,12 @@ const api = axios.create({
 
 const isPublicAuthPath = (url = "") =>
   url.includes("/auth/login") || url.includes("/auth/refresh");
+const AUTH_EXPIRED_EVENT = "cra:auth-expired";
+const LOGIN_IN_PROGRESS_FLAG = "__CRA_LOGIN_IN_PROGRESS__";
+
+function isLoginInProgress() {
+  return Boolean(typeof window !== "undefined" && window[LOGIN_IN_PROGRESS_FLAG]);
+}
 
 api.interceptors.request.use((config) => {
   const url = config.url || "";
@@ -41,9 +49,14 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.status === 401 && !isPublicAuthPath(error.config?.url)) {
+    if (error.response?.status === 401 && !isPublicAuthPath(error.config?.url) && !isLoginInProgress()) {
       console.warn("[CRA] 401 — clearing CRA tokens");
       tokenStorage.clear();
+      window.dispatchEvent(
+        new CustomEvent(AUTH_EXPIRED_EVENT, {
+          detail: { message: "Your sign-in session has expired. Please sign in again." },
+        })
+      );
     }
     if (import.meta.env.DEV) {
       console.error(
@@ -52,6 +65,14 @@ api.interceptors.response.use(
         error.response?.data || error.message
       );
     }
+    publishBackendError({
+      source: "api",
+      message: extractApiError(error),
+      status: error.response?.status,
+      method: error.config?.method?.toUpperCase(),
+      url: error.config?.url,
+      raw: error.response?.data || error.message,
+    });
     return Promise.reject(error);
   }
 );

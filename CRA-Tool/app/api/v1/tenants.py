@@ -18,6 +18,7 @@ from app.schemas.tenant import (
     TenantDeploymentRuntimeDebugResponse,
     TenantDeploymentValidationResponse,
     TenantPermissionsResponse,
+    TenantRepairResponse,
     TenantResponse,
 )
 from app.services import tenant_deployment_service, tenant_service
@@ -227,5 +228,32 @@ async def validate_tenant_consent(
     return success_response(
         message="Tenant admin consent validated",
         data=TenantDeploymentResponse(**result),
+        request_id=request.state.request_id,
+    )
+
+
+@router.post(
+    "/deployment/repair",
+    response_model=SuccessResponse[TenantRepairResponse],
+)
+async def repair_tenant_deployment(
+    payload: TenantDeploymentRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> SuccessResponse[TenantRepairResponse]:
+    """
+    Patch the app registration to add Exchange + Teams permissions and return a fresh consent URL.
+    Use this for tenants that were connected before Exchange/Teams permissions were introduced.
+    After calling this endpoint, send the admin to consent_url to re-grant permissions.
+    """
+    result = await tenant_deployment_service.repair_tenant_deployment(
+        db,
+        current_user=current_user,
+        graph_access_token=payload.graph_access_token,
+    )
+    return success_response(
+        message="Tenant deployment repaired — admin consent required for new permissions",
+        data=TenantRepairResponse(**result),
         request_id=request.state.request_id,
     )

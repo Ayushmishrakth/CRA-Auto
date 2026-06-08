@@ -24,15 +24,28 @@ import {
 } from "../utils/executiveFormatters";
 
 const SCORECARD_DOMAINS = ["Identity", "Exchange", "Teams", "SharePoint", "Purview", "OneDrive"];
+const TOTAL_PARAMETERS = 65;
+const PAGE_SIZE = 12;
 const CONTROL_FILTERS = [
   { label: "All", value: "ALL" },
   { label: "Pass", value: "PASS" },
   { label: "Fail", value: "FAIL" },
   { label: "Collection Error", value: "COLLECTION_ERROR" },
-  { label: "Needs License", value: "LICENSING_REQUIRED" },
-  { label: "Manual", value: "MANUAL_VALIDATION" },
   { label: "Not Collected", value: "NOT_COLLECTED" },
 ];
+const DOMAIN_FILTERS = ["All", ...SCORECARD_DOMAINS];
+const SORT_OPTIONS = [
+  { label: "Priority", value: "priority" },
+  { label: "Parameter", value: "parameter" },
+  { label: "Service", value: "service" },
+  { label: "Status", value: "status" },
+  { label: "Severity", value: "severity" },
+];
+
+function emptyText(value, fallback = "No data available") {
+  if (value === null || value === undefined || value === "" || value === "[]") return fallback;
+  return value;
+}
 
 function countStatus(rows, status) {
   return rows.filter((item) => item.status === status).length;
@@ -102,11 +115,17 @@ export default function AssessmentDetailPage() {
   const [evidenceError, setEvidenceError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [controlFilter, setControlFilter] = useState("ALL");
+  const [domainFilter, setDomainFilter] = useState("All");
+  const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState("priority");
+  const [page, setPage] = useState(1);
   const {
     activeAssessment,
     findings,
     recommendations,
     scores,
+    executionEvents,
+    websocketStatus,
     progress,
     loading,
     error,
@@ -165,14 +184,43 @@ export default function AssessmentDetailPage() {
   const rows = evidenceRows.length ? evidenceRows : findingRows;
   const coverage = evidencePayload?.coverage ?? {};
   const sortedRows = sortBusinessPriority(rows);
-  const visibleRows =
-    controlFilter === "ALL"
-      ? sortedRows
-      : sortedRows.filter((item) => item.status === controlFilter);
+  const filteredRows = (() => {
+    const queryText = query.trim().toLowerCase();
+    const filtered = sortedRows.filter((item) => {
+      const matchesStatus = controlFilter === "ALL" || item.status === controlFilter;
+      const matchesDomain = domainFilter === "All" || businessDomain(item) === domainFilter;
+      const haystack = [
+        businessName(item),
+        businessDomain(item),
+        item.status,
+        foundText(item),
+        expectedText(item),
+        item.severity,
+      ].join(" ").toLowerCase();
+      return matchesStatus && matchesDomain && (!queryText || haystack.includes(queryText));
+    });
+
+    if (sortKey === "priority") return filtered;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === "parameter") return businessName(a).localeCompare(businessName(b));
+      if (sortKey === "service") return businessDomain(a).localeCompare(businessDomain(b));
+      return String(a[sortKey] || "").localeCompare(String(b[sortKey] || ""));
+    });
+  })();
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visibleRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const scorecard = domainScorecard(rows);
   const passed = countStatus(rows, "PASS");
   const failed = countStatus(rows, "FAIL");
   const failedCollectors = countStatus(rows, "COLLECTION_ERROR") + countStatus(rows, "FAILED_COLLECTOR") + countStatus(rows, "FAILED");
+  const totalParameters = coverage.total_parameters ?? Math.max(TOTAL_PARAMETERS, rows.length);
+  const completedCount = rows.filter((item) => item.status && item.status !== "NOT_COLLECTED").length;
+  const failedCount = rows.filter((item) => ["FAIL", "COLLECTION_ERROR", "FAILED_COLLECTOR", "FAILED"].includes(item.status)).length;
+  const pendingCount = Math.max(0, totalParameters - completedCount);
+  const currentEvent = executionEvents.find((event) => event.payload?.parameter_key || event.parameter_key);
+  const currentParameter = currentEvent?.payload?.parameter_key || currentEvent?.parameter_key || "Waiting for backend update";
+  const liveUnavailable = ["disconnected", "reconnecting", "error"].includes(websocketStatus);
   const fallbackCoverage = rows.length ? Math.round(((passed + failed) / rows.length) * 100) : 0;
   const visibleCoverage = coverage.coverage_percent ?? (coveragePercent(coverage) || fallbackCoverage);
 
@@ -193,14 +241,36 @@ export default function AssessmentDetailPage() {
         <AssessmentProgress value={progress} />
       </div>
 
+      <section className="panel runtime-progress-panel">
+        <div className="panel-header">
+          <div>
+            <h2>Assessment Progress</h2>
+            <p>Current parameter: {emptyText(currentParameter, "Assessment data not collected")}</p>
+          </div>
+          <span className={`connection-pill ${websocketStatus}`}>
+            {websocketStatus === "reconnecting" ? "Connecting" : websocketStatus}
+          </span>
+        </div>
+        {liveUnavailable && (
+          <div className="info-banner compact-banner">
+            Live updates temporarily unavailable. Assessment is still running.
+          </div>
+        )}
+        <div className="metric-grid dashboard-metrics">
+          <article className="metric-card"><span>Parameters</span><strong>{totalParameters}</strong></article>
+          <article className="metric-card"><span>Completed</span><strong>{completedCount}</strong></article>
+          <article className="metric-card"><span>Failed</span><strong>{failedCount}</strong></article>
+          <article className="metric-card"><span>Pending</span><strong>{pendingCount}</strong></article>
+        </div>
+      </section>
+
       {(error || evidenceError) && <div className="error-banner">{error || evidenceError}</div>}
 
       <section className="metric-grid dashboard-metrics">
         <article className="metric-card"><span>Passed Controls</span><strong>{passed}</strong></article>
         <article className="metric-card"><span>Failed Controls</span><strong>{failed}</strong></article>
         <article className="metric-card"><span>Collection Issues</span><strong>{failedCollectors}</strong></article>
-        <article className="metric-card"><span>Licensing Required</span><strong>{coverage.licensing_required ?? 0}</strong></article>
-        <article className="metric-card"><span>Manual Validation</span><strong>{coverage.manual_validation ?? 0}</strong></article>
+        <article className="metric-card"><span>Not Collected</span><strong>{coverage.not_collected ?? 0}</strong></article>
         <article className="metric-card"><span>Coverage</span><strong>{visibleCoverage}%</strong></article>
       </section>
 
@@ -231,20 +301,27 @@ export default function AssessmentDetailPage() {
         <div className="panel-header">
           <div>
             <h2>Assessment Results</h2>
-            <p>{coverage.total_parameters ?? rows.length} business-readable control outcomes.</p>
+            <p>{filteredRows.length} of {coverage.total_parameters ?? rows.length} business-readable control outcomes.</p>
           </div>
-          <div className="segmented-control" aria-label="Assessment result status filter">
-            {CONTROL_FILTERS.map((item) => (
-              <button
-                type="button"
-                key={item.value}
-                className={controlFilter === item.value ? "active" : ""}
-                onClick={() => setControlFilter(item.value)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+        </div>
+        <div className="table-tools result-tools">
+          <input
+            value={query}
+            onChange={(event) => {
+              setPage(1);
+              setQuery(event.target.value);
+            }}
+            placeholder="Search parameters"
+          />
+          <select value={domainFilter} onChange={(event) => { setPage(1); setDomainFilter(event.target.value); }}>
+            {DOMAIN_FILTERS.map((domain) => <option key={domain} value={domain}>{domain === "All" ? "All services" : domain}</option>)}
+          </select>
+          <select value={controlFilter} onChange={(event) => { setPage(1); setControlFilter(event.target.value); }}>
+            {CONTROL_FILTERS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+          <select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
+            {SORT_OPTIONS.map((item) => <option key={item.value} value={item.value}>Sort: {item.label}</option>)}
+          </select>
         </div>
         <div className="table-wrap executive-results-wrap">
           <table className="data-table executive-results-table">
@@ -267,11 +344,11 @@ export default function AssessmentDetailPage() {
                   <td><strong>{businessName(item)}</strong></td>
                   <td>{businessDomain(item)}</td>
                   <td><span className={`status-pill tone-${statusTone(item.status)}`}>{executiveStatus(item.status)}</span></td>
-                  <td>{foundText(item)}</td>
-                  <td>{expectedText(item)}</td>
-                  <td>{item.severity || "info"}</td>
-                  <td>{item.recommendation?.impact || "This control affects Copilot readiness, data exposure, or governance posture."}</td>
-                  <td>{item.recommendation?.recommendation_text || "Review and remediate this control according to Microsoft 365 readiness guidance."}</td>
+                  <td>{emptyText(foundText(item), "Assessment data not collected")}</td>
+                  <td>{emptyText(expectedText(item))}</td>
+                  <td>{emptyText(item.severity, "No data available")}</td>
+                  <td>{emptyText(item.recommendation?.impact, "Assessment data not collected")}</td>
+                  <td>{emptyText(item.recommendation?.recommendation_text, "Assessment data not collected")}</td>
                   <td>
                     <button type="button" className="btn-secondary inline" onClick={() => setSelected(item)}>
                       View
@@ -280,13 +357,18 @@ export default function AssessmentDetailPage() {
                 </tr>
               ))}
               {!rows.length && (
-                <tr><td colSpan="9" className="muted-text">No assessment results are available yet.</td></tr>
+                <tr><td colSpan="9" className="muted-text">Assessment data not collected.</td></tr>
               )}
               {rows.length > 0 && visibleRows.length === 0 && (
                 <tr><td colSpan="9" className="muted-text">No controls match this filter.</td></tr>
               )}
             </tbody>
           </table>
+        </div>
+        <div className="pagination">
+          <button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <button type="button" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
         </div>
       </section>
 

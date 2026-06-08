@@ -282,34 +282,45 @@ http://localhost:3000
 
 Use four terminals:
 
-1. Redis
+1. Redis (Docker — recommended on Windows)
 
-```bash
-redis-server
+```powershell
+docker run -d -p 6379:6379 --name redis redis:latest
 ```
 
-2. Backend API
+Or via WSL:
 
 ```bash
+sudo apt install redis-server && redis-server
+```
+
+2. Backend API (runs migrations then starts FastAPI on port 8000)
+
+```powershell
 cd CRA-Tool
-.\venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload
+.\start.ps1
 ```
 
-3. Celery worker
+`start.ps1` automatically runs `alembic upgrade head` then starts the server.
+API docs: `http://localhost:8000/docs`
 
-```bash
+3. Celery worker (required for background assessment execution)
+
+```powershell
 cd CRA-Tool
-.\venv\Scripts\Activate.ps1
-celery -A app.core.celery_app.celery_app worker --loglevel=info
+venv\Scripts\python -m celery -A app.tasks.assessment_tasks worker --loglevel=info --pool=solo
 ```
+
+> `--pool=solo` is required on Windows.
 
 4. Frontend
 
-```bash
+```powershell
 cd CRA-frontend
 npm run dev
 ```
+
+Frontend: `http://localhost:3000`
 
 ## Validation After Transfer
 
@@ -342,9 +353,9 @@ Login validation:
 
 Check Redis and Celery:
 
-```bash
-redis-server
-celery -A app.core.celery_app.celery_app worker --loglevel=info
+```powershell
+docker run -d -p 6379:6379 --name redis redis:latest
+venv\Scripts\python -m celery -A app.tasks.assessment_tasks worker --loglevel=info --pool=solo
 ```
 
 Confirm `.env`:

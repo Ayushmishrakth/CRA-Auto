@@ -6,13 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import shutil
+import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -25,7 +29,7 @@ class PowerShellExecution:
     collector: dict[str, Any]
     assessment_id: str | None = None
     output_root: str = "artifacts"
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = 300.0
     max_retries: int = 0
     environment: dict[str, str] = field(default_factory=dict)
 
@@ -60,6 +64,28 @@ class PowerShellExecutionResult:
 class PowerShellExecutor:
     def __init__(self, *, executable: str = "pwsh") -> None:
         self.executable = executable
+
+    @staticmethod
+    def _event_loop_snapshot() -> dict[str, str | bool]:
+        policy = asyncio.get_event_loop_policy()
+        snapshot: dict[str, str | bool] = {
+            "event_loop_policy": f"{type(policy).__module__}.{type(policy).__name__}",
+            "loop_type": "none",
+            "subprocess_supported": True,  # always True with to_thread(subprocess.run())
+        }
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            close_loop = True
+        else:
+            close_loop = False
+        try:
+            snapshot["loop_type"] = f"{type(loop).__module__}.{type(loop).__name__}"
+        finally:
+            if close_loop:
+                loop.close()
+        return snapshot
 
     def _resolve_executable(self) -> list[str] | None:
         if Path(self.executable).exists():
@@ -106,6 +132,34 @@ class PowerShellExecutor:
             execution.output_root,
         ]
 
+    @staticmethod
+    def _run_powershell_sync(
+        args: list[str],
+        environment: dict[str, str],
+        timeout: int,
+    ) -> tuple[str, str, int | None, bool]:
+        """
+        Run PowerShell synchronously via subprocess.run().
+        Returns (stdout, stderr, returncode, timed_out).
+        Using subprocess.run() inside asyncio.to_thread() bypasses the event loop's
+        subprocess transport entirely, which fixes NotImplementedError on Windows
+        where SelectorEventLoop does not support asyncio.create_subprocess_exec().
+        """
+        try:
+            result = subprocess.run(
+                args,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                env={**os.environ, **environment},
+            )
+            return result.stdout, result.stderr, result.returncode, False
+        except subprocess.TimeoutExpired:
+            return "", "", None, True
+
     async def _run_once(
         self,
         execution: PowerShellExecution,
@@ -114,33 +168,52 @@ class PowerShellExecutor:
         attempt: int,
         started_at: float,
     ) -> PowerShellExecutionResult:
-        proc = await asyncio.create_subprocess_exec(
-            *self._build_args(executable, execution),
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, **execution.environment},
+        args = self._build_args(executable, execution)
+        logger.info(
+            "PowerShell collector subprocess starting",
+            extra={
+                "assessment_id": execution.assessment_id,
+                "parameter_key": execution.parameter_key,
+                "collector": execution.collector_name,
+                "source_script": str(execution.script_path),
+                "attempt": attempt,
+                **self._event_loop_snapshot(),
+            },
         )
         try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=execution.timeout_seconds,
+            stdout, stderr, returncode, timed_out = await asyncio.to_thread(
+                self._run_powershell_sync,
+                args,
+                execution.environment,
+                int(execution.timeout_seconds),
             )
-            stdout = stdout_bytes.decode("utf-8", errors="replace")
-            stderr = stderr_bytes.decode("utf-8", errors="replace")
-            status = "success" if proc.returncode == 0 else "failed"
-            return PowerShellExecutionResult(
-                status=status,
-                stdout=stdout,
-                stderr=stderr,
-                exit_code=proc.returncode,
-                duration_ms=round((time.perf_counter() - started_at) * 1000),
-                attempts=attempt,
-                errors=[] if proc.returncode == 0 else [stderr.strip() or f"PowerShell exited {proc.returncode}"],
+        except Exception:
+            logger.exception(
+                "PowerShell collector subprocess creation failed",
+                extra={
+                    "assessment_id": execution.assessment_id,
+                    "parameter_key": execution.parameter_key,
+                    "collector": execution.collector_name,
+                    "source_script": str(execution.script_path),
+                    "attempt": attempt,
+                    **self._event_loop_snapshot(),
+                },
             )
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
+            raise
+
+        if timed_out:
+            logger.warning(
+                "PowerShell collector subprocess timed out",
+                extra={
+                    "assessment_id": execution.assessment_id,
+                    "parameter_key": execution.parameter_key,
+                    "collector": execution.collector_name,
+                    "source_script": str(execution.script_path),
+                    "attempts": attempt,
+                    "exit_code": None,
+                    **self._event_loop_snapshot(),
+                },
+            )
             return PowerShellExecutionResult(
                 status="timeout",
                 stdout="",
@@ -151,6 +224,31 @@ class PowerShellExecutor:
                 timed_out=True,
                 errors=[f"PowerShell collector timed out after {execution.timeout_seconds}s"],
             )
+
+        status = "success" if returncode == 0 else "failed"
+        logger.info(
+            "PowerShell collector subprocess completed",
+            extra={
+                "assessment_id": execution.assessment_id,
+                "parameter_key": execution.parameter_key,
+                "collector": execution.collector_name,
+                "source_script": str(execution.script_path),
+                "attempts": attempt,
+                "exit_code": returncode,
+                "stdout": stdout[-20000:] if stdout else "",
+                "stderr": stderr[-4000:] if stderr else "",
+                **self._event_loop_snapshot(),
+            },
+        )
+        return PowerShellExecutionResult(
+            status=status,
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=returncode,
+            duration_ms=round((time.perf_counter() - started_at) * 1000),
+            attempts=attempt,
+            errors=[] if returncode == 0 else [stderr.strip() or f"PowerShell exited {returncode}"],
+        )
 
     async def execute(self, execution: PowerShellExecution) -> PowerShellExecutionResult:
         executable = self._resolve_executable()

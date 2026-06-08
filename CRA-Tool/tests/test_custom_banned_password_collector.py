@@ -74,6 +74,6 @@ async def test_custom_banned_password_list_manual_when_graph_does_not_expose_fie
 
     result = await collectors.collect_custom_banned_password_list(_tenant())
 
-    assert result["status"] == "manual_validation_required"
+    assert result["status"] == "not_collected"
     assert result["raw_value"]["actual_value"]["enabled"] is None
     assert "did not expose" in result["evaluated_value"]

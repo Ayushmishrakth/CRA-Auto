@@ -23,10 +23,10 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "powershell.active_sites_count",
-    "collector_type": "powershell",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.active_sites_count",
+    "collector_type": "graph",
+    "graph_endpoint": "/reports/getSharePointSiteUsageDetail(period='D30')",
     "parameter_key": "active_sites_count",
     "parser_mapping": {
       "expected_output": "List of active SharePoint site in the tenant",
@@ -713,10 +713,10 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "portal.audit_log_retention_duration",
-    "collector_type": "portal",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.audit_log_retention_duration",
+    "collector_type": "graph",
+    "graph_endpoint": "/auditLogs/directoryAudits",
     "parameter_key": "audit_log_retention_duration",
     "parser_mapping": {
       "expected_output": "List of Audit log retention policies",
@@ -736,9 +736,9 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "portal.compliance_score_overview",
-    "collector_type": "portal",
+    "collection_method": "graph",
+    "collector_name": "graph.compliance_score_overview",
+    "collector_type": "graph",
     "graph_endpoint": "",
     "parameter_key": "compliance_score_overview",
     "parser_mapping": {
@@ -805,10 +805,10 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "portal.secure_score_percentage",
-    "collector_type": "portal",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.secure_score_percentage",
+    "collector_type": "graph",
+    "graph_endpoint": "/security/secureScores",
     "parameter_key": "secure_score_percentage",
     "parser_mapping": {
       "expected_output": "Secure Score Percentage of the Tenant",
@@ -1104,10 +1104,10 @@
     }
   },
   {
-    "collection_method": "manual",
-    "collector_name": "manual.emergency_access_accounts",
-    "collector_type": "manual",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.emergency_access_accounts",
+    "collector_type": "graph",
+    "graph_endpoint": "/directoryRoles + /directoryRoles/{id}/members",
     "parameter_key": "emergency_access_accounts",
     "parser_mapping": {
       "expected_output": "",
@@ -1242,10 +1242,10 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "portal.restricted_access_to_microsoft_entra_admin_centre",
-    "collector_type": "portal",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.restricted_access_to_microsoft_entra_admin_centre",
+    "collector_type": "graph",
+    "graph_endpoint": "/policies/authorizationPolicy",
     "parameter_key": "restricted_access_to_microsoft_entra_admin_centre",
     "parser_mapping": {
       "expected_output": "To see its enabled or disabled",
@@ -1265,10 +1265,10 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "portal.self_service_password_reset_authentication_method",
-    "collector_type": "portal",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.self_service_password_reset_authentication_method",
+    "collector_type": "graph",
+    "graph_endpoint": "https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy",
     "parameter_key": "self_service_password_reset_authentication_method",
     "parser_mapping": {
       "expected_output": "To see how many and what methods registered",
@@ -1311,10 +1311,10 @@
     }
   },
   {
-    "collection_method": "portal",
-    "collector_name": "portal.user_consent_for_applications",
-    "collector_type": "portal",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.user_consent_for_applications",
+    "collector_type": "graph",
+    "graph_endpoint": "/policies/authorizationPolicy",
     "parameter_key": "user_consent_for_applications",
     "parser_mapping": {
       "expected_output": "Screenshot of User consent for application setting",

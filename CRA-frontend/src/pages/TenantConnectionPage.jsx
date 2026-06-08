@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle2, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
   deployTenantAccess,
@@ -9,6 +9,7 @@ import {
 } from "../api/tenantApi";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { getApiErrorMessage } from "../utils/apiErrors";
+import { getFriendlyOAuthError, isFatalOAuthError } from "../utils/authErrors";
 
 function deploymentRedirectUri() {
   const origin = typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
@@ -85,11 +86,75 @@ export default function TenantConnectionPage() {
 
   useEffect(() => {
     if (location.pathname !== "/tenant/deployment-success" || !user?.microsoft_tid) return;
+
+    // Read OAuth error params from the redirect URI before opening any popup.
+    // Azure embeds error/error_description in the query string when consent fails.
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get("error");
+    const oauthErrorDesc = params.get("error_description") || params.get("error_uri") || "";
+
+    if (oauthError) {
+      const friendly = getFriendlyOAuthError(oauthError, oauthErrorDesc);
+      const isFatal = isFatalOAuthError(oauthErrorDesc);
+      setError(
+        isFatal
+          ? friendly
+          : `${friendly} You can retry the deployment or continue without this module.`
+      );
+      setLoading(false);
+      return; // Do NOT call validateConsent — that opens more popups and creates the loop.
+    }
+
     validateConsent({ auto: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, user?.microsoft_tid]);
 
   if (loading) return <LoadingSpinner label="Loading tenant connection..." />;
+
+  // OAuth redirect error — show a clear card instead of the normal flow.
+  const oauthRedirectError = (() => {
+    if (location.pathname !== "/tenant/deployment-success") return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("error") || null;
+  })();
+
+  if (oauthRedirectError && error) {
+    return (
+      <div className="page-stack">
+        <div className="page-header">
+          <h1>Tenant Connection</h1>
+        </div>
+        <section className="panel">
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+            <AlertTriangle size={22} color="#D13438" style={{ flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <h2 style={{ margin: "0 0 8px", color: "#D13438" }}>Consent Error</h2>
+              <p style={{ margin: "0 0 16px", lineHeight: 1.5 }}>{error}</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn-secondary inline"
+                  onClick={() => navigate("/tenant")}
+                >
+                  Go Back
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary inline"
+                  onClick={() => navigate("/assessments/new")}
+                >
+                  Start Assessment Anyway
+                </button>
+              </div>
+              <p style={{ marginTop: 12, fontSize: "0.8rem", color: "#6B7280" }}>
+                Error code: <code>{oauthRedirectError}</code>
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   const current = deployment || tenant || {};
   const status = current.status || "NOT_DEPLOYED";

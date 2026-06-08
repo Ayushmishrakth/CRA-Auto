@@ -2,12 +2,18 @@
 CRA Backend — Microsoft Entra ID authentication + CRA JWT.
 """
 
+import sys
+if sys.platform == "win32":
+    import asyncio as _asyncio
+    _asyncio.set_event_loop_policy(_asyncio.WindowsSelectorEventLoopPolicy())
+
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
+import app.db.base  # noqa: F401 — registers all ORM models before first request
 from app.api.v1 import health as health_api
 from app.api.v1 import websocket as websocket_api
 from app.api.v1.router import api_router

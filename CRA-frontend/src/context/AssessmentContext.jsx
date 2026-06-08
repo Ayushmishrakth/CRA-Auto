@@ -25,6 +25,7 @@ import {
   normalizeRuntimeEvent,
 } from "../utils/assessmentFormatters";
 import { extractApiError } from "../utils/apiErrors";
+import { publishBackendError } from "../utils/backendErrors";
 
 const AssessmentContext = createContext(null);
 
@@ -265,7 +266,37 @@ export function AssessmentProvider({ children }) {
           updateProgress(100);
         }
         if (eventType === "assessment.failed") {
+          publishBackendError({
+            source: "assessment-runtime",
+            message: payload.error || normalized.error || "Assessment failed in backend runtime",
+            eventType,
+            parameterKey: payload.parameter_key,
+            parameterName: payload.parameter_name,
+            collector: payload.collector,
+            exceptionType: payload.exception_type,
+            raw: normalized,
+          });
           dispatch({ type: "setJob", job: { id: payload.job_id, status: "failed", error_message: payload.error } });
+        }
+        if (
+          eventType !== "assessment.failed" &&
+          (String(eventType || "").toLowerCase().includes("failed") ||
+            String(eventType || "").toLowerCase().includes("error") ||
+            normalized.status === "failed" ||
+            payload.error ||
+            payload.error_message)
+        ) {
+          publishBackendError({
+            source: "assessment-runtime",
+            message: payload.error || payload.error_message || normalized.message || "Backend runtime error",
+            eventType,
+            script: payload.script || payload.script_path,
+            parameterKey: payload.parameter_key,
+            parameterName: payload.parameter_name,
+            collector: payload.collector,
+            exceptionType: payload.exception_type,
+            raw: normalized,
+          });
         }
       },
     });

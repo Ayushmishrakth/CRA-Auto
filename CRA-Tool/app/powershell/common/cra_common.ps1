@@ -176,12 +176,24 @@ function Connect-CraTeams {
   )
   Assert-CraModule "MicrosoftTeams"
   $mode = (Get-CraAuthMode -SpecificEnvName "CRA_TEAMS_AUTH_MODE" -Collector $Collector).ToLowerInvariant()
-  if ($mode -eq "device") {
+  if ($mode -in @("app", "application", "client_credentials")) {
+    # App-only auth: requires application_access permission granted via admin consent
+    $clientId     = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_ID")
+    $clientSecret = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_SECRET")
+    if (-not $clientId -or -not $clientSecret) {
+      throw "[CRA_TEAMS_SKIP] Teams app auth requires CRA_GRAPH_CLIENT_ID and CRA_GRAPH_CLIENT_SECRET env vars."
+    }
+    $secureSecret = ConvertTo-SecureString $clientSecret -AsPlainText -Force
+    Connect-MicrosoftTeams -ApplicationId $clientId -ClientSecret $secureSecret -TenantId $TenantId -ErrorAction Stop | Out-Null
+  } elseif ($mode -eq "device") {
     Connect-MicrosoftTeams -TenantId $TenantId -UseDeviceAuthentication -ErrorAction Stop | Out-Null
-  } elseif ($mode -in @("browser", "interactive", "delegated", "context")) {
+  } elseif ($mode -in @("browser", "interactive", "delegated")) {
     Connect-MicrosoftTeams -TenantId $TenantId -ErrorAction Stop | Out-Null
+  } elseif ($mode -in @("skip", "none", "disabled")) {
+    throw "[CRA_TEAMS_SKIP] Teams auth is disabled for automated runs (CRA_TEAMS_AUTH_MODE=skip). Configure app or device auth for Teams collection."
   } else {
-    throw "Unsupported Microsoft Teams auth mode '$mode'."
+    # context mode: never open browser; fail cleanly if no active session
+    throw "[CRA_TEAMS_SKIP] Teams PowerShell requires delegated or app auth. Set CRA_TEAMS_AUTH_MODE=app for automated runs, or CRA_TEAMS_AUTH_MODE=device for interactive auth."
   }
 }
 
@@ -189,12 +201,38 @@ function Connect-CraExchange {
   param([object]$Collector = $null)
   Assert-CraModule "ExchangeOnlineManagement"
   $mode = (Get-CraAuthMode -SpecificEnvName "CRA_EXCHANGE_AUTH_MODE" -Collector $Collector).ToLowerInvariant()
-  if ($mode -eq "device") {
+  if ($mode -in @("app", "application", "client_credentials")) {
+    # App-only auth: use a pre-fetched Exchange Online access token.
+    # The Python runtime acquires this token via client_credentials against
+    # https://outlook.office365.com/.default and passes it as CRA_EXCHANGE_ACCESS_TOKEN.
+    $tok = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ACCESS_TOKEN")
+    $org = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ORGANIZATION")
+    if (-not $tok) { throw "[CRA_EXCHANGE_SKIP] CRA_EXCHANGE_ACCESS_TOKEN is not set. Exchange app auth requires Exchange.ManageAsApp consent and a pre-fetched token." }
+    if (-not $org) { throw "[CRA_EXCHANGE_SKIP] CRA_EXCHANGE_ORGANIZATION is not set. Set it to the tenant's primary .onmicrosoft.com domain." }
+    Connect-ExchangeOnline -AccessToken (ConvertTo-SecureString $tok -AsPlainText -Force) -Organization $org -ShowBanner:$false -ErrorAction Stop
+  } elseif ($mode -eq "device") {
     Connect-ExchangeOnline -Device -ShowBanner:$false -ErrorAction Stop
   } elseif ($mode -in @("browser", "interactive", "delegated")) {
     Connect-ExchangeOnline -DisableWAM -ShowBanner:$false -ErrorAction Stop
+  } elseif ($mode -in @("skip", "none", "disabled")) {
+    throw "[CRA_EXCHANGE_SKIP] Exchange Online auth is disabled for automated runs (CRA_EXCHANGE_AUTH_MODE=skip). Configure app auth to enable Exchange collection."
+  } elseif ($mode -eq "token") {
+    $tok = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ACCESS_TOKEN")
+    $org = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ORGANIZATION")
+    if (-not $tok) { throw "[CRA_EXCHANGE_SKIP] CRA_EXCHANGE_ACCESS_TOKEN is not set." }
+    if ($org) {
+      Connect-ExchangeOnline -AccessToken (ConvertTo-SecureString $tok -AsPlainText -Force) -Organization $org -ShowBanner:$false -ErrorAction Stop
+    } else {
+      Connect-ExchangeOnline -AccessToken (ConvertTo-SecureString $tok -AsPlainText -Force) -ShowBanner:$false -ErrorAction Stop
+    }
   } else {
-    Connect-ExchangeOnline -ShowBanner:$false -ErrorAction Stop
+    # context mode: only use an already-established session — never open a browser
+    try {
+      $conn = Get-ConnectionInformation -ErrorAction SilentlyContinue
+      if (-not $conn) { throw "no active session" }
+    } catch {
+      throw "[CRA_EXCHANGE_SKIP] Exchange Online: no active context session. Run Connect-ExchangeOnline manually first, or set CRA_EXCHANGE_AUTH_MODE=device for interactive auth."
+    }
   }
 }
 
@@ -202,10 +240,18 @@ function Connect-CraPurview {
   param([object]$Collector = $null)
   Assert-CraModule "ExchangeOnlineManagement"
   $mode = (Get-CraAuthMode -SpecificEnvName "CRA_PURVIEW_AUTH_MODE" -Collector $Collector).ToLowerInvariant()
-  if ($mode -in @("browser", "interactive", "delegated", "device")) {
+  if ($mode -in @("skip", "none", "disabled")) {
+    throw "[CRA_PURVIEW_SKIP] Purview auth is disabled for automated runs (CRA_PURVIEW_AUTH_MODE=skip)."
+  } elseif ($mode -in @("browser", "interactive", "delegated", "device")) {
     Connect-IPPSSession -DisableWAM -ErrorAction Stop | Out-Null
   } else {
-    Connect-IPPSSession -ErrorAction Stop | Out-Null
+    # context mode: never open browser; fail if no active session
+    try {
+      $conn = Get-ConnectionInformation -ErrorAction SilentlyContinue
+      if (-not $conn) { throw "no active session" }
+    } catch {
+      throw "[CRA_PURVIEW_SKIP] Purview/IPPSSession: no active context session. Set CRA_PURVIEW_AUTH_MODE=device for interactive auth."
+    }
   }
 }
 

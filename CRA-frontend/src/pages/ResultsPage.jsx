@@ -205,6 +205,57 @@ function getActualValue(raw_value) {
   return getCleanFinding(raw_value);
 }
 
+// ── Finding categorizer ──────────────────────────────────────
+function categorizeFinding(finding) {
+  if (!finding) return "not_collected";
+  const status = (finding.status || "").toLowerCase();
+  if (status === "pass") return "pass";
+  if (status === "not_collected") return "not_collected";
+
+  const evalVal = String(finding.evaluated_value || "").toLowerCase();
+  const rawActual =
+    typeof finding.raw_value?.actual_value === "string"
+      ? finding.raw_value.actual_value.toLowerCase()
+      : "";
+  const text = evalVal || rawActual;
+
+  const licensingPatterns = [
+    "not available in tenant",
+    "not available in this tenant",
+    "readiness gap",
+    "sharepoint online license",
+    "requires microsoft 365",
+    "requires m365",
+    "not licensed",
+    "license not available",
+    "service unavailable",
+    "aadsts500014",
+  ];
+
+  const zeroActivityPatterns = [
+    "0 active sharepoint",
+    "0 active mailbox",
+    "0 active onedrive",
+    "0 active group lifecycle",
+    "0 active site",
+    "active ratio 0.0",
+    "not applicable to target tenant",
+    "average sent email count per user is 0",
+    "0.0% of users",
+    "0 out of 0",
+  ];
+
+  if (licensingPatterns.some((p) => text.includes(p))) return "licensing";
+  if (zeroActivityPatterns.some((p) => text.includes(p))) return "activity";
+  return "actionable";
+}
+
+function buildCategorized(items) {
+  const cats = { actionable: [], licensing: [], activity: [], pass: [], not_collected: [] };
+  (items ?? []).forEach((f) => { cats[categorizeFinding(f)].push(f); });
+  return cats;
+}
+
 function severityBadge(sev) {
   const s = (sev || "").toLowerCase();
   const style = SEV_STYLE[s] || SEV_STYLE.info;
@@ -353,20 +404,51 @@ function ExecSummaryCard({ result }) {
 }
 
 // ── Tab 1: Key Observations ──────────────────────────────────
-function KeyObservationsTab({ result }) {
+function KeyObservationsTab({ result, categorized }) {
+  const [licensingExpanded, setLicensingExpanded] = useState(false);
+
   const findings = result.findings ?? {};
   const items = findings.items ?? [];
-  const fails = items.filter((f) => (f.status || "").toLowerCase() === "fail");
   const total = findings.total ?? 0;
-
-  const sev = { critical: findings.critical ?? 0, high: findings.high ?? 0, medium: findings.medium ?? 0, low: findings.low ?? 0 };
-  const sevTotal = sev.critical + sev.high + sev.medium + sev.low;
-
-  const pillarFails = { Security: 0, Governance: 0, "Best Practice": 0 };
-  fails.forEach((f) => { const p = getPillar(f); pillarFails[p] = (pillarFails[p] || 0) + 1; });
-  const pillarData = PILLARS.map(({ key, color }) => ({ name: key, value: pillarFails[key] || 0, color }));
+  const fails = items.filter((f) => (f.status || "").toLowerCase() === "fail");
   const totalFails = fails.length;
 
+  const { actionable, licensing, activity, pass } = categorized;
+  const allLicensingGaps = [...licensing, ...activity];
+
+  // Actionable grouped by severity
+  const SEV_ORDER = ["critical", "high", "medium", "low"];
+  const actionableBySev = SEV_ORDER.map((sev) => ({
+    sev,
+    items: actionable.filter((f) => (f.severity || "").toLowerCase() === sev),
+  })).filter((g) => g.items.length > 0);
+
+  // Licensing grouped by service
+  const svcGroups = { Teams: [], SharePoint: [], Exchange: [], Purview: [], Other: [] };
+  allLicensingGaps.forEach((f) => {
+    const ev = String(f.evaluated_value || "").toLowerCase();
+    if (ev.includes("teams")) svcGroups.Teams.push(f);
+    else if (ev.includes("sharepoint") || ev.includes("onedrive")) svcGroups.SharePoint.push(f);
+    else if (ev.includes("exchange") || ev.includes("mailbox")) svcGroups.Exchange.push(f);
+    else if (ev.includes("purview")) svcGroups.Purview.push(f);
+    else svcGroups.Other.push(f);
+  });
+
+  const SEV_HEADER = {
+    critical: { bg: "#FEE2E2", color: "#DC2626" },
+    high:     { bg: "#FFEDD5", color: "#EA580C" },
+    medium:   { bg: "#FEF9C3", color: "#CA8A04" },
+    low:      { bg: "#F3F4F6", color: "#6B7280" },
+  };
+
+  const getReasonText = (f) => {
+    const ev = f.evaluated_value;
+    if (ev) return ev.length > 120 ? ev.slice(0, 120) + "…" : ev;
+    const clean = getCleanFinding(f.raw_value);
+    return clean === "—" ? "" : clean;
+  };
+
+  // Activity data for Observations
   function activityPct(key, field = "active_ratio") {
     const f = items.find((i) => i.parameter_key === key);
     if (!f?.raw_value?.actual_value || typeof f.raw_value.actual_value !== "object") return null;
@@ -382,109 +464,188 @@ function KeyObservationsTab({ result }) {
     return Math.round(v <= 1 ? v * 100 : v);
   }
 
-  const activity = {
+  const activityData = {
     onedrive:   activityPct("active_users_per_site", "active_ratio") ?? activityPct("onedrive_active_users", "active_ratio"),
     teams:      activityPct("activer_inactive_teams_users", "computed_active"),
     outlook:    activityPct("email_active_users", "active_ratio") ?? activityPct("mailboxes_status_active_inactive", "active_ratio"),
     sharepoint: activityPct("active_users_on_sharepoint", "active_ratio"),
   };
 
-  const criticalRisks = items
-    .filter((f) => ["critical", "high"].includes((f.severity || "").toLowerCase()) && (f.status || "").toLowerCase() === "fail")
-    .sort((a, b) => {
-      const o = { critical: 0, high: 1 };
-      return (o[(a.severity || "").toLowerCase()] ?? 2) - (o[(b.severity || "").toLowerCase()] ?? 2);
-    });
-
   const eligible = result.assessment?.copilot_eligible_user_count;
   const totalUsers = result.assessment?.total_user_count;
 
-  // Pillar percentages for observations
-  const pillarPct = (key) =>
-    totalFails > 0 ? Math.round(((pillarFails[key] || 0) / totalFails) * 100) : 0;
-  const medHighCritPct = sevTotal > 0
-    ? Math.round(((sev.critical + sev.high + sev.medium) / sevTotal) * 100)
-    : 0;
+  const pillarFails = { Security: 0, Governance: 0, "Best Practice": 0 };
+  fails.forEach((f) => { const p = getPillar(f); pillarFails[p] = (pillarFails[p] || 0) + 1; });
+  const pillarPct = (key) => totalFails > 0 ? Math.round(((pillarFails[key] || 0) / totalFails) * 100) : 0;
 
-  const recs = result.recommendations ?? [];
-  const recsByKey = Object.fromEntries(recs.map((r) => [r.parameter_key, r]));
+  const sev = { critical: findings.critical ?? 0, high: findings.high ?? 0, medium: findings.medium ?? 0, low: findings.low ?? 0 };
+  const sevTotal = sev.critical + sev.high + sev.medium + sev.low;
+  const medHighCritPct = sevTotal > 0
+    ? Math.round(((sev.critical + sev.high + sev.medium) / sevTotal) * 100) : 0;
 
   return (
     <div className="space-y-6">
-      {/* ── 3 stat cards ── */}
+
+      {/* ── Change 3: Priority Banner ── */}
+      {actionable.length > 0 ? (
+        <div className="border-l-4 border-[#DC2626] bg-[#FEF2F2] rounded-r-xl px-5 py-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={16} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[#7F1D1D]">
+              <span className="font-bold">{actionable.length} parameters failed due to security misconfigurations</span>
+              {" — fix these first. The remaining "}
+              <span className="font-semibold">{allLicensingGaps.length}</span>
+              {" failures are licensing or service availability gaps."}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="border-l-4 border-[#16A34A] bg-[#F0FDF4] rounded-r-xl px-5 py-4">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={16} className="text-[#16A34A] flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[#14532D]">
+              <span className="font-bold">No security misconfigurations found.</span>
+              {" "}
+              <span className="font-semibold">{allLicensingGaps.length}</span>
+              {" failures are licensing gaps."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Change 2: 3 new metric cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1 — Total Gaps */}
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
-          <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Total Gaps</p>
-          <p className="text-5xl font-black text-[#DC2626]">{fails.length}</p>
-          <p className="text-sm text-[#6B7280] mt-1">out of {total} parameters assessed</p>
-          <p className="text-xs text-[#9CA3AF] mt-3">Distributed across Security, Governance, Best Practices</p>
+        {/* Card 1 — Security misconfigs (red) */}
+        <div className="rounded-xl p-5 border" style={{ backgroundColor: "#FEF2F2", borderColor: "#FECACA" }}>
+          <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Security Misconfigurations</p>
+          <p className="text-5xl font-black" style={{ color: "#DC2626" }}>{actionable.length}</p>
+          <p className="text-sm text-[#6B7280] mt-1">Fix these before Copilot</p>
         </div>
 
-        {/* Card 2 — Severity Breakdown */}
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
-          <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Severity Breakdown</p>
-          <div className="flex rounded-full overflow-hidden h-5 mb-3">
-            {[
-              { key: "critical", color: "#DC2626" },
-              { key: "high",     color: "#EA580C" },
-              { key: "medium",   color: "#CA8A04" },
-              { key: "low",      color: "#6B7280" },
-            ].map(({ key, color }) => {
-              const pct = sevTotal > 0 ? (sev[key] / sevTotal) * 100 : 0;
-              return pct > 0 ? (
-                <div key={key} style={{ width: `${pct}%`, backgroundColor: color }} title={`${key}: ${sev[key]}`} />
-              ) : null;
-            })}
-            {sevTotal === 0 && <div className="flex-1 bg-[#E5E7EB]" />}
-          </div>
-          <div className="flex gap-3 flex-wrap">
-            {[
-              { key: "critical", label: "Critical", color: "#DC2626" },
-              { key: "high",     label: "High",     color: "#EA580C" },
-              { key: "medium",   label: "Medium",   color: "#CA8A04" },
-              { key: "low",      label: "Low",      color: "#6B7280" },
-            ].map(({ key, label, color }) => (
-              <div key={key} className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                <span className="text-xs text-[#6B7280]">{label}: <b>{sev[key]}</b></span>
-              </div>
-            ))}
-          </div>
+        {/* Card 2 — Licensing / service gaps (amber) */}
+        <div className="rounded-xl p-5 border" style={{ backgroundColor: "#FFFBEB", borderColor: "#FDE68A" }}>
+          <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Licensing / Service Gaps</p>
+          <p className="text-5xl font-black" style={{ color: "#D97706" }}>{allLicensingGaps.length}</p>
+          <p className="text-sm text-[#6B7280] mt-1">Upgrade or enable services</p>
         </div>
 
-        {/* Card 3 — Pillar Distribution */}
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
-          <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Gap Distribution by Pillar</p>
-          <div className="flex items-center gap-2">
-            <div className="w-24 h-24 flex-shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pillarData} dataKey="value" cx="50%" cy="50%" innerRadius={22} outerRadius={40} stroke="none">
-                    {pillarData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-1.5 flex-1">
-              {pillarData.map(({ name, value, color }) => (
-                <div key={name} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                  <span className="text-xs text-[#374151] flex-1">{name}</span>
-                  <span className="text-xs font-bold" style={{ color }}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Card 3 — Passed (green) */}
+        <div className="rounded-xl p-5 border" style={{ backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" }}>
+          <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Passed</p>
+          <p className="text-5xl font-black" style={{ color: "#16A34A" }}>{pass.length}</p>
+          <p className="text-sm text-[#6B7280] mt-1">No action needed</p>
         </div>
       </div>
 
-      {/* ── Observations card ── */}
+      {/* ── Change 4: Security Misconfigurations section ── */}
+      <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-[#E5E7EB] bg-[#FEF2F2]">
+          <AlertTriangle size={16} className="text-[#DC2626]" />
+          <p className="text-sm font-bold text-[#DC2626]">Security Misconfigurations — Fix These First</p>
+          <span className="ml-auto text-xs font-semibold text-[#DC2626]">{actionable.length} issues</span>
+        </div>
+        {actionable.length === 0 ? (
+          <div className="flex items-center gap-2 px-5 py-6">
+            <CheckCircle2 size={16} className="text-[#16A34A]" />
+            <p className="text-sm text-[#6B7280]">No security misconfigurations identified.</p>
+          </div>
+        ) : (
+          <div>
+            {actionableBySev.map(({ sev: s, items: grpItems }) => {
+              const hs = SEV_HEADER[s] || SEV_HEADER.low;
+              return (
+                <div key={s}>
+                  <div className="px-5 py-2 border-b border-[#F3F4F6]" style={{ backgroundColor: hs.bg }}>
+                    <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: hs.color }}>
+                      {s} ({grpItems.length})
+                    </span>
+                  </div>
+                  <div className="divide-y divide-[#F9FAFB]">
+                    {grpItems.map((f, i) => (
+                      <div key={i} className="flex items-start justify-between gap-4 px-5 py-3 hover:bg-[#FAFAFA] transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-[#111827] leading-snug" style={{ fontSize: 14 }}>
+                            {f.parameter_name || fmtKey(f.parameter_key)}
+                          </p>
+                          {getReasonText(f) && (
+                            <p className="mt-0.5 text-[#6B7280] leading-snug" style={{ fontSize: 12 }}>
+                              {getReasonText(f)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0 pt-0.5">{severityBadge(f.severity)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Change 5: Licensing gaps (collapsed) ── */}
+      <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+        <button
+          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#FAFAFA] transition-colors text-left"
+          onClick={() => setLicensingExpanded(!licensingExpanded)}
+        >
+          <Info size={16} className="text-[#9CA3AF] flex-shrink-0" />
+          <p className="text-sm font-semibold text-[#374151] flex-shrink-0">
+            Licensing gaps ({allLicensingGaps.length}) — upgrade required
+          </p>
+          <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+            {Object.entries(svcGroups)
+              .filter(([, list]) => list.length > 0)
+              .map(([svc, list]) => (
+                <span key={svc} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#6B7280]">
+                  {svc} ({list.length})
+                </span>
+              ))}
+          </div>
+          {licensingExpanded
+            ? <ChevronUp size={16} className="text-[#9CA3AF] flex-shrink-0" />
+            : <ChevronDown size={16} className="text-[#9CA3AF] flex-shrink-0" />}
+        </button>
+        {licensingExpanded && (
+          <div className="border-t border-[#E5E7EB]">
+            {Object.entries(svcGroups)
+              .filter(([, list]) => list.length > 0)
+              .map(([svc, list]) => (
+                <div key={svc} className="border-b border-[#F3F4F6] last:border-b-0">
+                  <div className="px-5 py-2 bg-[#F8F9FA]">
+                    <span className="text-xs font-semibold text-[#374151] uppercase tracking-wide">{svc}</span>
+                  </div>
+                  <div className="divide-y divide-[#F9FAFB]">
+                    {list.map((f, i) => (
+                      <div key={i} className="flex items-start justify-between gap-4 px-5 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-[#374151] leading-snug" style={{ fontSize: 14 }}>
+                            {f.parameter_name || fmtKey(f.parameter_key)}
+                          </p>
+                          {getReasonText(f) && (
+                            <p className="mt-0.5 text-[#9CA3AF] leading-snug" style={{ fontSize: 12 }}>
+                              {getReasonText(f)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0 pt-0.5">{severityBadge(f.severity)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Observations card (kept) ── */}
       <div className="bg-white border border-[#E5E7EB] rounded-xl p-6">
         <p className="text-sm font-bold text-[#111827] mb-4">Observations</p>
         <ul className="space-y-3">
           {[
             `A total of ${totalFails} gaps out of ${total} parameters were identified, distributed across Security, Governance, and Best Practice categories.`,
+            `${actionable.length} of those failures are actionable security misconfigurations; the remaining ${allLicensingGaps.length} are licensing or service availability gaps.`,
             `Medium to Critical severity issues make up ${medHighCritPct}% of findings, indicating substantial exposure to operational and compliance risks.`,
             `Gap findings: Security (${pillarPct("Security")}%), Governance (${pillarPct("Governance")}%), Best Practices (${pillarPct("Best Practice")}%).`,
             eligible != null
@@ -496,61 +657,38 @@ function KeyObservationsTab({ result }) {
               <span className="text-sm text-[#374151]">{text}</span>
             </li>
           ))}
-          {/* M365 Activity mini row */}
           <li className="flex items-start gap-3">
             <div className="w-2 h-2 rounded-full bg-[#0078D4] flex-shrink-0 mt-1.5" />
             <div className="flex-1">
               <span className="text-sm text-[#374151]">In the past 30 days, activity across M365 services:</span>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <ActivityBar label="OneDrive"   pct={activity.onedrive}   color="#0078D4" />
-                <ActivityBar label="Teams"      pct={activity.teams}      color="#6264A7" />
-                <ActivityBar label="Outlook"    pct={activity.outlook}    color="#107C10" />
-                <ActivityBar label="SharePoint" pct={activity.sharepoint} color="#038387" />
+                <ActivityBar label="OneDrive"   pct={activityData.onedrive}   color="#0078D4" />
+                <ActivityBar label="Teams"      pct={activityData.teams}      color="#6264A7" />
+                <ActivityBar label="Outlook"    pct={activityData.outlook}    color="#107C10" />
+                <ActivityBar label="SharePoint" pct={activityData.sharepoint} color="#038387" />
               </div>
             </div>
           </li>
         </ul>
-      </div>
-
-      {/* ── Risks of Deployment card ── */}
-      <div className="bg-[#FEF2F2] border-2 border-[#FECACA] rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <AlertTriangle size={18} className="text-[#DC2626]" />
-          <p className="text-sm font-bold text-[#DC2626] uppercase tracking-wide">⚠ Risks of Immediate Deployment</p>
-        </div>
-        {criticalRisks.length === 0 ? (
-          <p className="text-sm text-[#DC2626]">No critical deployment risks identified.</p>
-        ) : (
-          <ul className="space-y-3">
-            {criticalRisks.map((f, i) => {
-              const rec = recsByKey[f.parameter_key];
-              const riskText = rec?.recommendation_text
-                ? rec.recommendation_text.split(".")[0] + "."
-                : `${f.parameter_name || fmtKey(f.parameter_key)} requires immediate attention before Copilot deployment.`;
-              return (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="text-[#DC2626] font-black text-sm flex-shrink-0 mt-0.5">•</span>
-                  <div>
-                    <span className="text-sm font-semibold text-[#7F1D1D]">{f.parameter_name || fmtKey(f.parameter_key)}</span>
-                    <span className="text-xs text-[#DC2626] ml-2">[{f.severity}]</span>
-                    <p className="text-xs text-[#991B1B] mt-0.5">{riskText}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </div>
     </div>
   );
 }
 
 // ── Tab 2: Detailed Findings ─────────────────────────────────
-function DetailedFindingsTab({ result }) {
+function DetailedFindingsTab({ result, categorized }) {
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [activeFilter, setActiveFilter] = useState("security");
+
   const items = result.findings?.items ?? [];
   const recs = result.recommendations ?? [];
   const recsByKey = Object.fromEntries(recs.map((r) => [r.parameter_key, r]));
+
+  const { actionable, licensing, activity, pass } = categorized;
+  const allLicensing = [...licensing, ...activity];
+
+  const filterMap = { all: items, security: actionable, licensing: allLicensing, passed: pass };
+  const filteredItems = filterMap[activeFilter] ?? items;
 
   const toggleRow = (id) => {
     setExpandedRows((prev) => {
@@ -560,6 +698,141 @@ function DetailedFindingsTab({ result }) {
     });
   };
 
+  const FILTER_BTNS = [
+    { key: "security",  label: "Security gaps", color: "#DC2626", activeBg: "#FEF2F2" },
+    { key: "all",       label: "All",            color: "#374151", activeBg: "#F3F4F6" },
+    { key: "licensing", label: "Licensing",      color: "#D97706", activeBg: "#FFFBEB" },
+    { key: "passed",    label: "Passed",          color: "#16A34A", activeBg: "#F0FDF4" },
+  ];
+
+  const STATUS_LABELS = {
+    pass: "Pass", fail: "Fail", not_collected: "Not Collected",
+    manual_validation: "Manual Validation", licensing_required: "Licensing Required",
+    collection_error: "Collection Error", service_unavailable: "Service Unavailable",
+    skipped: "Skipped",
+  };
+  const STATUS_COLORS = {
+    pass: "#107C10", fail: "#DC2626", licensing_required: "#7C3AED",
+    manual_validation: "#D97706", collection_error: "#EA580C",
+    service_unavailable: "#6B7280", not_collected: "#6B7280", skipped: "#9CA3AF",
+  };
+
+  // Shared row renderer — used by both grouped and flat views
+  const renderRow = (f, i, rowKey) => {
+    const isOpen = expandedRows.has(rowKey);
+    const cleanFinding = getCleanFinding(f.raw_value);
+    const fullFinding = getFullFinding(f.raw_value);
+    const reasonText = f.evaluated_value || (cleanFinding !== "—" ? cleanFinding : "");
+    const rec = recsByKey[f.parameter_key];
+    const pillar = getPillar(f);
+    const statusLower = (f.status || "").toLowerCase();
+    const statusLabel = STATUS_LABELS[statusLower] || (f.status || "Unknown");
+    const statusColor = STATUS_COLORS[statusLower] || "#6B7280";
+    const docUrl = extractDocUrl(rec?.remediation_steps, f.raw_value);
+
+    return (
+      <Fragment key={rowKey}>
+        <tr
+          className={`border-b border-[#F3F4F6] cursor-pointer hover:bg-[#FAFAFA] transition-colors ${i % 2 === 0 ? "bg-white" : "bg-[#FAFAFA]"}`}
+          onClick={() => toggleRow(rowKey)}
+        >
+          <td className="px-4 py-2.5 text-xs text-[#9CA3AF]">{i + 1}</td>
+          <td className="px-4 py-2.5">
+            <div className="flex items-start gap-2">
+              <div className="mt-0.5 flex-shrink-0">{statusIcon(f.status)}</div>
+              <div className="min-w-0">
+                <p className="font-medium text-[#111827] truncate max-w-[220px]" style={{ fontSize: 14 }}>
+                  {f.parameter_name || fmtKey(f.parameter_key)}
+                </p>
+                {reasonText && (
+                  <p className="text-[#6B7280] truncate max-w-[260px] leading-snug" style={{ fontSize: 12 }}>
+                    {reasonText.length > 110 ? reasonText.slice(0, 110) + "…" : reasonText}
+                  </p>
+                )}
+              </div>
+            </div>
+          </td>
+          <td className="px-4 py-2.5 hidden md:table-cell">
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: pillar === "Security" ? "#FEE2E2" : pillar === "Governance" ? "#FFEDD5" : "#DBEAFE",
+                color: pillar === "Security" ? "#DC2626" : pillar === "Governance" ? "#EA580C" : "#2563EB",
+              }}
+            >
+              {pillar}
+            </span>
+          </td>
+          <td className="px-4 py-2.5 text-[#6B7280] max-w-[200px] hidden md:table-cell">
+            <span className="block truncate text-xs">{cleanFinding}</span>
+          </td>
+          <td className="px-4 py-2.5">{severityBadge(f.severity)}</td>
+          <td className="px-2 py-2.5 text-[#9CA3AF]">
+            {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </td>
+        </tr>
+
+        {isOpen && (
+          <tr>
+            <td
+              colSpan={6}
+              className="border-b border-[#E5E7EB]"
+              style={{ borderLeft: `4px solid ${SEV_STYLE[(f.severity || "info").toLowerCase()]?.color ?? "#6B7280"}` }}
+            >
+              <div className="bg-[#F8FAFF] px-6 py-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Risk Rating</p>
+                    <div className="flex items-center gap-2">
+                      {severityBadge(f.severity)}
+                      <span className="text-xs font-medium" style={{ color: statusColor }}>– {statusLabel}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Description</p>
+                    <p className="text-xs text-[#374151]">
+                      {fullFinding !== "No specific data collected" ? fullFinding : (f.parameter_name || fmtKey(f.parameter_key))}
+                    </p>
+                  </div>
+                  {rec?.recommendation_text && (
+                    <div>
+                      <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Risk</p>
+                      <p className="text-xs text-[#374151]">{rec.recommendation_text}</p>
+                    </div>
+                  )}
+                  {rec?.remediation_steps?.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Remediation Steps</p>
+                      <ol className="text-xs text-[#374151] space-y-0.5 list-decimal list-inside">
+                        {rec.remediation_steps.slice(0, 3).map((step, si) => (
+                          <li key={si}>{String(step).slice(0, 140)}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+                {docUrl && (
+                  <div className="mt-3 pt-3 border-t border-[#E5E7EB]">
+                    <a
+                      href={docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-[#0078D4] hover:underline font-medium"
+                    >
+                      <ExternalLink size={12} />
+                      Microsoft Documentation →
+                    </a>
+                  </div>
+                )}
+              </div>
+            </td>
+          </tr>
+        )}
+      </Fragment>
+    );
+  };
+
+  // Domain-grouped structure (used for "all" filter)
   const domainOrder = DOMAINS.map((d) => d.cat);
   const grouped = {};
   items.forEach((f) => {
@@ -572,191 +845,96 @@ function DetailedFindingsTab({ result }) {
     ...Object.keys(grouped).filter((c) => !domainOrder.includes(c)),
   ];
 
-  if (orderedCats.length === 0) {
-    return <p className="text-sm text-[#6B7280] py-6 text-center">No finding details available.</p>;
-  }
+  const TABLE_HEAD = (
+    <thead>
+      <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB]">
+        <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5 w-10">#</th>
+        <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5">Parameter</th>
+        <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5 hidden md:table-cell">CRA Pillar</th>
+        <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5 hidden md:table-cell">Finding</th>
+        <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5">Severity</th>
+        <th className="w-8 px-2" />
+      </tr>
+    </thead>
+  );
 
   return (
-    <div className="space-y-6">
-      {orderedCats.map((cat) => {
-        const dom = DOMAIN_BY_CAT[cat] || { label: cat, color: "#6B7280", bg: "#F3F4F6", icon: Shield };
-        const catFindings = grouped[cat];
-        const Icon = dom.icon || Shield;
+    <div className="space-y-4">
+      {/* ── Change 7: Filter buttons ── */}
+      <div className="flex gap-2 flex-wrap items-center">
+        {FILTER_BTNS.map(({ key, label, color, activeBg }) => {
+          const isActive = activeFilter === key;
+          const count = filterMap[key]?.length ?? 0;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveFilter(key)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors"
+              style={{
+                backgroundColor: isActive ? activeBg : "white",
+                color: isActive ? color : "#6B7280",
+                borderColor: isActive ? color : "#E5E7EB",
+              }}
+            >
+              {label} ({count})
+            </button>
+          );
+        })}
+      </div>
 
-        // Check if this is an all-skipped domain
-        const allSkipped = catFindings.every((f) =>
-          ["skipped", "service_unavailable", "manual_validation", "licensing_required"].includes((f.status || "").toLowerCase())
-        );
-
-        return (
-          <div key={cat} className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-3" style={{ backgroundColor: dom.color, color: "#fff" }}>
-              <Icon size={18} />
-              <span className="font-bold text-sm">{dom.label}</span>
-              <span className="ml-auto text-xs opacity-75">{catFindings.length} parameters</span>
-            </div>
-
-            {allSkipped && (
-              <div className="flex items-center gap-2 px-5 py-2.5 bg-[#F8F9FA] border-b border-[#E5E7EB]">
-                <div className="w-2 h-2 rounded-full bg-[#9CA3AF]" />
-                <span className="text-xs text-[#6B7280]">
-                  {dom.label} was not assessed — service requires delegated authentication.
-                </span>
+      {activeFilter === "all" ? (
+        // Domain-grouped view
+        <div className="space-y-6">
+          {orderedCats.length === 0 && (
+            <p className="text-sm text-[#6B7280] py-6 text-center">No finding details available.</p>
+          )}
+          {orderedCats.map((cat) => {
+            const dom = DOMAIN_BY_CAT[cat] || { label: cat, color: "#6B7280", bg: "#F3F4F6", icon: Shield };
+            const catFindings = grouped[cat];
+            const Icon = dom.icon || Shield;
+            const allSkipped = catFindings.every((f) =>
+              ["skipped", "service_unavailable", "manual_validation", "licensing_required"].includes((f.status || "").toLowerCase())
+            );
+            return (
+              <div key={cat} className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-3" style={{ backgroundColor: dom.color, color: "#fff" }}>
+                  <Icon size={18} />
+                  <span className="font-bold text-sm">{dom.label}</span>
+                  <span className="ml-auto text-xs opacity-75">{catFindings.length} parameters</span>
+                </div>
+                {allSkipped && (
+                  <div className="flex items-center gap-2 px-5 py-2.5 bg-[#F8F9FA] border-b border-[#E5E7EB]">
+                    <div className="w-2 h-2 rounded-full bg-[#9CA3AF]" />
+                    <span className="text-xs text-[#6B7280]">
+                      {dom.label} was not assessed — service requires delegated authentication.
+                    </span>
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    {TABLE_HEAD}
+                    <tbody>{catFindings.map((f, i) => renderRow(f, i, `${cat}-${i}`))}</tbody>
+                  </table>
+                </div>
               </div>
-            )}
-
+            );
+          })}
+        </div>
+      ) : (
+        // Flat filtered view
+        <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden">
+          {filteredItems.length === 0 ? (
+            <p className="text-sm text-[#6B7280] py-8 text-center">No findings in this category.</p>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB]">
-                    <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5 w-10">#</th>
-                    <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5">Parameter</th>
-                    <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5 hidden md:table-cell">CRA Pillar</th>
-                    <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5">Finding</th>
-                    <th className="text-left text-xs font-semibold text-[#6B7280] px-4 py-2.5">Severity</th>
-                    <th className="w-8 px-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {catFindings.map((f, i) => {
-                    const rowKey = `${cat}-${i}`;
-                    const isOpen = expandedRows.has(rowKey);
-                    const cleanFinding = getCleanFinding(f.raw_value);
-                    const fullFinding = getFullFinding(f.raw_value);
-                    const rec = recsByKey[f.parameter_key];
-                    const pillar = getPillar(f);
-                    const statusLower = (f.status || "").toLowerCase();
-                    const STATUS_LABELS = {
-                      pass: "Pass",
-                      fail: "Fail",
-                      not_collected: "Not Collected",
-                      manual_validation: "Manual Validation",
-                      licensing_required: "Licensing Required",
-                      collection_error: "Collection Error",
-                      service_unavailable: "Service Unavailable",
-                      skipped: "Skipped",
-                    };
-                    const STATUS_COLORS = {
-                      pass: "#107C10",
-                      fail: "#DC2626",
-                      licensing_required: "#7C3AED",
-                      manual_validation: "#D97706",
-                      collection_error: "#EA580C",
-                      service_unavailable: "#6B7280",
-                      not_collected: "#6B7280",
-                      skipped: "#9CA3AF",
-                    };
-                    const statusLabel = STATUS_LABELS[statusLower] || (f.status || "Unknown");
-                    const statusColor = STATUS_COLORS[statusLower] || "#6B7280";
-                    const docUrl = extractDocUrl(rec?.remediation_steps, f.raw_value);
-
-                    return (
-                      <Fragment key={rowKey}>
-                        <tr
-                          className={`border-b border-[#F3F4F6] cursor-pointer hover:bg-[#FAFAFA] transition-colors ${i % 2 === 0 ? "bg-white" : "bg-[#FAFAFA]"}`}
-                          onClick={() => toggleRow(rowKey)}
-                        >
-                          <td className="px-4 py-2.5 text-xs text-[#9CA3AF]">{i + 1}</td>
-                          <td className="px-4 py-2.5 font-medium text-[#111827]">
-                            <div className="flex items-center gap-2">
-                              {statusIcon(f.status)}
-                              <span className="truncate max-w-[200px]">{f.parameter_name || fmtKey(f.parameter_key)}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5 hidden md:table-cell">
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                              style={{
-                                backgroundColor: pillar === "Security" ? "#FEE2E2" : pillar === "Governance" ? "#FFEDD5" : "#DBEAFE",
-                                color: pillar === "Security" ? "#DC2626" : pillar === "Governance" ? "#EA580C" : "#2563EB",
-                              }}
-                            >
-                              {pillar}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-[#6B7280] max-w-[200px]">
-                            <span className="block truncate text-xs">{cleanFinding}</span>
-                          </td>
-                          <td className="px-4 py-2.5">{severityBadge(f.severity)}</td>
-                          <td className="px-2 py-2.5 text-[#9CA3AF]">
-                            {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                          </td>
-                        </tr>
-
-                        {isOpen && (
-                          <tr>
-                            <td
-                              colSpan={6}
-                              className="border-b border-[#E5E7EB]"
-                              style={{ borderLeft: `4px solid ${SEV_STYLE[(f.severity||"info").toLowerCase()]?.color ?? "#6B7280"}` }}
-                            >
-                              <div className="bg-[#F8FAFF] px-6 py-4">
-                                <div className="grid md:grid-cols-2 gap-4">
-                                  {/* Risk Rating */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Risk Rating</p>
-                                    <div className="flex items-center gap-2">
-                                      {severityBadge(f.severity)}
-                                      <span className="text-xs font-medium" style={{ color: statusColor }}>– {statusLabel}</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Description */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Description</p>
-                                    <p className="text-xs text-[#374151]">
-                                      {fullFinding !== "No specific data collected" ? fullFinding : (f.parameter_name || fmtKey(f.parameter_key))}
-                                    </p>
-                                  </div>
-
-                                  {/* Risk */}
-                                  {rec?.recommendation_text && (
-                                    <div>
-                                      <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Risk</p>
-                                      <p className="text-xs text-[#374151]">{rec.recommendation_text}</p>
-                                    </div>
-                                  )}
-
-                                  {/* Remediation Steps */}
-                                  {rec?.remediation_steps?.length > 0 && (
-                                    <div>
-                                      <p className="text-xs font-semibold text-[#6B7280] mb-1.5 uppercase tracking-wide">Remediation Steps</p>
-                                      <ol className="text-xs text-[#374151] space-y-0.5 list-decimal list-inside">
-                                        {rec.remediation_steps.slice(0, 3).map((step, si) => (
-                                          <li key={si}>{String(step).slice(0, 140)}</li>
-                                        ))}
-                                      </ol>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* MS Documentation link */}
-                                {docUrl && (
-                                  <div className="mt-3 pt-3 border-t border-[#E5E7EB]">
-                                    <a
-                                      href={docUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1.5 text-xs text-[#0078D4] hover:underline font-medium"
-                                    >
-                                      <ExternalLink size={12} />
-                                      Microsoft Documentation →
-                                    </a>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
+                {TABLE_HEAD}
+                <tbody>{filteredItems.map((f, i) => renderRow(f, i, `flat-${activeFilter}-${i}`))}</tbody>
               </table>
             </div>
-          </div>
-        );
-      })}
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1109,9 +1287,14 @@ export default function ResultsPage() {
       <div className="flex flex-col items-center justify-center py-24 space-y-4">
         <XCircle size={48} className="text-[#D13438]" />
         <p className="text-base font-semibold text-[#374151]">{error ?? "Results not found."}</p>
-        <Button variant="secondary" onClick={() => navigate("/assessments")}>
-          <ChevronLeft size={16} /> Back to Assessments
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="primary" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+          <Button variant="secondary" onClick={() => navigate("/assessments")}>
+            <ChevronLeft size={16} /> Back to Assessments
+          </Button>
+        </div>
       </div>
     );
   }
@@ -1119,6 +1302,7 @@ export default function ResultsPage() {
   const assessment = result.assessment ?? {};
   const scores     = result.scores     ?? {};
   const allFindings = result.findings?.items ?? [];
+  const categorized = buildCategorized(allFindings);
   const tenantName = assessment.tenant_name ?? "Assessment";
   const runDate    = assessment.completed_at || assessment.started_at;
   const isRunning  = assessment.status && assessment.status !== "completed";
@@ -1197,7 +1381,33 @@ export default function ResultsPage() {
                 }
 
                 if (rule === "A") {
-                  // 0% with fail findings — red
+                  // Determine if this domain's fails are actionable or licensing-only (Change 6)
+                  const domDef = SCORE_DOMAINS.find((x) => x.key === key);
+                  const domCats = domDef?.cats ?? [];
+                  const domFails = allFindings.filter((f) =>
+                    domCats.length > 0
+                      ? domCats.includes(f.category || "")
+                      : (f.status || "").toLowerCase() === "fail"
+                  );
+                  const domActionable = domFails.filter((f) => categorizeFinding(f) === "actionable");
+                  const isLicensingOnly = domActionable.length === 0 && domFails.length > 0;
+
+                  if (isLicensingOnly) {
+                    return (
+                      <div key={key}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-[#9CA3AF]">{label}</span>
+                          <span className="font-semibold text-[#9CA3AF] ml-2">0%</span>
+                        </div>
+                        <div className="relative h-[5px] rounded-full bg-[#F3F4F6]">
+                          <div className="absolute left-0 top-0 h-full w-[3px] min-w-[3px] rounded-full bg-[#9CA3AF]" />
+                        </div>
+                        <p className="text-[10px] text-[#9CA3AF] mt-0.5">Service not available</p>
+                      </div>
+                    );
+                  }
+
+                  // Has actionable fails — red
                   return (
                     <div key={key}>
                       <div className="flex justify-between text-xs mb-1">
@@ -1207,7 +1417,9 @@ export default function ResultsPage() {
                       <div className="relative h-[5px] rounded-full bg-[#FEE2E2]">
                         <div className="absolute left-0 top-0 h-full w-[3px] min-w-[3px] rounded-full bg-[#DC2626]" />
                       </div>
-                      <p className="text-[10px] text-[#DC2626] mt-0.5">Critical failures</p>
+                      <p className="text-[10px] text-[#DC2626] mt-0.5">
+                        {domActionable.length} security gap{domActionable.length !== 1 ? "s" : ""}
+                      </p>
                     </div>
                   );
                 }
@@ -1309,8 +1521,8 @@ export default function ResultsPage() {
           </div>
 
           <div className="mt-4">
-            {activeTab === 0 && <KeyObservationsTab result={result} />}
-            {activeTab === 1 && <DetailedFindingsTab result={result} />}
+            {activeTab === 0 && <KeyObservationsTab result={result} categorized={categorized} />}
+            {activeTab === 1 && <DetailedFindingsTab result={result} categorized={categorized} />}
             {activeTab === 2 && <RecommendationsTab result={result} />}
             {activeTab === 3 && <RoadmapTab result={result} />}
           </div>

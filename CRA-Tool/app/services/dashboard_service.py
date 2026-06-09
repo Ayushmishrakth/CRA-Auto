@@ -12,7 +12,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 from app.core.exceptions import NotFoundException
 from app.db.models.assessment import Assessment
@@ -150,6 +150,12 @@ async def list_assessments(
         (
             await db.execute(
                 select(Assessment)
+                .options(
+                    noload(Assessment.findings),
+                    noload(Assessment.jobs),
+                    noload(Assessment.events),
+                    noload(Assessment.recommendations),
+                )
                 .where(*base_where)
                 .order_by(sort_col)
                 .offset(offset)
@@ -180,6 +186,7 @@ async def list_assessments(
         (
             await db.execute(
                 select(AssessmentJob)
+                .options(noload(AssessmentJob.assessment))
                 .where(AssessmentJob.assessment_id.in_(assessment_ids))
                 .order_by(AssessmentJob.created_at.desc())
             )
@@ -307,6 +314,7 @@ async def get_assessment_results(
                 status=f.status,
                 severity=f.severity,
                 raw_value=f.raw_value,
+                evaluated_value=f.evaluated_value,
                 score_contribution=f.score_contribution,
             )
         )

@@ -166,10 +166,10 @@ function ApiTab({ user }) {
   const [showRegen, setShowRegen] = useState(false);
   const [regenerating, setRegen] = useState(false);
   const MOCK_KEY = "sk-cra-••••••••••••••••••••••••••••••••";
-  const REAL_KEY = "sk-cra-abc123def456ghi789jkl012mno345pqr";
+  const DEMO_KEY = "sk-cra-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(REAL_KEY);
+    navigator.clipboard.writeText(DEMO_KEY);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -188,7 +188,7 @@ function ApiTab({ user }) {
       <Card header={{ title: "Your API Key" }}>
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center gap-2 h-10 px-3 bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg font-mono text-sm text-[#374151]">
-            {showKey ? REAL_KEY : MOCK_KEY}
+            {showKey ? DEMO_KEY : MOCK_KEY}
           </div>
           <button
             onClick={() => setShowKey((v) => !v)}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, ClipboardList, Building2, FileText, Settings,
+  LayoutDashboard, ClipboardList, FileText, Settings,
   Bell, Menu, X, LogOut, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -9,7 +9,6 @@ import { useAuth } from "../../context/AuthContext";
 const NAV_LINKS = [
   { to: "/dashboard",   icon: LayoutDashboard, label: "Dashboard" },
   { to: "/assessments", icon: ClipboardList,    label: "Assessments" },
-  { to: "/customers",   icon: Building2,        label: "Customers" },
   { to: "/reports",     icon: FileText,         label: "Reports" },
   { to: "/settings",    icon: Settings,         label: "Settings" },
 ];

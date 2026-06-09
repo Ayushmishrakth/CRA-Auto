@@ -3289,19 +3289,25 @@ async def collect_inactive_site_policies(tenant: ConnectedTenant) -> dict[str, A
     endpoint = "/reports/getSharePointSiteUsageDetail(period='D180')"
     report = await _graph_get_text(tenant, endpoint)
     if not report.get("ok"):
-        return _collection_error_result(
-            tenant,
-            parameter_key=parameter_key,
-            endpoint=endpoint,
-            required_api="Microsoft Graph usage reports plus SharePoint Online PowerShell",
-            required_permissions=["Reports.Read.All", "Sites.Read.All"],
-            expected_value="Inactive site policy is configured",
+        spo_msg = "SharePoint Online advanced management license not available in this tenant"
+        evidence = _evaluation_evidence(
             pass_criteria="Inactive site policies are configured",
             fail_criteria="Inactive site policies are not configured",
+            reasoning=spo_msg,
+            extra={"tenant_id": tenant.tenant_id, "endpoint": endpoint, "response": str(report.get("response", ""))[:200]},
+        )
+        return _collector_result(
+            parameter_key=parameter_key,
+            status="fail",
             severity="medium",
+            actual_value={"error": spo_msg},
+            expected_value="Inactive site policy is configured",
+            finding=spo_msg,
+            graph_endpoint=endpoint,
+            evidence=evidence,
+            raw_response={"error": spo_msg},
+            graph_calls=1,
             scoring_weight=3.0,
-            response=report,
-            command="Get-SPOSite -Limit All | Select Url,LastContentModifiedDate,Owner",
         )
     rows = _csv_rows(report)
     inactive = [row for row in rows if not _has_activity(row)]

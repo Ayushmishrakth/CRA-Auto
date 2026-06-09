@@ -76,6 +76,7 @@ class FindingItem(BaseModel):
     status: str
     severity: str | None
     raw_value: dict[str, Any] | list[Any] | None
+    evaluated_value: str | None = None
     score_contribution: float | None
 
 

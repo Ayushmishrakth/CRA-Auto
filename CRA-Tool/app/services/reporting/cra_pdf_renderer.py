@@ -473,24 +473,95 @@ def _out_template_evaluation_summary(story: list[Any], styles, rows: list[dict[s
 
 
 def _out_cover(story: list[Any], styles, summary: dict[str, Any], template_dir: Path) -> None:
-    from reportlab.platypus import Image, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
-    hero = _out_image(template_dir / "1.png", width=250)
-    accent = _out_image(template_dir / "3.png", width=125)
+    accent = _out_image(template_dir / "3.png", width=112)
     customer = _customer_label(summary)
     date = str(summary.get("assessment_date") or "DD-MM-YYYY")
-    title = Paragraph("Microsoft 365 Copilot Readiness Assessment Report", styles["TemplateTitle"])
-    prepared = Paragraph(
-        f"<b>Prepared for:</b> {_escape(customer)}<br/><b>Assessment Date:</b> {_escape(date)}<br/><b>Prepared by:</b> CRA Platform",
-        styles["TemplateSubtitle"],
+    cover_badge = ParagraphStyle(
+        "CoverBadge",
+        parent=styles["TemplateSmall"],
+        fontSize=7.5,
+        leading=10,
+        textColor=HexColor("#bfdbfe"),
     )
-    visual = Table([[hero or "", accent or ""]], colWidths=[320, 155])
-    visual.setStyle(TableStyle([
+    cover_title = ParagraphStyle(
+        "CoverTitle",
+        parent=styles["TemplateTitle"],
+        fontSize=28,
+        leading=33,
+        textColor=HexColor("#ffffff"),
+    )
+    cover_subtitle = ParagraphStyle(
+        "CoverSubtitle",
+        parent=styles["TemplateBody"],
+        fontSize=9.5,
+        leading=14,
+        textColor=HexColor("#dbeafe"),
+    )
+    hero_text = [
+        Paragraph("<b>MICROSOFT 365 COPILOT READINESS</b>", cover_badge),
+        Spacer(1, 12),
+        Paragraph("Readiness Assessment Report", cover_title),
+        Spacer(1, 10),
+        Paragraph(
+            "Executive assessment of security, governance, collaboration, compliance, and operational readiness for Microsoft 365 Copilot adoption.",
+            cover_subtitle,
+        ),
+    ]
+    hero = Table([[hero_text, accent or ""]], colWidths=[350, 125], rowHeights=[188])
+    hero.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#0f172a")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING", (0, 0), (0, 0), 28),
+        ("RIGHTPADDING", (0, 0), (0, 0), 20),
+        ("LEFTPADDING", (1, 0), (1, 0), 10),
+        ("RIGHTPADDING", (1, 0), (1, 0), 22),
+        ("TOPPADDING", (0, 0), (-1, -1), 18),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 18),
+        ("BOX", (0, 0), (-1, -1), 0.7, HexColor("#1e293b")),
     ]))
-    story.extend([Spacer(1, 82), visual, Spacer(1, 28), title, Spacer(1, 16), prepared])
+
+    prepared = Table(
+        [[
+            Paragraph(
+                f"<b>Prepared for</b><br/>{_escape(customer)}",
+                styles["TemplateSubtitle"],
+            ),
+            Paragraph(
+                f"<b>Prepared by</b><br/>CRA Platform",
+                styles["TemplateSubtitle"],
+            ),
+        ]],
+        colWidths=[300, 175],
+        rowHeights=[74],
+    )
+    prepared.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#ffffff")),
+        ("BOX", (0, 0), (-1, -1), 0.6, HexColor("#cbd5e1")),
+        ("LINEBEFORE", (1, 0), (1, 0), 3, HexColor("#0078d4")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 18),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+        ("TOPPADDING", (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+    ]))
+
+    note = Paragraph(
+        "This report summarizes validated assessment evidence and prioritized readiness gaps for executive review.",
+        styles["TemplateMuted"],
+    )
+    story.extend([
+        Spacer(1, 56),
+        hero,
+        Spacer(1, 28),
+        prepared,
+        Spacer(1, 14),
+        note,
+    ])
 
 
 def _out_dashboard(story: list[Any], styles, summary: dict[str, Any], rows: list[dict[str, Any]]) -> None:

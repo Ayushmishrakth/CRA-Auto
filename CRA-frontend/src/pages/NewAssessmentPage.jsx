@@ -31,32 +31,77 @@ function Step1({ onNext }) {
   const [phase, setPhase] = useState(() => (tenantInfo.connected ? "success" : "idle"));
   const [error, setError] = useState(null);
 
-  // Load existing tenant on mount
+  // Load existing tenant AND validate it exists in Azure
   useEffect(() => {
     let isMounted = true;
     if (tenantInfo.connected) return;
 
-    listTenants()
-      .then((tenants) => {
+    const loadAndValidate = async () => {
+      try {
+        // Step 1: Load from database
+        const tenants = await listTenants();
         if (!isMounted) return;
+
         const active = (Array.isArray(tenants) ? tenants : tenants?.items ?? [])
           .find((t) => t.status === "ACTIVE");
-        if (active) {
+
+        if (!active) {
+          setPhase("idle");
+          return;
+        }
+
+        // Step 2: Validate it still exists in Azure
+        try {
+          const graphAccessToken = await getTenantDeploymentToken();
+          if (!isMounted) return;
+
+          const validationResult = await validateTenantConsent({
+            tenantId: active.tenant_id,
+            graphAccessToken,
+          });
+
+          if (!isMounted) return;
+
+          // Validation succeeded - app registration exists
+          if (validationResult?.status === "ACTIVE") {
+            setTenantInfo({
+              connected: true,
+              tenantId: active.tenant_id,
+              tenantName: active.tenant_name || active.tenant_id,
+            });
+            setPhase("success");
+          } else {
+            // Validation failed - app was deleted
+            setTenantInfo({
+              connected: true,
+              tenantId: active.tenant_id,
+              tenantName: active.tenant_name || active.tenant_id,
+            });
+            setPhase("error");
+            setError("App registration was deleted from Azure. Click 'Try Again' to recreate it.");
+          }
+        } catch (validationErr) {
+          if (!isMounted) return;
+          // Validation error - app likely deleted
           setTenantInfo({
             connected: true,
             tenantId: active.tenant_id,
             tenantName: active.tenant_name || active.tenant_id,
           });
-          setPhase("success");
+          setPhase("error");
+          setError("App registration was deleted from Azure. Click 'Try Again' to recreate it.");
         }
-      })
-      .catch(() => {
-        if (isMounted) setPhase("idle");
-      });
+      } catch (err) {
+        if (!isMounted) return;
+        setPhase("idle");
+      }
+    };
+
+    loadAndValidate();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [getTenantDeploymentToken]); // Re-run if auth context changes
 
   // Step 1: Create app registration
   const handleCreateAppRegistration = async () => {
@@ -205,19 +250,20 @@ function Step1({ onNext }) {
           <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
             <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm text-[#D13438] font-medium">Connection failed</p>
+              <p className="text-sm text-[#D13438] font-medium">Connection Invalid</p>
               {error && <p className="text-xs text-[#D13438] mt-0.5">{error}</p>}
             </div>
           </div>
           <Button
-            variant="secondary"
+            variant="primary"
             fullWidth
             onClick={() => {
+              setTenantInfo({ connected: false, tenantId: null, tenantName: null });
               setPhase("idle");
               setError(null);
             }}
           >
-            Try Again
+            Recreate App Registration
           </Button>
         </div>
       )}

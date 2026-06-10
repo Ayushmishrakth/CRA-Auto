@@ -109,10 +109,12 @@ function Step1({ onNext }) {
     setError(null);
     try {
       const graphAccessToken = await getTenantDeploymentToken();
+      // Use the correct redirect URI that backend expects
+      const redirectUri = `${window.location.origin}/tenant/deployment-success`;
       await deployTenantAccess({
         tenantId: user.microsoft_tid,
         graphAccessToken,
-        redirectUri: window.location.origin,
+        redirectUri,
       });
       setPhase("consent");
     } catch (err) {

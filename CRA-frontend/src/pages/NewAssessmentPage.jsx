@@ -15,172 +15,96 @@ import { getApiErrorMessage } from "../utils/apiErrors";
 
 const STEPS = ["Connect Tenant", "Review & Launch"];
 
-const MODULES = [
-  { key: "identity",   icon: Shield,     color: "#0078D4", bg: "#EFF6FC", label: "Identity & Access",    desc: "MFA, Conditional Access, guest users, SSPR" },
-  { key: "security",   icon: Lock,       color: "#D13438", bg: "#FDE7E9", label: "Security Posture",      desc: "Defender, DLP policies, Secure Score, compliance" },
-  { key: "exchange",   icon: Mail,       color: "#FF8C00", bg: "#FFF4CE", label: "Exchange Online",       desc: "Mailbox policies, anti-phishing, encryption" },
-  { key: "teams",      icon: Users,      color: "#5C2D91", bg: "#F4EEF9", label: "Microsoft Teams",       desc: "Governance, external sharing, meeting policies" },
-  { key: "sharepoint", icon: FolderOpen, color: "#107C10", bg: "#DFF6DD", label: "SharePoint & OneDrive", desc: "Sharing settings, sensitivity labels, sync" },
-  { key: "licensing",  icon: CreditCard, color: "#0097A7", bg: "#E0F7FA", label: "Licensing & Cost",      desc: "Copilot eligibility, license count, ROI estimate" },
+const PERMISSIONS = [
+  "Read user accounts and licenses",
+  "Read Teams usage and activity reports",
+  "Read SharePoint site metrics",
+  "Read security and compliance configuration",
+  "Read sign-in logs and audit events",
 ];
 
-const POLL_INTERVAL_MS = 3000;
-const POLL_MAX = 100; // ~5 minutes
-
-// ── Step 1: Connect Tenant ──────────────────────────────────
+// ── Step 1: Connect Tenant (All inline, no redirects) ──────────────────────────────────
 function Step1({ onNext }) {
   const { user, getTenantDeploymentToken } = useAuth();
   const { tenantInfo, setTenantInfo } = useWizard();
-  // idle | deploying | waiting | success | error | timeout | validating
-  const [phase, setPhase] = useState(() => (tenantInfo.connected ? "validating" : "idle"));
+  // idle | deploying | consent | validating | success | error
+  const [phase, setPhase] = useState(() => (tenantInfo.connected ? "success" : "idle"));
   const [error, setError] = useState(null);
-  const [validationError, setValidationError] = useState(null);
-  const [isStale, setIsStale] = useState(false);
-  const pollRef = useRef(null);
-  const credRef = useRef(null); // { tenantId, graphAccessToken }
 
-  useEffect(() => () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-  }, []);
-
-  // Auto-detect and validate already-connected tenant (once only)
+  // Load existing tenant on mount
   useEffect(() => {
     let isMounted = true;
+    if (tenantInfo.connected) return;
 
-    const validateConnection = async () => {
-      try {
-        // Load tenant list from database
-        const tenants = await listTenants();
+    listTenants()
+      .then((tenants) => {
         if (!isMounted) return;
-
         const active = (Array.isArray(tenants) ? tenants : tenants?.items ?? [])
           .find((t) => t.status === "ACTIVE");
-
-        if (!active) {
-          setPhase("idle");
-          return;
-        }
-
-        // Found ACTIVE tenant in DB - now validate it still exists in Azure
-        try {
-          const graphAccessToken = await getTenantDeploymentToken();
-          if (!isMounted) return;
-
-          // Call validation endpoint to check if app registration exists
-          const validationResult = await validateTenantConsent({
-            tenantId: active.tenant_id,
-            graphAccessToken,
-          });
-
-          if (!isMounted) return;
-
-          // Validation succeeded - connection is real
-          if (validationResult?.status === "ACTIVE") {
-            setTenantInfo({
-              connected: true,
-              tenantId: active.tenant_id,
-              tenantName: active.tenant_name || active.tenant_id,
-            });
-            setPhase("success");
-            setIsStale(false);
-            setValidationError(null);
-          } else {
-            // Validation returned non-ACTIVE status
-            setTenantInfo({
-              connected: true,
-              tenantId: active.tenant_id,
-              tenantName: active.tenant_name || active.tenant_id,
-            });
-            setPhase("success");
-            setIsStale(true);
-            setValidationError("App registration deleted or permissions revoked. Click 'Reconnect' to fix.");
-          }
-        } catch (validationErr) {
-          if (!isMounted) return;
-          // Validation failed - app registration likely deleted
+        if (active) {
           setTenantInfo({
             connected: true,
             tenantId: active.tenant_id,
             tenantName: active.tenant_name || active.tenant_id,
           });
           setPhase("success");
-          setIsStale(true);
-          setValidationError("App registration was deleted from Azure. Click 'Reconnect' to recreate it.");
         }
-      } catch (err) {
-        if (!isMounted) return;
-        setPhase("idle");
-      }
-    };
-
-    validateConnection();
-
+      })
+      .catch(() => {
+        if (isMounted) setPhase("idle");
+      });
     return () => {
       isMounted = false;
     };
-  }, []); // Run only once on mount
+  }, []);
 
-  const startPolling = (tenantId, graphAccessToken) => {
-    let polls = 0;
-    pollRef.current = setInterval(async () => {
-      polls++;
-      if (polls > POLL_MAX) {
-        clearInterval(pollRef.current);
-        setPhase("timeout");
-        return;
-      }
-      try {
-        const result = await validateTenantConsent({ tenantId, graphAccessToken });
-        if (result?.status === "ACTIVE") {
-          clearInterval(pollRef.current);
-          setTenantInfo({
-            connected: true,
-            tenantId,
-            tenantName: result.tenant_name || result.tenantName || tenantId,
-          });
-          setPhase("success");
-        }
-      } catch {
-        // Ignore individual poll errors — keep trying
-      }
-    }, POLL_INTERVAL_MS);
-  };
-
-  const handleConnect = async () => {
-    if (pollRef.current) clearInterval(pollRef.current);
+  // Step 1: Create app registration
+  const handleCreateAppRegistration = async () => {
     setPhase("deploying");
     setError(null);
     try {
       const graphAccessToken = await getTenantDeploymentToken();
-      const tenantId = user.microsoft_tid;
-      credRef.current = { tenantId, graphAccessToken };
-
-      const result = await deployTenantAccess({
-        tenantId,
+      await deployTenantAccess({
+        tenantId: user.microsoft_tid,
         graphAccessToken,
-        redirectUri: `${window.location.origin}/tenant/deployment-success`,
+        redirectUri: window.location.origin,
       });
-
-      if (result?.admin_consent_url) {
-        window.open(result.admin_consent_url, "_blank", "noopener,noreferrer");
-      }
-
-      setPhase("waiting");
-      startPolling(tenantId, graphAccessToken);
+      setPhase("consent");
     } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to start tenant deployment"));
+      setError(getApiErrorMessage(err, "Failed to create app registration"));
       setPhase("error");
     }
   };
 
-  const handleRetry = () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    setPhase("idle");
+  // Step 2: Accept permissions and validate
+  const handleAcceptPermissions = async () => {
+    setPhase("validating");
     setError(null);
+    try {
+      const graphAccessToken = await getTenantDeploymentToken();
+      const result = await validateTenantConsent({
+        tenantId: user.microsoft_tid,
+        graphAccessToken,
+      });
+
+      if (result?.status === "ACTIVE") {
+        setTenantInfo({
+          connected: true,
+          tenantId: result.tenant_id || user.microsoft_tid,
+          tenantName: result.tenant_name || user.microsoft_tid,
+        });
+        setPhase("success");
+      } else {
+        setError("Validation failed. Please try again.");
+        setPhase("consent");
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to validate permissions"));
+      setPhase("consent");
+    }
   };
 
   const isConnected = phase === "success" || tenantInfo.connected;
-  const isBusy = phase === "deploying" || phase === "waiting";
 
   return (
     <div className="space-y-5">
@@ -192,110 +116,115 @@ function Step1({ onNext }) {
         </p>
       </div>
 
-      {/* Phase-driven status cards */}
-      {isConnected && (
-        <div className="space-y-4">
-          {isStale ? (
-            <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
-              <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-[#D13438] font-semibold">Connection is invalid</p>
-                {validationError && <p className="text-xs text-[#D13438] mt-0.5">{validationError}</p>}
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-3 p-4 rounded-lg bg-[#DFF6DD] border border-[#107C10]/20">
-              <Check size={18} className="text-[#107C10] flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-[#107C10] font-semibold">✓ Tenant connected and verified</p>
-            </div>
-          )}
-          <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg p-4 space-y-2">
-            <Row label="Tenant Name" value={tenantInfo.tenantName || tenantInfo.tenantId} />
-            <Row label="Tenant ID"   value={<code className="text-xs font-mono">{tenantInfo.tenantId}</code>} />
-            {isStale && <Row label="Status" value="⚠️ Invalid (needs reconnect)" />}
-          </div>
-        </div>
+      {/* Phase: Idle */}
+      {phase === "idle" && (
+        <Button
+          variant="primary"
+          fullWidth
+          onClick={handleCreateAppRegistration}
+        >
+          <Shield size={16} />
+          Create App Registration
+        </Button>
       )}
 
-      {phase === "waiting" && (
+      {/* Phase: Deploying */}
+      {phase === "deploying" && (
         <div className="flex gap-3 p-4 rounded-lg bg-[#FFF4CE] border border-[#FF8C00]/30">
           <div className="w-2.5 h-2.5 rounded-full bg-[#FF8C00] animate-pulse flex-shrink-0 mt-1" />
-          <p className="text-sm text-[#B45309] font-medium">
-            Waiting for admin consent… Keep this page open.
-          </p>
+          <p className="text-sm text-[#B45309] font-medium">Creating app registration...</p>
         </div>
       )}
 
-      {phase === "error" && (
-        <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
-          <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm text-[#D13438] font-medium">Connection failed</p>
-            {error && <p className="text-xs text-[#D13438] mt-0.5">{error}</p>}
+      {/* Phase: Consent - Show Permissions Inline */}
+      {phase === "consent" && (
+        <div className="space-y-4">
+          <div className="border border-[#E5E7EB] rounded-lg p-4 bg-[#F8F9FA]">
+            <p className="text-sm font-semibold text-[#374151] mb-3">Permissions requested (read-only)</p>
+            <ul className="space-y-2">
+              {PERMISSIONS.map((p) => (
+                <li key={p} className="flex items-center gap-2.5 text-sm text-[#374151]">
+                  <Check size={16} className="text-[#107C10] flex-shrink-0" />
+                  {p}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-[#6B7280] mt-4 pt-4 border-t border-[#E5E7EB]">
+              ✓ We never access email content, file content, or passwords.
+            </p>
           </div>
-        </div>
-      )}
-
-      {phase === "timeout" && (
-        <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
-          <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-[#D13438] font-medium">Consent timed out after 5 minutes</p>
-            <p className="text-xs text-[#6B7280] mt-0.5">Ask your admin to complete consent, then try again.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Action button — shown when not connected or when stale */}
-      {(!isConnected || isStale) && (
-        <div className="border border-[#E5E7EB] rounded-lg p-4 space-y-3">
-          <p className="text-sm font-semibold text-[#374151]">
-            {isStale ? "Reconnect your tenant" : "Connect directly (if you are the admin)"}
-          </p>
           <Button
             variant="primary"
             fullWidth
-            loading={isBusy}
-            onClick={isBusy ? undefined : phase === "error" || phase === "timeout" ? handleRetry : handleConnect}
-            disabled={isBusy}
+            loading={phase === "validating"}
+            onClick={handleAcceptPermissions}
+            disabled={phase === "validating"}
           >
-            {phase === "deploying"
-              ? "Creating app registration…"
-              : phase === "waiting"
-              ? "Waiting for admin consent…"
-              : phase === "error" || phase === "timeout"
-              ? "Try Again"
-              : isStale
-              ? "Reconnect Microsoft 365 Tenant"
-              : "Connect Microsoft 365 Tenant"}
+            {phase === "validating" ? "Processing..." : "Accept & Connect"}
+          </Button>
+          {error && (
+            <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
+              <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[#D13438]">{error}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Phase: Validating */}
+      {phase === "validating" && (
+        <div className="flex gap-3 p-4 rounded-lg bg-[#FFF4CE] border border-[#FF8C00]/30">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#FF8C00] animate-pulse flex-shrink-0 mt-1" />
+          <p className="text-sm text-[#B45309] font-medium">Validating permissions...</p>
+        </div>
+      )}
+
+      {/* Phase: Success */}
+      {phase === "success" && isConnected && (
+        <div className="space-y-4">
+          <div className="flex gap-3 p-4 rounded-lg bg-[#DFF6DD] border border-[#107C10]/20">
+            <Check size={18} className="text-[#107C10] flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[#107C10] font-semibold">✓ Tenant connected and verified</p>
+          </div>
+          <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-3 text-sm">
+              <span className="w-28 text-[#6B7280] flex-shrink-0">Tenant Name</span>
+              <span className="text-[#111827] font-medium">{tenantInfo.tenantName || tenantInfo.tenantId}</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="w-28 text-[#6B7280] flex-shrink-0">Tenant ID</span>
+              <code className="text-xs font-mono text-[#111827]">{tenantInfo.tenantId}</code>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase: Error */}
+      {phase === "error" && (
+        <div className="space-y-3">
+          <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
+            <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-[#D13438] font-medium">Connection failed</p>
+              {error && <p className="text-xs text-[#D13438] mt-0.5">{error}</p>}
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => {
+              setPhase("idle");
+              setError(null);
+            }}
+          >
+            Try Again
           </Button>
         </div>
       )}
 
-      {/* Read-only permissions list */}
-      <div className="border border-[#E5E7EB] rounded-lg p-4">
-        <p className="text-sm font-semibold text-[#374151] mb-3">Permissions requested (read-only)</p>
-        <ul className="space-y-2">
-          {[
-            "Read user accounts and licenses",
-            "Read Teams usage and activity reports",
-            "Read SharePoint site metrics",
-            "Read security and compliance configuration",
-            "Read sign-in logs and audit events",
-          ].map((p) => (
-            <li key={p} className="flex items-center gap-2.5 text-sm text-[#374151]">
-              <Check size={14} className="text-[#107C10] flex-shrink-0" />
-              {p}
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-[#6B7280] mt-3 pt-3 border-t border-[#E5E7EB]">
-          We never access email content, file content, or passwords.
-        </p>
-      </div>
-
+      {/* Review & Launch button */}
       <div className="flex justify-end pt-2">
-        <Button variant="primary" disabled={!isConnected || isStale} onClick={onNext}>
+        <Button variant="primary" disabled={!isConnected} onClick={onNext}>
           Review & Launch <ChevronRight size={16} />
         </Button>
       </div>
@@ -303,17 +232,8 @@ function Step1({ onNext }) {
   );
 }
 
-function Row({ label, value }) {
-  return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="w-28 text-[#6B7280] flex-shrink-0">{label}</span>
-      <span className="text-[#111827] font-medium">{value}</span>
-    </div>
-  );
-}
-
-// ── Step 3: Review & Launch ─────────────────────────────────
-function Step3({ onBack }) {
+// ── Step 2: Review & Launch ─────────────────────────────────
+function Step2({ onBack }) {
   const navigate = useNavigate();
   const toast = useToast();
   const { tenantInfo, selectedModules } = useWizard();
@@ -384,7 +304,7 @@ function WizardInner() {
 
   const stepComponents = [
     <Step1 key={0} onNext={() => setStep(1)} />,
-    <Step3 key={1} onBack={() => setStep(0)} />,
+    <Step2 key={1} onBack={() => setStep(0)} />,
   ];
 
   const titles = [

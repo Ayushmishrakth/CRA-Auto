@@ -137,6 +137,14 @@ export default function ReportsPage() {
                           <Eye size={15} />
                         </button>
                         <button
+                          onClick={() => handleDownload(a.id, a.tenant_name, "docx")}
+                          disabled={downloading[`${a.id}-docx`]}
+                          className="p-1.5 rounded-md text-[#6B7280] hover:bg-[#EFF6FC] hover:text-[#0078D4] transition-colors disabled:opacity-40"
+                          title="Download DOCX"
+                        >
+                          <FileText size={15} />
+                        </button>
+                        <button
                           onClick={() => handleDownload(a.id, a.tenant_name, "pdf")}
                           disabled={downloading[`${a.id}-pdf`]}
                           className="p-1.5 rounded-md text-[#6B7280] hover:bg-[#EFF6FC] hover:text-[#0078D4] transition-colors disabled:opacity-40"

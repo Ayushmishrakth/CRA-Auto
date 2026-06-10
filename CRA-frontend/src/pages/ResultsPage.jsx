@@ -19,6 +19,7 @@ import {
   getAssessmentReport,
   downloadAssessmentReport,
   startAssessment,
+  customizeAssessmentReport,
 } from "../api/assessmentApi";
 
 // ── Domain configuration ─────────────────────────────────────
@@ -1118,6 +1119,7 @@ function ReportModal({ assessmentId, tenantName, onClose }) {
   const [phase, setPhase]             = useState("config");
   const [genProgress, setGenProgress] = useState(0);
   const [genMsg, setGenMsg]           = useState("");
+  const [reportType, setReportType]   = useState("docx");
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
@@ -1151,14 +1153,24 @@ function ReportModal({ assessmentId, tenantName, onClose }) {
       setGenMsg(msg);
     }, 700);
     try {
-      await generateAssessmentReport(assessmentId);
+      const result = await generateAssessmentReport(assessmentId, reportType);
       clearInterval(fakeInterval);
       setGenProgress(85);
       setGenMsg("Finalizing report…");
+
+      // Check if PDF conversion failed but DOCX succeeded
+      if (result.pdf_conversion_error && reportType === "both") {
+        toast.warning(
+          "DOCX report generated successfully. PDF conversion failed. " +
+          "You can download the DOCX report instead."
+        );
+      }
+
       startPolling();
-    } catch {
+    } catch (error) {
       clearInterval(fakeInterval);
-      toast.error("Failed to generate report. Please try again.");
+      const errorMsg = error?.response?.data?.detail || error?.message || "Failed to generate report.";
+      toast.error(errorMsg);
       setPhase("error");
     }
   };
@@ -1202,11 +1214,26 @@ function ReportModal({ assessmentId, tenantName, onClose }) {
       }
     >
       {phase === "config" && (
-        <div className="flex items-start gap-3 p-4 rounded-lg bg-[#EFF6FC]">
-          <FileText size={20} className="text-[#0078D4] mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-[#111827]">PDF Report</p>
-            <p className="text-xs text-[#6B7280]">Professional PDF delivered for this assessment.</p>
+        <div className="space-y-3">
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-[#EFF6FC]">
+            <FileText size={20} className="text-[#0078D4] mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-[#111827]">Report Output</p>
+              <p className="text-xs text-[#6B7280]">DOCX preserves the Word template most reliably. PDF requires Word or LibreOffice conversion.</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-[#374151]" htmlFor="report-type">Output format</label>
+            <select
+              id="report-type"
+              value={reportType}
+              onChange={(event) => setReportType(event.target.value)}
+              className="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#111827]"
+            >
+              <option value="docx">Word DOCX - recommended</option>
+              <option value="pdf">PDF only</option>
+              <option value="both">Word DOCX and PDF</option>
+            </select>
           </div>
         </div>
       )}
@@ -1229,9 +1256,16 @@ function ReportModal({ assessmentId, tenantName, onClose }) {
           </div>
           <h3 className="text-xl font-bold text-[#111827]">Report ready!</h3>
           <div className="flex flex-col gap-2">
-            <Button variant="primary" fullWidth onClick={() => handleDownload("pdf")}>
-              <Download size={16} /> Download PDF
-            </Button>
+            {(reportType === "docx" || reportType === "both") && (
+              <Button variant="primary" fullWidth onClick={() => handleDownload("docx")}>
+                <Download size={16} /> Download DOCX
+              </Button>
+            )}
+            {(reportType === "pdf" || reportType === "both") && (
+              <Button variant={reportType === "pdf" ? "primary" : "secondary"} fullWidth onClick={() => handleDownload("pdf")}>
+                <Download size={16} /> Download PDF
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -1241,8 +1275,12 @@ function ReportModal({ assessmentId, tenantName, onClose }) {
           <div className="w-16 h-16 rounded-full bg-[#FDE7E9] flex items-center justify-center mx-auto">
             <XCircle size={32} className="text-[#D13438]" />
           </div>
-          <h3 className="text-lg font-bold text-[#111827]">Generation failed</h3>
-          <p className="text-sm text-[#6B7280]">Something went wrong. Please try again.</p>
+          <h3 className="text-lg font-bold text-[#111827]">Report generation failed</h3>
+          <p className="text-sm text-[#6B7280]">
+            {reportType === "both"
+              ? "PDF conversion failed. Try selecting 'Word DOCX - recommended' instead."
+              : "An error occurred. Please try again or use a different format."}
+          </p>
         </div>
       )}
     </Modal>
@@ -1263,6 +1301,12 @@ export default function ResultsPage() {
   const [showReport, setShowReport]     = useState(false);
   const [rerunning, setRerunning]       = useState(false);
   const [skippedBanner, setSkippedBanner] = useState(true);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [companyName, setCompanyName] = useState("");
+  const [address, setAddress] = useState("");
+  const [customizing, setCustomizing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1444,11 +1488,14 @@ export default function ResultsPage() {
             </div>
 
             {/* Actions */}
-            <div className="p-4 border-t border-[#E5E7EB] space-y-2">
-              <Button variant="primary" fullWidth onClick={() => setShowReport(true)} disabled={isRunning}>
-                <Download size={15} /> Generate Report
+            <div className="p-4 border-t border-[#E5E7EB] space-y-2 flex flex-col">
+              <Button variant="primary" fullWidth onClick={() => setShowCustomizeModal(true)} className="justify-center h-10 rounded-lg">
+                <FileText size={16} /> Customize & Generate
               </Button>
-              <Button variant="secondary" fullWidth size="sm" loading={rerunning} onClick={handleRerun} disabled={isRunning || rerunning}>
+              <Button variant="secondary" fullWidth size="sm" onClick={() => setShowReport(true)} disabled={isRunning} className="justify-center">
+                <Download size={15} /> Quick Generate
+              </Button>
+              <Button variant="secondary" fullWidth size="sm" loading={rerunning} onClick={handleRerun} disabled={isRunning || rerunning} className="justify-center">
                 <RotateCcw size={14} /> Re-run Assessment
               </Button>
             </div>
@@ -1471,9 +1518,11 @@ export default function ResultsPage() {
           </div>
 
           <div className="lg:hidden mb-4 flex gap-2">
-            <Button variant="primary" fullWidth onClick={() => setShowReport(true)} disabled={isRunning}>
-              <Download size={15} /> Generate Report
-            </Button>
+            <Link to={`/assessments/${assessmentId}/report`} className="flex-1">
+              <Button variant="primary" fullWidth>
+                <FileText size={15} /> Customize
+              </Button>
+            </Link>
             <Button variant="secondary" fullWidth loading={rerunning} onClick={handleRerun} disabled={isRunning || rerunning}>
               <RotateCcw size={14} /> Re-run
             </Button>
@@ -1535,6 +1584,101 @@ export default function ResultsPage() {
           tenantName={tenantName}
           onClose={() => setShowReport(false)}
         />
+      )}
+
+      {showCustomizeModal && (
+        <Modal onClose={() => setShowCustomizeModal(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">📋 Customize Report</h2>
+
+            {/* Logo Upload */}
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2">🎨 Company Logo</label>
+              {logoPreview ? (
+                <div className="border rounded-lg p-3 bg-gray-50 flex items-center justify-between">
+                  <img src={logoPreview} alt="Logo" className="h-12 w-auto" />
+                  <button
+                    onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setLogoFile(file);
+                      const reader = new FileReader();
+                      reader.onload = (event) => setLogoPreview(event.target?.result);
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="w-full text-sm"
+                />
+              )}
+            </div>
+
+            {/* Company Name */}
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-2">🏢 Company Name</label>
+              <input
+                type="text"
+                placeholder="e.g., Acme Corporation"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            {/* Address */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-2">📍 Company Address</label>
+              <textarea
+                placeholder="e.g., 123 Business St, City, State 12345"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 resize-none"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCustomizeModal(false)}
+                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setCustomizing(true);
+                    await customizeAssessmentReport(assessmentId, { logoFile, companyName, address });
+                    setShowCustomizeModal(false);
+                    setLogoFile(null);
+                    setLogoPreview(null);
+                    setCompanyName("");
+                    setAddress("");
+                    setShowReport(true);
+                  } catch (err) {
+                    toast.error(err?.message || "Failed to customize report");
+                  } finally {
+                    setCustomizing(false);
+                  }
+                }}
+                disabled={customizing || (!logoFile && !companyName && !address)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50"
+              >
+                {customizing ? "Applying..." : "Apply & Generate"}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </>
   );

@@ -34,7 +34,7 @@ from app.services.graph_permission_service import (
     REQUIRED_DELEGATED_PERMISSIONS,
     build_required_resource_access,
 )
-from app.services.graph_service_principal_service import ensure_service_principal, get_service_principal
+from app.services.graph_service_principal_service import ensure_service_principal, get_service_principal, get_service_principal_by_app_id
 from app.services.tenant_secret_service import store_client_secret
 from app.utils.datetime_utils import parse_graph_datetime
 from app.utils.logger import logger
@@ -952,6 +952,40 @@ async def validate_admin_consent(
     await _assert_graph_token(client, access_token=graph_access_token, tenant_id=tenant_id)
     _mark_deployment(tenant, step=STEP_DEPLOYMENT_VALIDATION, status=TENANT_STATUS_VALIDATING)
     await db.commit()
+
+    # Re-verify service principal exists and is correct before validation
+    # This handles cases where the stored ID might be stale or incorrect
+    if tenant.app_client_id:
+        try:
+            verified_sp = await get_service_principal(
+                client,
+                service_principal_id=tenant.service_principal_id,
+            )
+            if verified_sp.get("appId") != tenant.app_client_id:
+                _deployment_log(
+                    "SERVICE_PRINCIPAL_APP_ID_MISMATCH",
+                    stored_sp_id=tenant.service_principal_id,
+                    stored_app_client_id=tenant.app_client_id,
+                    graph_sp_app_id=verified_sp.get("appId"),
+                )
+                sp_by_app_id = await get_service_principal_by_app_id(client, app_id=tenant.app_client_id)
+                if sp_by_app_id and sp_by_app_id.get("id") != tenant.service_principal_id:
+                    _deployment_log(
+                        "CORRECTING_SERVICE_PRINCIPAL_ID",
+                        old_sp_id=tenant.service_principal_id,
+                        new_sp_id=sp_by_app_id.get("id"),
+                        app_client_id=tenant.app_client_id,
+                    )
+                    tenant.service_principal_id = sp_by_app_id["id"]
+                    await db.commit()
+        except Exception as exc:
+            if not _is_graph_not_found(exc):
+                raise
+            _deployment_log(
+                "SERVICE_PRINCIPAL_NOT_FOUND_IN_TENANT",
+                stored_sp_id=tenant.service_principal_id,
+                app_client_id=tenant.app_client_id,
+            )
 
     validation = await validate_deployment_with_retry(client, tenant, delay_seconds=10)
     tenant.granted_permissions = {

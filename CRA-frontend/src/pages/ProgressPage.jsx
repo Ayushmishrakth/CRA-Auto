@@ -275,42 +275,6 @@ export default function ProgressPage() {
         )}
       </div>
 
-      {/* Module progress cards */}
-      <div className="space-y-3">
-        {Object.entries(MODULE_DISPLAY_MAP).map(([key, { icon: Icon, color, bg, label }]) => {
-          const state = moduleStates[key] ?? { status: "queued", progress: 0, current_check: "Queued…" };
-          return (
-            <div key={key} className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-sm flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: bg }}>
-                <Icon size={18} style={{ color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-semibold text-[#111827]">{label}</p>
-                  <div className="flex-shrink-0 ml-3">{moduleStatusIcon(state.status)}</div>
-                </div>
-                <p className="text-xs text-[#6B7280] mb-2 truncate">
-                  {state.status === "queued" ? "Queued…" : state.current_check}
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, backgroundColor: "#E5E7EB" }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${state.progress}%`,
-                        backgroundColor: state.status === "completed" ? "#107C10" : color,
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs text-[#9CA3AF] whitespace-nowrap flex-shrink-0">
-                    {state.progress}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

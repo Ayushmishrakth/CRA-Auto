@@ -45,22 +45,23 @@ PALETTE = {
 OUT_TEMPLATE_DIR = Path(__file__).resolve().parents[3] / "out"
 
 
-def render_pdf(path: Path, report: dict[str, Any]) -> Path:
+def render_pdf(path: Path, report: dict[str, Any], customization: dict[str, Any] | None = None) -> Path:
     import reportlab  # noqa: F401 - fail fast when the enterprise PDF engine is unavailable.
 
     path.parent.mkdir(parents=True, exist_ok=True)
+    customization = customization or {}
     if (OUT_TEMPLATE_DIR / "index.html").exists():
-        return _render_exact_out_template(path, report, OUT_TEMPLATE_DIR)
-    return _render_reportlab(path, report)
+        return _render_exact_out_template(path, report, OUT_TEMPLATE_DIR, customization=customization)
+    return _render_reportlab(path, report, customization=customization)
 
 
-def _render_exact_out_template(path: Path, report: dict[str, Any], template_dir: Path) -> Path:
+def _render_exact_out_template(path: Path, report: dict[str, Any], template_dir: Path, customization: dict[str, Any] | None = None) -> Path:
     html_path = path.with_suffix(".html")
     _copy_out_template_assets(template_dir, html_path.parent)
     html_path.write_text(_build_exact_template_html(report, template_dir), encoding="utf-8")
     browser = _browser_executable()
     if browser is None:
-        return _render_out_template_reportlab(path, report, template_dir)
+        return _render_out_template_reportlab(path, report, template_dir, customization=customization)
     _print_html_to_pdf(browser, html_path, path)
     return path
 
@@ -249,7 +250,7 @@ def _slug(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", text)
 
 
-def _render_out_template_reportlab(path: Path, report: dict[str, Any], template_dir: Path) -> Path:
+def _render_out_template_reportlab(path: Path, report: dict[str, Any], template_dir: Path, customization: dict[str, Any] | None = None) -> Path:
     from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -291,12 +292,13 @@ def _render_out_template_reportlab(path: Path, report: dict[str, Any], template_
         ),
     ])
 
+    customization = customization or {}
     summary = report["summary"]
     rows = report.get("parameter_rows") or []
     story: list[Any] = []
 
     # Page 1 — Cover
-    _out_cover(story, styles, summary, template_dir)
+    _out_cover(story, styles, summary, template_dir, customization=customization)
     story.append(PageBreak())
 
     # Page 2 — Table of Contents
@@ -472,11 +474,13 @@ def _out_template_evaluation_summary(story: list[Any], styles, rows: list[dict[s
     story.append(tbl)
 
 
-def _out_cover(story: list[Any], styles, summary: dict[str, Any], template_dir: Path) -> None:
+def _out_cover(story: list[Any], styles, summary: dict[str, Any], template_dir: Path, customization: dict[str, Any] | None = None) -> None:
     from reportlab.lib.colors import HexColor
     from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.styles import ParagraphStyle
-    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, Image
+
+    customization = customization or {}
 
     accent = _out_image(template_dir / "3.png", width=112)
     customer = _customer_label(summary)
@@ -554,14 +558,56 @@ def _out_cover(story: list[Any], styles, summary: dict[str, Any], template_dir: 
         "This report summarizes validated assessment evidence and prioritized readiness gaps for executive review.",
         styles["TemplateMuted"],
     )
-    story.extend([
+
+    # Build logo and company/address section if provided
+    logo_and_address_items: list[Any] = []
+    if customization.get("logo_path"):
+        try:
+            from pathlib import Path
+            logo_path = Path(customization["logo_path"])
+            if logo_path.exists():
+                logo_image = Image(str(logo_path), width=100, height=70, kind="proportional")
+                logo_and_address_items.append(logo_image)
+                logo_and_address_items.append(Spacer(1, 8))
+        except Exception:
+            pass
+
+    if customization.get("company_name"):
+        logo_and_address_items.append(Paragraph(
+            f"<b>{_escape(customization['company_name'])}</b>",
+            styles["TemplateSubtitle"],
+        ))
+        logo_and_address_items.append(Spacer(1, 4))
+
+    if customization.get("address"):
+        address_text = customization["address"].replace("\n", "<br/>")
+        logo_and_address_items.append(Paragraph(
+            address_text,
+            styles["TemplateSmall"],
+        ))
+        logo_and_address_items.append(Spacer(1, 8))
+
+    story_items = [
         Spacer(1, 56),
         hero,
         Spacer(1, 28),
+    ]
+
+    # Add logo/company/address section if any item exists
+    if logo_and_address_items:
+        story_items.append(Table(
+            [[logo_and_address_items]],
+            colWidths=[475],
+        ))
+        story_items.append(Spacer(1, 14))
+
+    story_items.extend([
         prepared,
         Spacer(1, 14),
         note,
     ])
+
+    story.extend(story_items)
 
 
 def _out_dashboard(story: list[Any], styles, summary: dict[str, Any], rows: list[dict[str, Any]]) -> None:
@@ -828,13 +874,14 @@ def _rows_by_service(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any
     return {service: grouped[service] for service in order if grouped.get(service)}
 
 
-def _render_reportlab(path: Path, report: dict[str, Any]) -> Path:
+def _render_reportlab(path: Path, report: dict[str, Any], customization: dict[str, Any] | None = None) -> Path:
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.platypus import BaseDocTemplate, Frame, NextPageTemplate, PageBreak, PageTemplate, Paragraph, Spacer
 
+    customization = customization or {}
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="Small", parent=styles["BodyText"], fontSize=7.5, leading=9.5))
     styles.add(ParagraphStyle(name="Fine", parent=styles["BodyText"], fontSize=6.5, leading=8))
@@ -850,6 +897,10 @@ def _render_reportlab(path: Path, report: dict[str, Any]) -> Path:
     margin_top = 46
     margin_bottom = 34
     doc = BaseDocTemplate(str(path), pagesize=portrait)
+
+    # Store customization in doc for use in callbacks
+    doc.customization = customization
+
     doc.addPageTemplates([
         PageTemplate(
             id="Cover",
@@ -877,7 +928,7 @@ def _render_reportlab(path: Path, report: dict[str, Any]) -> Path:
     service_summary = _service_summary(rows)
     story: list[Any] = []
 
-    _cover_page(story, styles, summary)
+    _cover_page(story, styles, summary, customization)
     story.append(NextPageTemplate("Portrait"))
     story.append(PageBreak())
     _table_of_contents(story, styles)
@@ -907,13 +958,18 @@ def _render_reportlab(path: Path, report: dict[str, Any]) -> Path:
     return path
 
 
-def _cover_page(story: list[Any], styles, summary: dict[str, Any]) -> None:
+def _cover_page(story: list[Any], styles, summary: dict[str, Any], customization: dict[str, Any] | None = None) -> None:
+    customization = customization or {}
     customer = _customer_label(summary)
+    prepared_by = customization.get("company_name") or "CRA Platform"
     story.append(_CoverPageFlowable(
         customer=customer,
         tenant=_tenant_label(summary, customer),
         date=str(summary.get("assessment_date") or "DD-MM-YYYY"),
-        prepared_by="CRA Platform",
+        prepared_by=prepared_by,
+        logo_path=customization.get("logo_path"),
+        company_name=customization.get("company_name"),
+        address=customization.get("address"),
     ))
 
 
@@ -1606,8 +1662,24 @@ def _section(story: list[Any], styles, title: str) -> None:
 
 
 def _page_header_footer(canvas, doc) -> None:
+    from pathlib import Path
+
     canvas.saveState()
     width, height = doc.pagesize
+
+    # Draw logo in header if available
+    customization = getattr(doc, "customization", {}) or {}
+    logo_path = customization.get("logo_path")
+    if logo_path:
+        try:
+            logo_file = Path(logo_path)
+            if logo_file.exists():
+                # Draw small logo on left side of header, max height 35px
+                canvas.drawImage(str(logo_file), 34, height - 45, height=35, width=35, preserveAspectRatio=True)
+        except Exception:
+            # Silently skip if logo can't be loaded
+            pass
+
     canvas.setStrokeColor(_color("border"))
     canvas.setLineWidth(0.4)
     canvas.line(34, 30, width - 34, 30)
@@ -1656,12 +1728,25 @@ def _card_grid(cards: list[tuple[Any, Any, str]], styles, *, columns: int):
 
 
 class _CoverPageFlowable(Flowable):
-    def __init__(self, *, customer: str, tenant: str, date: str, prepared_by: str) -> None:
+    def __init__(
+        self,
+        *,
+        customer: str,
+        tenant: str,
+        date: str,
+        prepared_by: str,
+        logo_path: str | None = None,
+        company_name: str | None = None,
+        address: str | None = None,
+    ) -> None:
         super().__init__()
         self.customer = customer
         self.tenant = tenant
         self.date = date
         self.prepared_by = prepared_by
+        self.logo_path = logo_path
+        self.company_name = company_name
+        self.address = address
         self.width = 520
         self.height = 742
 
@@ -1674,10 +1759,46 @@ class _CoverPageFlowable(Flowable):
         canvas.saveState()
         canvas.translate(x, y)
         self._draw_background(canvas)
+        self._draw_custom_logo_and_address(canvas)
         self._draw_title(canvas)
         self._draw_copilot_mark(canvas)
         self._draw_document_art(canvas)
         canvas.restoreState()
+
+    def _draw_custom_logo_and_address(self, canvas) -> None:
+        from pathlib import Path
+
+        # Draw logo and company info at top of cover page if provided
+        y_pos = self.height - 30
+
+        # Draw logo if available
+        if self.logo_path:
+            try:
+                logo_path = Path(self.logo_path)
+                if logo_path.exists():
+                    # Draw logo with max width of 150px and proportional height
+                    max_width = 150
+                    canvas.drawImage(str(logo_path), 24, y_pos - 60, width=max_width, height=60, preserveAspectRatio=True)
+                    y_pos -= 70
+            except Exception:
+                # Silently skip if logo can't be loaded
+                pass
+
+        # Draw company name if provided
+        if self.company_name:
+            canvas.setFillColor(_white())
+            canvas.setFont("Helvetica-Bold", 14)
+            canvas.drawString(24, y_pos, self.company_name)
+            y_pos -= 20
+
+        # Draw address if provided
+        if self.address:
+            canvas.setFillColor(_white())
+            canvas.setFont("Helvetica", 9)
+            # Split address into lines if it contains newlines
+            for line in self.address.split("\n"):
+                canvas.drawString(24, y_pos, line)
+                y_pos -= 14
 
     def _draw_background(self, canvas) -> None:
         from reportlab.lib import colors

@@ -3,8 +3,15 @@ Report API schemas.
 """
 
 from uuid import UUID
+from typing import Optional
 
 from pydantic import BaseModel
+
+
+class ReportCustomizationRequest(BaseModel):
+    logo_path: Optional[str] = None
+    address: Optional[str] = None
+    company_name: Optional[str] = None
 
 
 class ReportResponse(BaseModel):

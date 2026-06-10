@@ -1,0 +1,151 @@
+{
+  "client_name": "WealthScape",
+  "tenant_name": "WealthScape",
+  "report_date": "2026-06-10",
+  "readiness_level": "Not Ready",
+  "pass_count": 7,
+  "fail_count": 58,
+  "gaps_count": 44,
+  "total_params": 65,
+  "pass_percentage": "10.66",
+  "security_fail_pct": "68",
+  "governance_fail_pct": "70",
+  "bestpractice_fail_pct": "67",
+  "eligible_users": "0",
+  "total_users": "14",
+  "onedrive_active_pct": "0",
+  "teams_active_pct": "0",
+  "outlook_active_pct": "75",
+  "sharepoint_active_pct": "0",
+  "pillars": {
+    "Security": 34,
+    "Best Practices": 51,
+    "Governance": 15
+  },
+  "services_distribution": {
+    "EntraID": 31,
+    "ExchangeOnline": 11,
+    "MicrosoftPurview": 14,
+    "MicrosoftTeams": 23,
+    "OneDrive": 6,
+    "SharePointOnline": 14
+  },
+  "risk_counts": {
+    "Critical": 18,
+    "High": 17,
+    "Medium": 18,
+    "Low": 5,
+    "Informational": 42
+  },
+  "licenses": [
+    {"name": "E5", "count": 14}
+  ],
+  "user_info_fields": {
+    "First Name": {"added": 0, "not_added": 1},
+    "Last Name": {"added": 0, "not_added": 1},
+    "Job Title": {"added": 0, "not_added": 1},
+    "Department": {"added": 0, "not_added": 1},
+    "Manager": {"added": 0, "not_added": 1},
+    "City": {"added": 0, "not_added": 1},
+    "Country": {"added": 0, "not_added": 1},
+    "Office Location": {"added": 0, "not_added": 1}
+  },
+  "usage": {
+    "SharePoint": {"active": 0, "inactive": 4},
+    "OneDrive": {"active": 0, "inactive": 4},
+    "Teams": {"active": 0, "inactive": 4},
+    "Outlook": {"active": 3, "inactive": 1}
+  },
+  "service_pillar_matrix": {
+    "fail": {
+      "EntraID_BestPractice": 4,
+      "ExchangeOnline_BestPractice": 1,
+      "SharePoint_BestPractice": 1,
+      "Teams_BestPractice": 2,
+      "EntraID_Governance": 2,
+      "ExchangeOnline_Governance": 3,
+      "Purview_Governance": 2,
+      "Teams_Governance": 7,
+      "OneDrive_Governance": 1,
+      "SharePoint_Governance": 6,
+      "EntraID_Security": 2,
+      "ExchangeOnline_Security": 2,
+      "Purview_Security": 1,
+      "Teams_Security": 1,
+      "OneDrive_Security": 1,
+      "SharePoint_Security": 1
+    },
+    "pass": {
+      "EntraID_BestPractice": 2,
+      "ExchangeOnline_BestPractice": 3,
+      "SharePoint_BestPractice": 1,
+      "Teams_BestPractice": 1,
+      "EntraID_Governance": 1,
+      "ExchangeOnline_Governance": 1,
+      "Purview_Governance": 8,
+      "Teams_Governance": 2,
+      "OneDrive_Governance": 2,
+      "SharePoint_Governance": 3,
+      "EntraID_Security": 1,
+      "ExchangeOnline_Security": 1,
+      "Purview_Security": 1,
+      "Teams_Security": 3,
+      "OneDrive_Security": 1,
+      "SharePoint_Security": 1
+    }
+  },
+  "severity_pillar_matrix": {
+    "Informational": {
+      "BestPractice_fail": 2,
+      "Governance_fail": 2,
+      "Security_fail": 0,
+      "BestPractice_pass": 0,
+      "Governance_pass": 0,
+      "Security_pass": 0
+    },
+    "Low": {
+      "BestPractice_fail": 1,
+      "Governance_fail": 1,
+      "Security_fail": 1,
+      "BestPractice_pass": 0,
+      "Governance_pass": 0,
+      "Security_pass": 0
+    },
+    "Medium": {
+      "BestPractice_fail": 2,
+      "Governance_fail": 3,
+      "Security_fail": 4,
+      "BestPractice_pass": 3,
+      "Governance_pass": 5,
+      "Security_pass": 1
+    },
+    "High": {
+      "BestPractice_fail": 2,
+      "Governance_fail": 3,
+      "Security_fail": 6,
+      "BestPractice_pass": 3,
+      "Governance_pass": 4,
+      "Security_pass": 0
+    },
+    "Critical": {
+      "BestPractice_fail": 3,
+      "Governance_fail": 2,
+      "Security_fail": 1,
+      "BestPractice_pass": 2,
+      "Governance_pass": 9,
+      "Security_pass": 4
+    }
+  },
+  "parameters": {
+    "Custom Banned Password List": {
+      "status": "Fail",
+      "severity": "Critical",
+      "description": "Enabled: No; Custom Word Count: 0; Configured: No"
+    },
+    "Emergency Access Accounts": {
+      "status": "Fail",
+      "severity": "Critical",
+      "description": "Emergency Access Accounts: 0; Cap Exclusion Count: 0"
+    }
+  }
+}

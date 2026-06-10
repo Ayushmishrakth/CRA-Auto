@@ -13,7 +13,7 @@ import { startAssessment } from "../api/assessmentApi";
 import { deployTenantAccess, listTenants, validateTenantConsent } from "../api/tenantApi";
 import { getApiErrorMessage } from "../utils/apiErrors";
 
-const STEPS = ["Connect Tenant", "Configure", "Review & Launch"];
+const STEPS = ["Connect Tenant", "Review & Launch"];
 
 const MODULES = [
   { key: "identity",   icon: Shield,     color: "#0078D4", bg: "#EFF6FC", label: "Identity & Access",    desc: "MFA, Conditional Access, guest users, SSPR" },
@@ -31,9 +31,11 @@ const POLL_MAX = 100; // ~5 minutes
 function Step1({ onNext }) {
   const { user, getTenantDeploymentToken } = useAuth();
   const { tenantInfo, setTenantInfo } = useWizard();
-  // idle | deploying | waiting | success | error | timeout
-  const [phase, setPhase] = useState(() => (tenantInfo.connected ? "success" : "idle"));
+  // idle | deploying | waiting | success | error | timeout | validating
+  const [phase, setPhase] = useState(() => (tenantInfo.connected ? "validating" : "idle"));
   const [error, setError] = useState(null);
+  const [validationError, setValidationError] = useState(null);
+  const [isStale, setIsStale] = useState(false);
   const pollRef = useRef(null);
   const credRef = useRef(null); // { tenantId, graphAccessToken }
 
@@ -41,24 +43,82 @@ function Step1({ onNext }) {
     if (pollRef.current) clearInterval(pollRef.current);
   }, []);
 
-  // Auto-detect already-connected tenant — skip MSAL deploy if status is ACTIVE
+  // Auto-detect and validate already-connected tenant (once only)
   useEffect(() => {
-    if (tenantInfo.connected) return;
-    listTenants()
-      .then((tenants) => {
+    let isMounted = true;
+
+    const validateConnection = async () => {
+      try {
+        // Load tenant list from database
+        const tenants = await listTenants();
+        if (!isMounted) return;
+
         const active = (Array.isArray(tenants) ? tenants : tenants?.items ?? [])
           .find((t) => t.status === "ACTIVE");
-        if (active) {
+
+        if (!active) {
+          setPhase("idle");
+          return;
+        }
+
+        // Found ACTIVE tenant in DB - now validate it still exists in Azure
+        try {
+          const graphAccessToken = await getTenantDeploymentToken();
+          if (!isMounted) return;
+
+          // Call validation endpoint to check if app registration exists
+          const validationResult = await validateTenantConsent({
+            tenantId: active.tenant_id,
+            graphAccessToken,
+          });
+
+          if (!isMounted) return;
+
+          // Validation succeeded - connection is real
+          if (validationResult?.status === "ACTIVE") {
+            setTenantInfo({
+              connected: true,
+              tenantId: active.tenant_id,
+              tenantName: active.tenant_name || active.tenant_id,
+            });
+            setPhase("success");
+            setIsStale(false);
+            setValidationError(null);
+          } else {
+            // Validation returned non-ACTIVE status
+            setTenantInfo({
+              connected: true,
+              tenantId: active.tenant_id,
+              tenantName: active.tenant_name || active.tenant_id,
+            });
+            setPhase("success");
+            setIsStale(true);
+            setValidationError("App registration deleted or permissions revoked. Click 'Reconnect' to fix.");
+          }
+        } catch (validationErr) {
+          if (!isMounted) return;
+          // Validation failed - app registration likely deleted
           setTenantInfo({
             connected: true,
             tenantId: active.tenant_id,
             tenantName: active.tenant_name || active.tenant_id,
           });
           setPhase("success");
+          setIsStale(true);
+          setValidationError("App registration was deleted from Azure. Click 'Reconnect' to recreate it.");
         }
-      })
-      .catch(() => {}); // Ignore errors — user can still manually connect
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      } catch (err) {
+        if (!isMounted) return;
+        setPhase("idle");
+      }
+    };
+
+    validateConnection();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Run only once on mount
 
   const startPolling = (tenantId, graphAccessToken) => {
     let polls = 0;
@@ -135,13 +195,24 @@ function Step1({ onNext }) {
       {/* Phase-driven status cards */}
       {isConnected && (
         <div className="space-y-4">
-          <div className="flex gap-3 p-4 rounded-lg bg-[#DFF6DD] border border-[#107C10]/20">
-            <Check size={18} className="text-[#107C10] flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-[#107C10] font-semibold">✓ Tenant connected successfully</p>
-          </div>
+          {isStale ? (
+            <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
+              <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-[#D13438] font-semibold">Connection is invalid</p>
+                {validationError && <p className="text-xs text-[#D13438] mt-0.5">{validationError}</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 p-4 rounded-lg bg-[#DFF6DD] border border-[#107C10]/20">
+              <Check size={18} className="text-[#107C10] flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-[#107C10] font-semibold">✓ Tenant connected and verified</p>
+            </div>
+          )}
           <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg p-4 space-y-2">
             <Row label="Tenant Name" value={tenantInfo.tenantName || tenantInfo.tenantId} />
             <Row label="Tenant ID"   value={<code className="text-xs font-mono">{tenantInfo.tenantId}</code>} />
+            {isStale && <Row label="Status" value="⚠️ Invalid (needs reconnect)" />}
           </div>
         </div>
       )}
@@ -175,10 +246,12 @@ function Step1({ onNext }) {
         </div>
       )}
 
-      {/* Action button — hidden when connected */}
-      {!isConnected && (
+      {/* Action button — shown when not connected or when stale */}
+      {(!isConnected || isStale) && (
         <div className="border border-[#E5E7EB] rounded-lg p-4 space-y-3">
-          <p className="text-sm font-semibold text-[#374151]">Connect directly (if you are the admin)</p>
+          <p className="text-sm font-semibold text-[#374151]">
+            {isStale ? "Reconnect your tenant" : "Connect directly (if you are the admin)"}
+          </p>
           <Button
             variant="primary"
             fullWidth
@@ -192,6 +265,8 @@ function Step1({ onNext }) {
               ? "Waiting for admin consent…"
               : phase === "error" || phase === "timeout"
               ? "Try Again"
+              : isStale
+              ? "Reconnect Microsoft 365 Tenant"
               : "Connect Microsoft 365 Tenant"}
           </Button>
         </div>
@@ -220,8 +295,8 @@ function Step1({ onNext }) {
       </div>
 
       <div className="flex justify-end pt-2">
-        <Button variant="primary" disabled={!isConnected} onClick={onNext}>
-          Continue <ChevronRight size={16} />
+        <Button variant="primary" disabled={!isConnected || isStale} onClick={onNext}>
+          Review & Launch <ChevronRight size={16} />
         </Button>
       </div>
     </div>
@@ -237,62 +312,6 @@ function Row({ label, value }) {
   );
 }
 
-// ── Step 2: Configure modules ───────────────────────────────
-function Step2({ onNext, onBack }) {
-  const { selectedModules, toggleModule } = useWizard();
-  const count = Object.values(selectedModules).filter(Boolean).length;
-  const estMins = Math.max(1, Math.ceil(count * 0.67));
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-[#6B7280]">Choose which areas to include in this assessment.</p>
-        <span className="text-sm font-semibold text-[#0078D4]">{count} of 6 selected</span>
-      </div>
-
-      <div className="space-y-2">
-        {MODULES.map(({ key, icon: Icon, color, bg, label, desc }) => {
-          const on = selectedModules[key];
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => toggleModule(key)}
-              className={["module-card w-full text-left", on ? "active" : ""].join(" ")}
-            >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: bg }}>
-                <Icon size={18} style={{ color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#111827]">{label}</p>
-                <p className="text-xs text-[#6B7280] mt-0.5">{desc}</p>
-              </div>
-              <label className="toggle-switch flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                <input type="checkbox" checked={on} onChange={() => toggleModule(key)} />
-                <span className="toggle-track" />
-              </label>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-[#F8F9FA] border border-[#E5E7EB]">
-        <Clock size={16} className="text-[#6B7280]" />
-        <p className="text-sm text-[#6B7280]">
-          Estimated time: <strong className="text-[#111827]">~{estMins} minute{estMins !== 1 ? "s" : ""}</strong>
-        </p>
-      </div>
-
-      <div className="flex justify-between pt-2">
-        <Button variant="ghost" onClick={onBack}><ChevronLeft size={16} /> Back</Button>
-        <Button variant="primary" disabled={count === 0} onClick={onNext}>
-          Continue <ChevronRight size={16} />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ── Step 3: Review & Launch ─────────────────────────────────
 function Step3({ onBack }) {
   const navigate = useNavigate();
@@ -300,8 +319,7 @@ function Step3({ onBack }) {
   const { tenantInfo, selectedModules } = useWizard();
   const [launching, setLaunching] = useState(false);
 
-  const activeModules = MODULES.filter((m) => selectedModules[m.key]);
-  const count = activeModules.length;
+  const count = Object.values(selectedModules).filter(Boolean).length;
   const estMins = Math.max(1, Math.ceil(count * 0.67));
 
   const handleLaunch = async () => {
@@ -325,25 +343,6 @@ function Step3({ onBack }) {
         </div>
         <p className="text-sm text-[#6B7280] ml-6">{tenantInfo.tenantName || tenantInfo.tenantId}</p>
         <p className="text-xs font-mono text-[#9CA3AF] ml-6 mt-0.5">{tenantInfo.tenantId}</p>
-      </div>
-
-      {/* Modules */}
-      <div className="border border-[#E5E7EB] rounded-lg p-4">
-        <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wide mb-3">
-          Modules — {count} selected
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {activeModules.map((m) => (
-            <span
-              key={m.key}
-              className="flex items-center gap-1.5 text-xs font-semibold text-white px-2.5 py-1 rounded-full"
-              style={{ backgroundColor: m.color }}
-            >
-              <m.icon size={12} />
-              {m.label}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* Time estimate */}
@@ -385,13 +384,11 @@ function WizardInner() {
 
   const stepComponents = [
     <Step1 key={0} onNext={() => setStep(1)} />,
-    <Step2 key={1} onNext={() => setStep(2)} onBack={() => setStep(0)} />,
-    <Step3 key={2} onBack={() => setStep(1)} />,
+    <Step3 key={1} onBack={() => setStep(0)} />,
   ];
 
   const titles = [
     { title: "Connect Microsoft 365 Tenant", subtitle: "Securely connect to your customer's Microsoft 365 environment." },
-    { title: "Select Assessment Modules",    subtitle: "Choose which areas to include in this assessment." },
     { title: "Review & Launch Assessment",   subtitle: "Confirm all details before starting." },
   ];
 

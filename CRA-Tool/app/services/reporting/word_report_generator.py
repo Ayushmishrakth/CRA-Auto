@@ -152,6 +152,15 @@ def render_word_report(
 
     _enable_field_update(doc)
     doc.save(path)
+
+    # Update native chart caches safely - skip if it fails to avoid corrupting the DOCX
+    try:
+        _update_native_chart_caches(path, rows, summary)
+    except Exception as exc:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Chart cache update failed (report still usable): {exc}")
+
     _validate_docx(path)
     return path
 
@@ -668,6 +677,264 @@ def _chart_block(doc, title: str, values: dict[str, int], inches_module: Any) ->
     _table(doc, ["Category", "Count"], list(filtered.items()))
     image = _bar_chart_png(filtered)
     doc.add_picture(image, width=inches_module(5.8))
+
+
+def _update_native_chart_caches(path: Path, rows: list[dict[str, Any]], summary: dict[str, Any]) -> None:
+    """Update native Word chart caches preserved from the sample DOCX template.
+
+    python-docx intentionally does not expose chart editing APIs. The template contains
+    native Office charts, so we update their cached OOXML values directly instead of
+    leaving stale sample numbers in the generated report.
+
+    CRITICAL: Preserve ZIP metadata (compress_type) when rewriting files to avoid
+    corruption that Microsoft Word will reject.
+    """
+    payloads = _native_chart_payloads(rows, summary)
+    if not payloads:
+        return
+
+    tmp_path = path.with_suffix(".charts.tmp.docx")
+    try:
+        with zipfile.ZipFile(path, "r") as source:
+            # First check if any charts actually exist in the DOCX
+            existing_charts = {name for name in source.namelist() if name.startswith("word/charts/chart")}
+            if not existing_charts:
+                # No charts to update - template doesn't have them
+                return
+
+        # Now repack with modifications
+        with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                payload = payloads.get(item.filename)
+
+                if payload is not None:
+                    try:
+                        data = _render_chart_xml(data, payload)
+                    except Exception as chart_exc:
+                        # If chart update fails for this specific chart, skip it and use original
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Chart update failed for {item.filename}, using original: {chart_exc}")
+
+                # CRITICAL: Preserve compress_type to maintain ZIP integrity
+                target.writestr(item, data, compress_type=item.compress_type)
+
+        tmp_path.replace(path)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to update chart caches in DOCX: {exc}") from exc
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def _native_chart_payloads(rows: list[dict[str, Any]], summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    status_counts = _status_counter(rows)
+    pass_count = status_counts.get("PASS", 0)
+    not_pass_count = max(0, len(rows) - pass_count)
+
+    pillar_order = ["Security", "Best Practice", "Governance"]
+    service_order = [
+        "Entra ID",
+        "Exchange Online",
+        "Microsoft Purview",
+        "Microsoft Teams",
+        "OneDrive for Business",
+        "SharePoint Online",
+    ]
+    severity_order = ["Critical", "High", "Medium", "Low", "Informational"]
+
+    service_pillar_pairs = [
+        ("Best Practice", "Entra ID"),
+        ("Best Practice", "Exchange Online"),
+        ("Best Practice", "SharePoint Online"),
+        ("Best Practice", "Microsoft Teams"),
+        ("Governance", "Entra ID"),
+        ("Governance", "Exchange Online"),
+        ("Governance", "Microsoft Purview"),
+        ("Governance", "Microsoft Teams"),
+        ("Governance", "OneDrive for Business"),
+        ("Governance", "SharePoint Online"),
+        ("Security", "Entra ID"),
+        ("Security", "Exchange Online"),
+        ("Security", "Microsoft Purview"),
+        ("Security", "Microsoft Teams"),
+        ("Security", "OneDrive for Business"),
+        ("Security", "SharePoint Online"),
+    ]
+    status_pillar_pairs = [
+        ("Best Practice", "Fail"),
+        ("Best Practice", "Pass"),
+        ("Governance", "Fail"),
+        ("Governance", "Pass"),
+        ("Security", "Fail"),
+        ("Security", "Pass"),
+    ]
+
+    def rows_for(*, pillar: str | None = None, service: str | None = None) -> list[dict[str, Any]]:
+        result = rows
+        if pillar is not None:
+            result = [row for row in result if _pillar_label(row) == pillar]
+        if service is not None:
+            result = [row for row in result if _service_name(row) == service]
+        return result
+
+    def pass_fail_counts(items: list[dict[str, Any]]) -> tuple[int, int]:
+        passed = len([row for row in items if _status_label(row) == "PASS"])
+        return passed, max(0, len(items) - passed)
+
+    pillar_counts = {pillar: len(rows_for(pillar=pillar)) for pillar in pillar_order}
+    service_counts = {service: len(rows_for(service=service)) for service in service_order}
+    severity_counts = Counter(_severity_label(row) for row in rows)
+    licensing_counts = _licensing_chart_counts(rows, summary)
+    user_info = _user_profile_chart_counts(rows)
+
+    chart5_fail: list[int] = []
+    chart5_pass: list[int] = []
+    for pillar, service in service_pillar_pairs:
+        passed, failed = pass_fail_counts(rows_for(pillar=pillar, service=service))
+        chart5_fail.append(failed)
+        chart5_pass.append(passed)
+
+    chart6 = {severity: [] for severity in severity_order}
+    for pillar, status in status_pillar_pairs:
+        items = rows_for(pillar=pillar)
+        for severity in severity_order:
+            matching = [
+                row for row in items
+                if _severity_label(row) == severity
+                and (("Pass" if _status_label(row) == "PASS" else "Fail") == status)
+            ]
+            chart6[severity].append(len(matching))
+
+    return {
+        "word/charts/chart1.xml": {"categories": pillar_order, "series": [("3 Pillars of CRA", [pillar_counts[name] for name in pillar_order])]},
+        "word/charts/chart2.xml": {"categories": service_order, "series": [("Services", [service_counts[name] for name in service_order])]},
+        "word/charts/chart3.xml": {"categories": severity_order, "series": [("Risk-wise Parameters", [severity_counts.get(name, 0) for name in severity_order])]},
+        "word/charts/chart4.xml": {"categories": ["Readiness"], "series": [("Pass", [pass_count]), ("Fail", [not_pass_count])]},
+        "word/charts/chart5.xml": {"series": [("Fail", chart5_fail), ("Pass", chart5_pass)]},
+        "word/charts/chart6.xml": {"series": [(severity, chart6[severity]) for severity in severity_order]},
+        "word/charts/chart7.xml": {"categories": list(licensing_counts), "series": [("Count", list(licensing_counts.values()))]},
+        "word/charts/chart8.xml": {"categories": list(user_info), "series": [("Added", [value[0] for value in user_info.values()]), ("Missing", [value[1] for value in user_info.values()])]},
+        "word/charts/chart9.xml": {"categories": ["Active", "Inactive"], "series": [("SharePoint", _active_inactive_counts(rows, "SharePoint Online"))]},
+        "word/charts/chart10.xml": {"categories": ["Active", "Inactive"], "series": [("OneDrive", _active_inactive_counts(rows, "OneDrive for Business"))]},
+        "word/charts/chart11.xml": {"categories": ["Active", "Inactive"], "series": [("Teams", _active_inactive_counts(rows, "Microsoft Teams"))]},
+        "word/charts/chart12.xml": {"categories": ["Active", "Inactive"], "series": [("Outlook", _active_inactive_counts(rows, "Exchange Online"))]},
+    }
+
+
+def _render_chart_xml(data: bytes, payload: dict[str, Any]) -> bytes:
+    ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+    ET.register_namespace("c", ns["c"])
+    ET.register_namespace("a", "http://schemas.openxmlformats.org/drawingml/2006/main")
+    ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
+
+    try:
+        root = ET.fromstring(data)
+        series_nodes = root.findall(".//c:ser", ns)
+        categories = payload.get("categories")
+
+        for index, (series_name, values) in enumerate(payload.get("series") or []):
+            if index >= len(series_nodes):
+                break
+            series = series_nodes[index]
+            _set_chart_series_name(series, str(series_name), ns)
+            _set_chart_values(series, [int(value or 0) for value in values], ns)
+            if categories is not None:
+                _set_chart_categories(series, [str(value) for value in categories], ns)
+
+        # Use proper XML serialization with all namespaces preserved
+        result = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+        # Ensure the result is valid bytes without double declaration
+        if isinstance(result, str):
+            result = result.encode("utf-8")
+
+        return result
+    except Exception as exc:
+        raise ValueError(f"Failed to render chart XML: {exc}") from exc
+
+
+def _set_chart_series_name(series: Any, name: str, ns: dict[str, str]) -> None:
+    for value in series.findall(".//c:tx//c:v", ns):
+        value.text = name
+
+
+def _set_chart_values(series: Any, values: list[int], ns: dict[str, str]) -> None:
+    cache = series.find(".//c:val/c:numRef/c:numCache", ns)
+    if cache is None:
+        cache = series.find(".//c:val/c:numLit", ns)
+    if cache is None:
+        return
+    _replace_cache_points(cache, values, ns, numeric=True)
+
+
+def _set_chart_categories(series: Any, categories: list[str], ns: dict[str, str]) -> None:
+    cache = series.find(".//c:cat/c:strRef/c:strCache", ns)
+    if cache is None:
+        cache = series.find(".//c:cat/c:strLit", ns)
+    if cache is None:
+        return
+    _replace_cache_points(cache, categories, ns, numeric=False)
+
+
+def _replace_cache_points(cache: Any, values: list[Any], ns: dict[str, str], *, numeric: bool) -> None:
+    c_ns = ns["c"]
+    for child in list(cache):
+        if child.tag in {f"{{{c_ns}}}pt", f"{{{c_ns}}}ptCount"}:
+            cache.remove(child)
+    count = ET.SubElement(cache, f"{{{c_ns}}}ptCount")
+    count.set("val", str(len(values)))
+    for index, value in enumerate(values):
+        point = ET.SubElement(cache, f"{{{c_ns}}}pt")
+        point.set("idx", str(index))
+        node = ET.SubElement(point, f"{{{c_ns}}}v")
+        node.text = str(int(value)) if numeric else str(value)
+
+
+def _licensing_chart_counts(rows: list[dict[str, Any]], summary: dict[str, Any]) -> dict[str, int]:
+    licensing_rows = [row for row in rows if _service_name(row) == "Licensing" or "license" in str(row.get("parameter_key") or "").lower()]
+    if not licensing_rows:
+        licensing_rows = [row for row in rows if _status_label(row) == "LICENSING REQUIRED"]
+    counts = Counter(_status_label(row).title() for row in licensing_rows)
+    if not counts and summary.get("licensing_required"):
+        counts["Licensing Required"] = int(summary.get("licensing_required") or 0)
+    return dict(counts or {"No Licensing Gaps": 0})
+
+
+def _user_profile_chart_counts(rows: list[dict[str, Any]]) -> dict[str, tuple[int, int]]:
+    profile_fields = ["First Name", "Last Name", "Job Title", "Department", "Manager", "City", "Country"]
+    user_rows = [row for row in rows if any(token in str(row.get("parameter_key") or "").lower() for token in ["user", "profile", "manager"])]
+    total = max(1, len(user_rows))
+    pass_rows = len([row for row in user_rows if _status_label(row) == "PASS"])
+    missing = max(0, total - pass_rows)
+    return {field: (pass_rows, missing) for field in profile_fields}
+
+
+def _active_inactive_counts(rows: list[dict[str, Any]], service: str) -> list[int]:
+    service_rows = rows_for_service = [row for row in rows if _service_name(row) == service]
+    active = len([row for row in rows_for_service if _status_label(row) == "PASS"])
+    inactive = max(0, len(service_rows) - active)
+    return [active, inactive]
+
+
+def _pillar_label(row: dict[str, Any]) -> str:
+    value = row.get("pillar") or row.get("category") or "Best Practice"
+    text = str(value).replace("_", " ").strip().title()
+    if text.lower() in {"Best Practices", "Best Practice"}:
+        return "Best Practice"
+    if text.lower() == "security":
+        return "Security"
+    if text.lower() == "governance":
+        return "Governance"
+    return text or "Best Practice"
+
+
+def _severity_label(row: dict[str, Any]) -> str:
+    severity = str(row.get("severity") or "info").strip().lower()
+    if severity in {"info", "informational"}:
+        return "Informational"
+    return severity.title() if severity else "Informational"
 
 
 def _bar_chart_png(values: dict[str, int]) -> BytesIO:

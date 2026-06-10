@@ -1,4 +1,5 @@
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -90,20 +91,54 @@ async def test_phase8_report_service_generates_pdf_docx_and_metadata(
     )
 
     assert payload["status"] == "generated"
-    assert len(payload["artifacts"]) == 2
+    assert len(payload["artifacts"]) == 1
     paths = {item["report_type"]: Path(item["storage_path"]) for item in payload["artifacts"]}
-    pdf_bytes = paths["pdf"].read_bytes()
-    assert pdf_bytes.startswith(b"%PDF")
-    assert b"Copilot Readiness Assessment" in pdf_bytes
     with ZipFile(paths["docx"]) as docx:
         assert "word/document.xml" in docx.namelist()
+        ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+        chart3 = ET.fromstring(docx.read("word/charts/chart3.xml"))
+        categories = [value.text for value in chart3.findall(".//c:cat//c:strCache//c:v", ns)]
+        values = [value.text for value in chart3.findall(".//c:val//c:numCache//c:v", ns)]
+        assert categories == ["Critical", "High", "Medium", "Low", "Informational"]
+        assert values != ["21", "18", "18", "4", "4"]
+        assert sum(int(value) for value in values) == payload["artifacts"][0]["metadata"]["parameter_count"]
 
     stored = (
         await db_session.execute(
             select(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id)
         )
     ).scalars().all()
-    assert {item.report_type for item in stored} == {"pdf", "docx"}
+    assert {item.report_type for item in stored} == {"docx"}
+
+
+async def test_phase8_report_service_generates_both_when_requested(
+    db_session: AsyncSession,
+    auth_context: dict,
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setattr(cra_report_service, "REPORT_ROOT", tmp_path)
+
+    async def fake_convert_docx_to_pdf(docx_path: Path, pdf_path: Path) -> Path:
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\n% Copilot Readiness Assessment\n" + b"0" * 256)
+        return pdf_path
+
+    monkeypatch.setattr(cra_report_service, "_convert_docx_to_pdf_async", fake_convert_docx_to_pdf)
+    assessment = await _create_completed_assessment(db_session, auth_context)
+
+    payload = await cra_report_service.generate_report_bundle(
+        db_session,
+        current_user=auth_context["user"],
+        assessment_id=assessment.id,
+        report_type="both",
+    )
+
+    paths = {item["report_type"]: Path(item["storage_path"]) for item in payload["artifacts"]}
+    assert set(paths) == {"pdf", "docx"}
+    assert paths["pdf"].read_bytes().startswith(b"%PDF")
+    with ZipFile(paths["docx"]) as docx:
+        assert "word/document.xml" in docx.namelist()
 
 
 async def test_phase8_report_api_status_generate_and_download(
@@ -114,6 +149,13 @@ async def test_phase8_report_api_status_generate_and_download(
     monkeypatch,
 ):
     monkeypatch.setattr(cra_report_service, "REPORT_ROOT", tmp_path)
+
+    async def fake_convert_docx_to_pdf(docx_path: Path, pdf_path: Path) -> Path:
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\n% Copilot Readiness Assessment\n" + b"0" * 256)
+        return pdf_path
+
+    monkeypatch.setattr(cra_report_service, "_convert_docx_to_pdf_async", fake_convert_docx_to_pdf)
     assessment = await _create_completed_assessment(db_session, auth_context)
 
     status_response = await api_client.get(
@@ -124,7 +166,7 @@ async def test_phase8_report_api_status_generate_and_download(
     assert status_response.json()["data"]["download_ready"] is False
 
     generate_response = await api_client.post(
-        f"/api/v1/assessments/{assessment.id}/generate-report",
+        f"/api/v1/assessments/{assessment.id}/generate-report?report_type=both",
         headers=auth_context["headers"],
     )
     assert generate_response.status_code == 200

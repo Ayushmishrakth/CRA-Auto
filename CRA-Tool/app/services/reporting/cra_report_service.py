@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import re
+import shutil
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -18,12 +21,11 @@ from app.db.models.tenant import ConnectedTenant
 from app.db.models.user import User
 from app.services.assessment_service import get_assessment
 from app.services.reporting.cra_chart_service import build_chart_data
-from app.services.reporting.cra_docx_renderer import render_docx
 from app.services.reporting.cra_narrative_service import build_narrative
-from app.services.reporting.cra_pdf_renderer import render_pdf
 from app.services.reporting.cra_risk_engine import aggregate_findings
 from app.services.reporting.cra_summary_service import build_summary
 from app.services.reporting.word_report_generator import render_word_report
+from app.services.reporting.report_customization import get_customization_for_pdf, clear_customization
 from app.services.registry_service import get_registry
 
 
@@ -45,39 +47,103 @@ async def generate_report_bundle(
     *,
     current_user: User,
     assessment_id: UUID,
+    report_type: str | None = None,
 ) -> dict[str, Any]:
     report_data = await build_report_data(db, current_user=current_user, assessment_id=assessment_id)
+    customization = get_customization_for_pdf(assessment_id)
+    requested_report_type = _normalize_report_type(report_type or customization.get("output_format") or "docx")
+
     assessment = report_data["assessment"]
     target_dir = REPORT_ROOT / str(assessment.id)
     tenant_name = _safe_report_filename(report_data["summary"].get("tenant_name") or report_data["summary"].get("customer_name") or assessment.tenant_id)
+    generated_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    report_stem = f"Copilot_Readiness_Assessment_{tenant_name}_{generated_stamp}"
     docx_path = await asyncio.to_thread(
         render_word_report,
-        target_dir / f"Copilot_Readiness_Assessment_{tenant_name}.docx",
+        target_dir / f"{report_stem}.docx",
         report_data,
     )
-    pdf_path = await _convert_docx_to_pdf_async(docx_path, target_dir / f"Copilot_Readiness_Assessment_{tenant_name}.pdf", report_data)
 
     await db.execute(delete(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id))
-    pdf_artifact = AssessmentReport(
+    artifacts: list[AssessmentReport] = []
+    docx_artifact = AssessmentReport(
         assessment_id=assessment.id,
-        report_type="pdf",
+        report_type="docx",
         report_status="generated",
-        storage_path=str(pdf_path),
+        storage_path=str(docx_path),
         generated_by=current_user.id,
-        metadata_json=report_data["metadata"],
+        metadata_json={**report_data["metadata"], "source": "docx_template"},
     )
-    db.add(pdf_artifact)
-    assessment.report_path = str(pdf_path)
+    db.add(docx_artifact)
+    artifacts.append(docx_artifact)
+    assessment.report_path = str(docx_path)
+
+    pdf_error = None
+    if requested_report_type in {"pdf", "both"}:
+        try:
+            pdf_path = await _convert_docx_to_pdf_async(
+                docx_path,
+                target_dir / f"{report_stem}.pdf",
+            )
+            pdf_artifact = AssessmentReport(
+                assessment_id=assessment.id,
+                report_type="pdf",
+                report_status="generated",
+                storage_path=str(pdf_path),
+                generated_by=current_user.id,
+                metadata_json={**report_data["metadata"], "source": "docx_to_pdf"},
+            )
+            db.add(pdf_artifact)
+            artifacts.append(pdf_artifact)
+            assessment.report_path = str(pdf_path)
+        except Exception as exc:
+            # If PDF conversion fails but DOCX succeeded, capture the error
+            # but still return DOCX successfully
+            pdf_error = str(exc)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"PDF conversion failed for assessment {assessment_id}: {pdf_error}. "
+                "DOCX report is available."
+            )
+
     await db.commit()
-    await db.refresh(pdf_artifact)
+    for artifact in artifacts:
+        await db.refresh(artifact)
+
+    # Clear customization after report generation
+    clear_customization(assessment_id)
 
     return {
         "assessment_id": assessment.id,
-        "status": "generated",
-        "artifacts": [_artifact_payload(pdf_artifact)],
+        "status": "generated" if not pdf_error else "partial",
+        "artifacts": [_artifact_payload(artifact) for artifact in artifacts],
         "summary": report_data["summary"],
         "analytics": report_data["analytics"],
+        "pdf_conversion_error": pdf_error,
     }
+
+
+async def generate_legacy_pdf_report_bundle(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    assessment_id: UUID,
+) -> dict[str, Any]:
+    """Compatibility wrapper for callers that still expect the old PDF-first behavior."""
+    return await generate_report_bundle(
+        db,
+        current_user=current_user,
+        assessment_id=assessment_id,
+        report_type="pdf",
+    )
+
+
+def _normalize_report_type(report_type: str) -> str:
+    value = (report_type or "docx").strip().lower()
+    if value not in {"docx", "pdf", "both"}:
+        raise ValueError("Report type must be one of: docx, pdf, both")
+    return value
 
 
 async def get_report_bundle(
@@ -681,15 +747,60 @@ def _safe_report_filename(value: str) -> str:
     return cleaned.strip("._") or "tenant"
 
 
-async def _convert_docx_to_pdf_async(docx_path: Path, pdf_path: Path, report_data: dict[str, Any]) -> Path:
-    """Convert DOCX to PDF using Word (via docx2pdf). Falls back to ReportLab renderer."""
+async def _convert_docx_to_pdf_async(
+    docx_path: Path,
+    pdf_path: Path,
+) -> Path:
+    """Convert DOCX to PDF with a real document converter; never fall back to synthetic PDF."""
     try:
         from docx2pdf import convert
         pdf_path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(convert, str(docx_path), str(pdf_path))
-        if pdf_path.exists() and pdf_path.stat().st_size > 1000:
+        if _is_valid_pdf(pdf_path):
             return pdf_path
-    except Exception:
-        pass
-    # Fallback: use ReportLab renderer
-    return await asyncio.to_thread(render_pdf, pdf_path.parent / "copilot-readiness-assessment.pdf", report_data)
+    except Exception as exc:
+        last_error = exc
+    else:
+        last_error = RuntimeError("docx2pdf did not produce a valid PDF")
+
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        try:
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            await asyncio.to_thread(
+                subprocess.run,
+                [
+                    soffice,
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    str(pdf_path.parent),
+                    str(docx_path),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            converted = pdf_path.parent / f"{docx_path.stem}.pdf"
+            if converted != pdf_path and converted.exists():
+                converted.replace(pdf_path)
+            if _is_valid_pdf(pdf_path):
+                return pdf_path
+        except Exception as exc:
+            last_error = exc
+
+    raise RuntimeError(
+        "PDF generation requires a reliable DOCX-to-PDF converter. "
+        "Generate DOCX, or install/configure Microsoft Word docx2pdf or LibreOffice headless."
+    ) from last_error
+
+
+def _is_valid_pdf(path: Path) -> bool:
+    try:
+        if not path.exists() or path.stat().st_size <= 1000:
+            return False
+        with path.open("rb") as handle:
+            return handle.read(4) == b"%PDF"
+    except OSError:
+        return False

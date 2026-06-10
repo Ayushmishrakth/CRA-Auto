@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, FileSpreadsheet, Printer } from "lucide-react";
+import { Download, FileText, FileSpreadsheet, Printer } from "lucide-react";
 import { downloadAssessmentReport } from "../../api/assessmentApi";
 
 
@@ -49,6 +49,7 @@ export default function ReportDownloadPanel({ assessmentId, report = {} }) {
   const [busyType, setBusyType] = useState(null);
   const safeReport = report ?? {};
   const artifacts = Array.isArray(safeReport.artifacts) ? safeReport.artifacts : [];
+  const hasDocx = artifacts.some((item) => item.report_type === "docx");
   const hasPdf = artifacts.some((item) => item.report_type === "pdf");
   const runDownload = async (reportType) => {
     setBusyType(reportType);
@@ -70,7 +71,16 @@ export default function ReportDownloadPanel({ assessmentId, report = {} }) {
       <div className="download-actions">
         <button
           type="button"
-          className={`primary-action ${hasPdf ? "" : "disabled-link"}`}
+          className={`primary-action ${hasDocx ? "" : "disabled-link"}`}
+          disabled={!hasDocx}
+          onClick={() => runDownload("docx")}
+        >
+          <FileText size={16} />
+          {busyType === "docx" ? "Preparing DOCX..." : "Export DOCX"}
+        </button>
+        <button
+          type="button"
+          className={`btn-secondary inline ${hasPdf ? "" : "disabled-link"}`}
           disabled={!hasPdf}
           onClick={() => runDownload("pdf")}
         >

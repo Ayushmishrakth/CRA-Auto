@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, FilePlus2, History } from "lucide-react";
+import { ArrowLeft, FilePlus2, History, Upload } from "lucide-react";
 import {
   getAssessment,
   getAssessmentEvidence,
@@ -8,6 +8,7 @@ import {
   getAssessmentRecommendations,
   generateAssessmentReport,
   getAssessmentReport,
+  customizeAssessmentReport,
 } from "../api/assessmentApi";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ReportDownloadPanel from "../components/report/ReportDownloadPanel";
@@ -20,7 +21,7 @@ import { businessDomain, businessName, executiveStatus, foundText, riskRating, s
 const REPORT_STATUS_COPY = {
   generated: {
     title: "Report generated",
-    message: "PDF download is available for this assessment.",
+    message: "Downloadable report artifacts are available for this assessment.",
   },
   not_generated: {
     title: "Report not generated",
@@ -65,6 +66,13 @@ function AssessmentReportContent() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [companyName, setCompanyName] = useState("");
+  const [address, setAddress] = useState("");
+  const [outputFormat, setOutputFormat] = useState("docx");
+  const [customizing, setCustomizing] = useState(false);
+  const [customizeSuccess, setCustomizeSuccess] = useState(false);
 
   const loadReport = async () => {
     setLoading(true);
@@ -116,13 +124,43 @@ function AssessmentReportContent() {
     setGenerating(true);
     setError(null);
     try {
-      const reportData = await generateAssessmentReport(assessmentId);
+      const reportData = await generateAssessmentReport(assessmentId, outputFormat);
       setReport(reportData ?? {});
     } catch (err) {
       setError(extractApiError(err));
       setReport((current) => ({ ...(current ?? {}), status: "generation_failed" }));
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLogoPreview(event.target?.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCustomize = async () => {
+    if (!logoFile && !companyName && !address && !outputFormat) {
+      alert("Please fill in at least one field");
+      return;
+    }
+    setCustomizing(true);
+    setError(null);
+    try {
+      await customizeAssessmentReport(assessmentId, { logoFile, companyName, address, outputFormat });
+      setCustomizeSuccess(true);
+      setTimeout(() => setCustomizeSuccess(false), 3000);
+    } catch (err) {
+      setError(extractApiError(err));
+    } finally {
+      setCustomizing(false);
     }
   };
 
@@ -160,147 +198,129 @@ function AssessmentReportContent() {
           <div>
             <Link className="back-link" to={`/assessments/${assessmentId}`}>
               <ArrowLeft size={16} />
-              Assessment
+              Back to Assessment
             </Link>
-            <h1>Enterprise Report</h1>
-            <p>Executive summary, analytics, and downloadable CRA deliverables.</p>
-          </div>
-          <div className="report-actions">
-            <Link className="btn-secondary inline" to="/reports">
-              <History size={16} />
-              Report History
-            </Link>
-            <button type="button" className="primary-action" onClick={handleGenerate} disabled={generating}>
-              <FilePlus2 size={16} />
-              {generating ? "Generating..." : "Generate Report"}
-            </button>
           </div>
         </div>
 
         {error && <div className="error-banner">{error}</div>}
-        {generating && <LoadingSpinner label="Generating enterprise report..." />}
+        {customizeSuccess && <div className="success-banner">✓ Report customization saved! Ready to generate.</div>}
 
-        <div className={reportStatus === "generation_failed" ? "error-banner" : "info-banner"}>
-          <strong>{statusCopy.title}</strong>
-          <p>{statusCopy.message}</p>
-        </div>
-
-        {!safeReport.summary && (
-          <div className="warning-banner">
-            Report data is empty. Generate the report after assessment completion.
-          </div>
-        )}
-
-        <ReportSummaryCards summary={summary} />
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Executive Summary</h2>
-              <p>{summary.deployment_recommendation ?? "Generate a report to preview deployment guidance."}</p>
+        {/* MAIN CUSTOMIZATION SECTION - PROMINENT FOCUS */}
+        <section className="customization-hero">
+          <div className="customization-content">
+            <div className="customization-header">
+              <h1>📋 Customize Your Report</h1>
+              <p className="subtitle">Add your company branding. Your logo and details will appear on <strong>every page</strong> of the generated PDF.</p>
             </div>
-          </div>
-          <div className="report-executive-grid">
-            <article>
-              <span>Readiness Score</span>
-              <strong>{summary.overall_readiness ?? assessmentData?.overall_score ?? 0}%</strong>
-            </article>
-            <article>
-              <span>Top Risks</span>
-              <strong>{safeEvidence.filter((item) => item.status === "FAIL").length}</strong>
-            </article>
-            <article>
-              <span>Recommendations</span>
-              <strong>{summary.recommendation_count ?? safeRecommendations.length}</strong>
-            </article>
-            <article>
-              <span>Assessment Coverage</span>
-              <strong>{safeCoverage.coverage_percent ?? 0}%</strong>
-            </article>
+
+            {/* Logo Upload - Featured */}
+            <div className="logo-upload-section">
+              <div className="form-group full-width">
+                <label htmlFor="logo-input" className="label-with-icon">🎨 Company Logo</label>
+                <p className="label-hint">Will appear on cover page and every page header</p>
+                <div className="logo-upload-container-large">
+                  {logoPreview ? (
+                    <div className="logo-preview-large">
+                      <img src={logoPreview} alt="Logo preview" className="logo-img-preview" />
+                      <button
+                        type="button"
+                        className="btn-change"
+                        onClick={() => {
+                          setLogoFile(null);
+                          setLogoPreview(null);
+                        }}
+                      >
+                        ✎ Change Logo
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="logo-input" className="logo-upload-label-large">
+                      <div className="upload-icon">📤</div>
+                      <strong>Click to upload your logo</strong>
+                      <span className="upload-hint">PNG, JPG, SVG • Max 5MB</span>
+                      <input
+                        id="logo-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/svg+xml"
+                        onChange={handleLogoChange}
+                        style={{ display: "none" }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Company Details */}
+            <div className="company-details-section">
+              <div className="form-group">
+                <label htmlFor="company-input" className="label-with-icon">🏢 Company Name</label>
+                <input
+                  id="company-input"
+                  type="text"
+                  placeholder="e.g., Acme Corporation"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="form-input-large"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="address-input" className="label-with-icon">📍 Company Address</label>
+                <textarea
+                  id="address-input"
+                  placeholder="e.g., 123 Business St, City, State 12345"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="form-input-large"
+                  rows="3"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="output-format" className="label-with-icon">Report Output</label>
+                <select
+                  id="output-format"
+                  value={outputFormat}
+                  onChange={(e) => setOutputFormat(e.target.value)}
+                  className="form-input-large"
+                >
+                  <option value="docx">Word DOCX - recommended</option>
+                  <option value="pdf">PDF only</option>
+                  <option value="both">Word DOCX and PDF</option>
+                </select>
+                <p className="label-hint">
+                  DOCX preserves the sample Word template most reliably. PDF requires Word or LibreOffice conversion.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="customization-actions">
+              <button
+                type="button"
+                className="btn-apply"
+                onClick={handleCustomize}
+                disabled={customizing}
+              >
+                {customizing ? "⏳ Saving..." : "✓ Apply Customization"}
+              </button>
+              <button
+                type="button"
+                className="btn-generate-primary"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                <FilePlus2 size={18} />
+                {generating ? "Generating..." : "📄 Generate Report"}
+              </button>
+              <p className="action-hint">Your logo and details will appear on every page of the PDF</p>
+            </div>
           </div>
         </section>
 
-        <section className="two-column">
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Risk Distribution</h2>
-                <p>Open risks by severity.</p>
-              </div>
-            </div>
-            <div className="risk-distribution">
-              {severityDistribution.map((item) => (
-                <article key={item.severity}>
-                  <span className={`severity severity-${item.severity}`}>{item.severity}</span>
-                  <strong>{item.count}</strong>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Service Readiness</h2>
-                <p>Readiness score by workload.</p>
-              </div>
-            </div>
-            <div className="service-readiness-list">
-              {serviceRows.map((item) => (
-                <article key={item.service}>
-                  <div>
-                    <strong>{item.service}</strong>
-                    <span>{item.total} controls · {item.rating} risk</span>
-                  </div>
-                  <b>{item.readiness}%</b>
-                </article>
-              ))}
-            </div>
-          </section>
-        </section>
-
-        <section className="two-column">
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Top Risks</h2>
-                <p>Controls requiring executive attention.</p>
-              </div>
-            </div>
-            <div className="blocker-list">
-              {sortBusinessPriority(safeEvidence).filter((item) => item.status !== "PASS").slice(0, 5).map((item) => (
-                <article className="blocker-row" key={item.parameter_key}>
-                  <span className={`status-dot tone-${statusTone(item.status)}`} />
-                  <div>
-                    <h3>{businessName(item)}</h3>
-                    <p>{foundText(item)}</p>
-                  </div>
-                  <span className={`status-pill tone-${statusTone(item.status)}`}>{executiveStatus(item.status)}</span>
-                </article>
-              ))}
-              {!safeEvidence.length && <p className="muted-text">No evidence rows are available.</p>}
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Top Recommendations</h2>
-                <p>Priority remediation actions.</p>
-              </div>
-            </div>
-            <div className="recommendation-list compact">
-              {safeRecommendations.slice(0, 5).map((item) => (
-                <article key={item.id || item.title}>
-                  <strong>{item.title || "Recommendation"}</strong>
-                  <p>{item.impact || item.recommendation_text || "Apply the recommended remediation for this control."}</p>
-                  <span>{item.effort || "medium"} effort</span>
-                </article>
-              ))}
-              {!safeRecommendations.length && <p className="muted-text">No recommendations are available.</p>}
-            </div>
-          </section>
-        </section>
+        {/* Only customization form is shown - old dashboards removed */}
 
         <ReportDownloadPanel assessmentId={assessmentId} report={safeReport} />
         {requestErrors.length > 0 && <div className="warning-banner">Some report data was unavailable. The executive summary is based on available assessment results.</div>}

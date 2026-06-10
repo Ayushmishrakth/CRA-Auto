@@ -69,8 +69,9 @@ export async function getTenantAssessments(tenantId, params = {}) {
   return Array.isArray(data) ? data.map(normalizeAssessment) : [];
 }
 
-export async function generateAssessmentReport(assessmentId) {
+export async function generateAssessmentReport(assessmentId, reportType = "docx") {
   const response = await api.post(`/assessments/${assessmentId}/generate-report`, undefined, {
+    params: { report_type: reportType },
     timeout: 180000,
   });
   return unwrapApiData(response);
@@ -111,14 +112,38 @@ export function getAssessmentReportDownloadUrl(assessmentId, reportType = "pdf")
   return `${baseURL}/assessments/${assessmentId}/report/download?report_type=${reportType}`;
 }
 
-export async function downloadAssessmentReport(assessmentId) {
+export async function downloadAssessmentReport(assessmentId, reportType = "docx") {
   const response = await api.get(`/assessments/${assessmentId}/report/download`, {
-    params: { report_type: "pdf" },
+    params: { report_type: reportType },
     responseType: "arraybuffer",
   });
   const disposition = response.headers?.["content-disposition"] || "";
   const match = disposition.match(/filename="?([^";\n]+)"?/i);
-  const filename = match?.[1] ?? "copilot-readiness-assessment.pdf";
-  const data = new Blob([response.data], { type: "application/pdf" });
+  const filename = match?.[1] ?? `copilot-readiness-assessment.${reportType}`;
+  const type =
+    reportType === "pdf"
+      ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const data = new Blob([response.data], { type });
   return { data, filename };
+}
+
+export async function customizeAssessmentReport(assessmentId, { logoFile, address, companyName, outputFormat = "docx" }) {
+  const formData = new FormData();
+  if (logoFile) {
+    formData.append("logo", logoFile);
+  }
+  if (address) {
+    formData.append("address", address);
+  }
+  if (companyName) {
+    formData.append("company_name", companyName);
+  }
+  formData.append("output_format", outputFormat);
+  const response = await api.post(`/reports/assessments/${assessmentId}/customize`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return unwrapApiData(response);
 }

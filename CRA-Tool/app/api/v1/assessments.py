@@ -307,6 +307,7 @@ async def get_assessment_readiness(
 async def generate_assessment_report(
     assessment_id: UUID,
     request: Request,
+    report_type: str = Query(default="docx", pattern="^(docx|pdf|both)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> SuccessResponse[GenerateReportResponse]:
@@ -314,6 +315,7 @@ async def generate_assessment_report(
         db,
         current_user=current_user,
         assessment_id=assessment_id,
+        report_type=report_type,
     )
     return success_response(
         message="Assessment report generated",

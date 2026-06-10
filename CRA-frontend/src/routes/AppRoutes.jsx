@@ -16,7 +16,6 @@ import SettingsPage        from "../pages/SettingsPage";
 import AssessmentDetailPage  from "../pages/AssessmentDetailPage";
 import AssessmentEvidencePage from "../pages/AssessmentEvidencePage";
 import AssessmentReportPage  from "../pages/AssessmentReportPage";
-import TenantConnectionPage  from "../pages/TenantConnectionPage";
 import ParametersPage        from "../pages/ParametersPage";
 
 export default function AppRoutes() {
@@ -46,8 +45,6 @@ export default function AppRoutes() {
           <Route path="/assessments/:assessmentId/report"         element={<AssessmentReportPage />} />
           <Route path="/reports"      element={<ReportsPage />} />
           <Route path="/settings"     element={<SettingsPage />} />
-          <Route path="/tenant"       element={<TenantConnectionPage />} />
-          <Route path="/tenant/deployment-success" element={<TenantConnectionPage />} />
           <Route path="/parameters"   element={<ParametersPage />} />
           {/* Customers placeholder (future page) */}
           <Route path="/customers"    element={<Navigate to="/dashboard" replace />} />

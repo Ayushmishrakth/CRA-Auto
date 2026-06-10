@@ -19,7 +19,6 @@ const PAGE_TITLES = {
   "/customers":   "Customers",
   "/reports":     "Reports",
   "/settings":    "Settings",
-  "/tenant":      "Tenant Setup",
   "/parameters":  "Parameters",
 };
 

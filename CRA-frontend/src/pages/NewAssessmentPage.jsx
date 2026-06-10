@@ -31,6 +31,8 @@ function Step1({ onNext }) {
   const [phase, setPhase] = useState(() => (tenantInfo.connected ? "success" : "idle"));
   const [error, setError] = useState(null);
 
+  const [adminConsentUrl, setAdminConsentUrl] = useState(null);
+
   // Load existing tenant AND validate it exists in Azure
   useEffect(() => {
     let isMounted = true;
@@ -71,14 +73,20 @@ function Step1({ onNext }) {
             });
             setPhase("success");
           } else {
-            // Validation failed - app was deleted
+            // Validation failed - app was deleted or needs consent
             setTenantInfo({
               connected: true,
               tenantId: active.tenant_id,
               tenantName: active.tenant_name || active.tenant_id,
             });
-            setPhase("error");
-            setError("App registration was deleted from Azure. Click 'Try Again' to recreate it.");
+            // If consent not granted, show consent URL
+            if (validationResult?.admin_consent_url) {
+              setAdminConsentUrl(validationResult.admin_consent_url);
+              setPhase("consent");
+            } else {
+              setPhase("error");
+              setError("App registration was deleted from Azure. Click 'Try Again' to recreate it.");
+            }
           }
         } catch (validationErr) {
           if (!isMounted) return;
@@ -111,11 +119,15 @@ function Step1({ onNext }) {
       const graphAccessToken = await getTenantDeploymentToken();
       // Use the correct redirect URI that backend expects
       const redirectUri = `${window.location.origin}/tenant/deployment-success`;
-      await deployTenantAccess({
+      const result = await deployTenantAccess({
         tenantId: user.microsoft_tid,
         graphAccessToken,
         redirectUri,
       });
+      // Store the admin consent URL from the response
+      if (result?.admin_consent_url) {
+        setAdminConsentUrl(result.admin_consent_url);
+      }
       setPhase("consent");
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to create app registration"));
@@ -123,8 +135,8 @@ function Step1({ onNext }) {
     }
   };
 
-  // Step 2: Accept permissions and validate
-  const handleAcceptPermissions = async () => {
+  // Step 2: Validate after user grants consent
+  const handleValidateConsent = async () => {
     setPhase("validating");
     setError(null);
     try {
@@ -142,7 +154,7 @@ function Step1({ onNext }) {
         });
         setPhase("success");
       } else {
-        setError("Validation failed. Please try again.");
+        setError("Validation failed. Please ensure you've granted admin consent in Azure.");
         setPhase("consent");
       }
     } catch (err) {
@@ -183,7 +195,7 @@ function Step1({ onNext }) {
         </div>
       )}
 
-      {/* Phase: Consent - Show Permissions Inline */}
+      {/* Phase: Consent - Show Permissions & Admin Consent Link */}
       {phase === "consent" && (
         <div className="space-y-4">
           <div className="border border-[#E5E7EB] rounded-lg p-4 bg-[#F8F9FA]">
@@ -200,15 +212,41 @@ function Step1({ onNext }) {
               ✓ We never access email content, file content, or passwords.
             </p>
           </div>
-          <Button
-            variant="primary"
-            fullWidth
-            loading={phase === "validating"}
-            onClick={handleAcceptPermissions}
-            disabled={phase === "validating"}
-          >
-            {phase === "validating" ? "Processing..." : "Accept & Connect"}
-          </Button>
+
+          {/* Admin Consent Step */}
+          {adminConsentUrl && (
+            <div className="border border-[#0078D4]/20 rounded-lg p-4 bg-[#EFF6FC]">
+              <p className="text-sm font-semibold text-[#374151] mb-3">Step 1: Grant Admin Consent</p>
+              <p className="text-xs text-[#6B7280] mb-3">
+                A Global Administrator must grant permissions in Azure. Click the button below to open the consent form in a new window.
+              </p>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={() => window.open(adminConsentUrl, "_blank", "noopener,noreferrer")}
+              >
+                Open Consent Form
+              </Button>
+            </div>
+          )}
+
+          {/* Validate Step */}
+          <div className="border border-[#107C10]/20 rounded-lg p-4 bg-[#F0FDF4]">
+            <p className="text-sm font-semibold text-[#374151] mb-3">Step 2: Validate Connection</p>
+            <p className="text-xs text-[#6B7280] mb-3">
+              After granting consent, click below to verify the connection.
+            </p>
+            <Button
+              variant="primary"
+              fullWidth
+              loading={phase === "validating"}
+              onClick={handleValidateConsent}
+              disabled={phase === "validating"}
+            >
+              {phase === "validating" ? "Validating..." : "Validate Connection"}
+            </Button>
+          </div>
+
           {error && (
             <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
               <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />

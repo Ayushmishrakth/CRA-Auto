@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-import shutil
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -49,20 +47,77 @@ async def generate_report_bundle(
     assessment_id: UUID,
     report_type: str | None = None,
 ) -> dict[str, Any]:
+    import logging
+    logger = logging.getLogger(__name__)
+
     report_data = await build_report_data(db, current_user=current_user, assessment_id=assessment_id)
     customization = get_customization_for_pdf(assessment_id)
     requested_report_type = _normalize_report_type(report_type or customization.get("output_format") or "docx")
+
+    # Log customization
+    logger.info(f"[REPORT] Customization for {assessment_id}:")
+    logger.info(f"[REPORT]   company_name: {customization.get('company_name')}")
+    logger.info(f"[REPORT]   address: {customization.get('address')}")
+    logger.info(f"[REPORT]   logo_path: {customization.get('logo_path')}")
 
     assessment = report_data["assessment"]
     target_dir = REPORT_ROOT / str(assessment.id)
     tenant_name = _safe_report_filename(report_data["summary"].get("tenant_name") or report_data["summary"].get("customer_name") or assessment.tenant_id)
     generated_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     report_stem = f"Copilot_Readiness_Assessment_{tenant_name}_{generated_stamp}"
-    docx_path = await asyncio.to_thread(
-        render_word_report,
-        target_dir / f"{report_stem}.docx",
-        report_data,
-    )
+
+    # Generate DOCX using docxtpl with fallback
+    docx_bytes = None
+    try:
+        logger.info(f"[REPORT] Calling render_word_report with customization")
+        docx_bytes = await asyncio.to_thread(
+            render_word_report,
+            report_data,
+            logo_path=customization.get("logo_path"),
+            company_name=customization.get("company_name"),
+            address=customization.get("address"),
+        )
+    except Exception as docx_err:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"docxtpl generation failed: {docx_err}, using enhanced generator")
+
+        # Fallback to enhanced generator
+        try:
+            from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
+
+            # Convert ORM data to dict format for enhanced generator
+            assessment_dict = {
+                'id': str(assessment.id),
+                'tenant_id': str(assessment.tenant_id),
+                'tenant_name': customization.get("company_name") or report_data["summary"].get("tenant_name", "Organization"),
+                'partner_name': report_data["summary"].get("partner_name", "Assessment Team"),
+                'created_at': assessment.created_at,
+                'overall_score': assessment.overall_score or 0.0,
+                'findings': [],
+                'summary': report_data["summary"],
+                'company_address': customization.get("address"),  # Add address
+                'logo_path': customization.get("logo_path"),  # Add logo path
+            }
+
+            logger.info(f"[REPORT] Creating EnhancedReportGenerator with:")
+            logger.info(f"[REPORT]   tenant_name: {assessment_dict['tenant_name']}")
+            logger.info(f"[REPORT]   company_address: {assessment_dict.get('company_address')}")
+            logger.info(f"[REPORT]   logo_path param: {customization.get('logo_path')}")
+
+            generator = EnhancedReportGenerator(assessment_dict, logo_path=customization.get("logo_path"))
+            docx_bytes = await asyncio.to_thread(generator.generate)
+            docx_bytes = __import__('io').BytesIO(docx_bytes) if isinstance(docx_bytes, bytes) else docx_bytes
+            logger.info(f"[REPORT] Enhanced generator succeeded, generated {len(docx_bytes.getvalue())} bytes")
+        except Exception as fallback_err:
+            logger.error(f"Both generators failed: {fallback_err}")
+            raise
+
+    # Save DOCX to disk
+    target_dir.mkdir(parents=True, exist_ok=True)
+    docx_path = target_dir / f"{report_stem}.docx"
+    with open(docx_path, 'wb') as f:
+        f.write(docx_bytes.getvalue())
 
     await db.execute(delete(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id))
     artifacts: list[AssessmentReport] = []
@@ -84,6 +139,7 @@ async def generate_report_bundle(
             pdf_path = await _convert_docx_to_pdf_async(
                 docx_path,
                 target_dir / f"{report_stem}.pdf",
+                report_data=report_data,
             )
             pdf_artifact = AssessmentReport(
                 assessment_id=assessment.id,
@@ -750,57 +806,23 @@ def _safe_report_filename(value: str) -> str:
 async def _convert_docx_to_pdf_async(
     docx_path: Path,
     pdf_path: Path,
+    report_data: dict = None,
 ) -> Path:
-    """Convert DOCX to PDF with a real document converter; never fall back to synthetic PDF."""
+    """
+    Generate PDF report using ReportLab (no LibreOffice dependency).
+    Uses the same report_data that generated the DOCX.
+    """
+    from app.services.reporting.pdf_report_generator import render_pdf_report
+
+    if report_data is None:
+        raise ValueError("report_data required for PDF generation")
+
     try:
-        from docx2pdf import convert
-        pdf_path.parent.mkdir(parents=True, exist_ok=True)
-        await asyncio.to_thread(convert, str(docx_path), str(pdf_path))
-        if _is_valid_pdf(pdf_path):
-            return pdf_path
+        pdf_path = await asyncio.to_thread(
+            render_pdf_report,
+            pdf_path,
+            report_data,
+        )
+        return pdf_path
     except Exception as exc:
-        last_error = exc
-    else:
-        last_error = RuntimeError("docx2pdf did not produce a valid PDF")
-
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if soffice:
-        try:
-            pdf_path.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread(
-                subprocess.run,
-                [
-                    soffice,
-                    "--headless",
-                    "--convert-to",
-                    "pdf",
-                    "--outdir",
-                    str(pdf_path.parent),
-                    str(docx_path),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            converted = pdf_path.parent / f"{docx_path.stem}.pdf"
-            if converted != pdf_path and converted.exists():
-                converted.replace(pdf_path)
-            if _is_valid_pdf(pdf_path):
-                return pdf_path
-        except Exception as exc:
-            last_error = exc
-
-    raise RuntimeError(
-        "PDF generation requires a reliable DOCX-to-PDF converter. "
-        "Generate DOCX, or install/configure Microsoft Word docx2pdf or LibreOffice headless."
-    ) from last_error
-
-
-def _is_valid_pdf(path: Path) -> bool:
-    try:
-        if not path.exists() or path.stat().st_size <= 1000:
-            return False
-        with path.open("rb") as handle:
-            return handle.read(4) == b"%PDF"
-    except OSError:
-        return False
+        raise RuntimeError(f"PDF generation failed: {exc}") from exc

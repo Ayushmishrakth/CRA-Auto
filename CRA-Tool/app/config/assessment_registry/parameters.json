@@ -2004,7 +2004,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "No relation",
     "display_name": "Customer Lockbox",
-    "domain": "unclassified",
+    "domain": "purview",
     "expected_output": "We can see if enabled or disabled",
     "fail_criteria": "Microsoft support staff can access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed",
     "graph_endpoint": "",

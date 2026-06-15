@@ -17,6 +17,9 @@ def store_customization(
     output_format: Optional[str] = None,
 ) -> None:
     """Store logo, address, and company_name temporarily for this assessment."""
+    import logging
+    logger = logging.getLogger(__name__)
+
     key = str(assessment_id)
     _customization_cache[key] = {
         "logo_path": logo_path,
@@ -24,6 +27,12 @@ def store_customization(
         "company_name": company_name,
         "output_format": output_format or "docx",
     }
+
+    logger.info(f"[CACHE] Storing customization for {assessment_id}:")
+    logger.info(f"[CACHE]   logo_path: {logo_path}")
+    logger.info(f"[CACHE]   company_name: {company_name}")
+    logger.info(f"[CACHE]   address: {address}")
+    logger.info(f"[CACHE] Cache size: {len(_customization_cache)}")
 
 
 def get_customization(assessment_id: UUID) -> Dict[str, Any]:
@@ -44,7 +53,23 @@ def clear_customization(assessment_id: UUID) -> None:
 
 def get_customization_for_pdf(assessment_id: UUID) -> Dict[str, Any]:
     """Get customization data formatted for PDF renderer."""
+    import logging
+    from pathlib import Path
+    logger = logging.getLogger(__name__)
+
     customization = get_customization(assessment_id)
+
+    logger.info(f"[CACHE] Retrieving customization for {assessment_id}:")
+    logger.info(f"[CACHE]   logo_path from cache: {customization.get('logo_path')}")
+    logger.info(f"[CACHE]   company_name from cache: {customization.get('company_name')}")
+    logger.info(f"[CACHE]   address from cache: {customization.get('address')}")
+
+    if customization.get("logo_path"):
+        path = Path(customization.get("logo_path"))
+        logger.info(f"[CACHE]   logo file exists: {path.exists()}")
+        if path.exists():
+            logger.info(f"[CACHE]   logo file size: {path.stat().st_size} bytes")
+
     return {
         "logo_path": customization.get("logo_path"),
         "address": customization.get("address"),

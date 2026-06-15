@@ -32,6 +32,9 @@ from app.tasks.assessment_tasks import run_assessment_task
 
 assessment_repository = TenantScopedRepository(Assessment)
 
+# Store references to running assessment tasks to prevent garbage collection
+_running_assessment_tasks: set = set()
+
 
 SERVICE_LABELS = {
     "entra": "Entra ID",
@@ -127,7 +130,9 @@ async def start_assessment(
             }
     await db.commit()
     if api_background_job_id:
-        asyncio.create_task(run_assessment_job(api_background_job_id, worker_id="api-background"))
+        task = asyncio.create_task(run_assessment_job(api_background_job_id, worker_id="api-background"))
+        _running_assessment_tasks.add(task)
+        task.add_done_callback(_running_assessment_tasks.discard)
     await db.refresh(assessment)
     await db.refresh(job)
     assessment.job_id = job.id

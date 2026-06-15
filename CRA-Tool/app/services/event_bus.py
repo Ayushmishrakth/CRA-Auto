@@ -4,6 +4,7 @@ Assessment event persistence and Redis-backed fanout.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -102,8 +103,14 @@ async def publish_event(payload: dict[str, Any]) -> None:
         raise
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     try:
-        await redis.publish(assessment_channel(payload["assessment_id"]), encoded)
-        await redis.publish(tenant_channel(payload["tenant_id"]), encoded)
+        try:
+            # Shield from task cancellation to prevent GeneratorExit errors
+            await asyncio.shield(redis.publish(assessment_channel(payload["assessment_id"]), encoded))
+            await asyncio.shield(redis.publish(tenant_channel(payload["tenant_id"]), encoded))
+        except (asyncio.CancelledError, GeneratorExit):
+            logger.warning("Redis fanout skipped due to task cancellation")
+        except Exception as exc:
+            logger.warning("Redis fanout failed: error=%s", exc)
     finally:
         await redis.aclose()
 

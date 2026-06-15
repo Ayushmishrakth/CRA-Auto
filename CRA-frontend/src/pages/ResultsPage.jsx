@@ -1306,6 +1306,7 @@ export default function ResultsPage() {
   const [logoPreview, setLogoPreview] = useState(null);
   const [companyName, setCompanyName] = useState("");
   const [address, setAddress] = useState("");
+  const [outputFormat, setOutputFormat] = useState("docx");
   const [customizing, setCustomizing] = useState(false);
 
   useEffect(() => {
@@ -1605,20 +1606,30 @@ export default function ResultsPage() {
                   </button>
                 </div>
               ) : (
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/svg+xml"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setLogoFile(file);
-                      const reader = new FileReader();
-                      reader.onload = (event) => setLogoPreview(event.target?.result);
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                  className="w-full text-sm"
-                />
+                <div>
+                  <input
+                    type="file"
+                    id="logo-upload"
+                    accept="image/png,image/jpeg,image/svg+xml"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setLogoFile(file);
+                        const reader = new FileReader();
+                        reader.onload = (event) => setLogoPreview(event.target?.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="logo-upload"
+                    className="inline-block w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg cursor-pointer text-center transition-colors duration-200"
+                  >
+                    📤 Upload Logo
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">PNG, JPG, or SVG (max 5MB)</p>
+                </div>
               )}
             </div>
 
@@ -1646,6 +1657,47 @@ export default function ResultsPage() {
               />
             </div>
 
+            {/* Report Format */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold mb-3">📄 Report Format</label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                  <input
+                    type="radio"
+                    name="format"
+                    value="docx"
+                    checked={outputFormat === "docx"}
+                    onChange={(e) => setOutputFormat(e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">Word Document (.docx)</span>
+                  <span className="text-xs text-gray-500 ml-auto">Recommended</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                  <input
+                    type="radio"
+                    name="format"
+                    value="pdf"
+                    checked={outputFormat === "pdf"}
+                    onChange={(e) => setOutputFormat(e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">PDF Document (.pdf)</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                  <input
+                    type="radio"
+                    name="format"
+                    value="both"
+                    checked={outputFormat === "both"}
+                    onChange={(e) => setOutputFormat(e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium text-gray-700">Both (.docx + .pdf)</span>
+                </label>
+              </div>
+            </div>
+
             {/* Buttons */}
             <div className="flex gap-2">
               <button
@@ -1658,12 +1710,13 @@ export default function ResultsPage() {
                 onClick={async () => {
                   try {
                     setCustomizing(true);
-                    await customizeAssessmentReport(assessmentId, { logoFile, companyName, address });
+                    await customizeAssessmentReport(assessmentId, { logoFile, companyName, address, outputFormat });
                     setShowCustomizeModal(false);
                     setLogoFile(null);
                     setLogoPreview(null);
                     setCompanyName("");
                     setAddress("");
+                    setOutputFormat("docx");
                     setShowReport(true);
                   } catch (err) {
                     toast.error(err?.message || "Failed to customize report");

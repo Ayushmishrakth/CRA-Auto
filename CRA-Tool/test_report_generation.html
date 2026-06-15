@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CRA Report Generator - Test Form</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 40px auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 30px; font-size: 24px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; color: #333; margin-bottom: 8px; }
+        input[type="text"], input[type="email"], input[type="file"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        textarea { min-height: 80px; resize: vertical; }
+        input[type="file"] { padding: 8px; }
+        .file-preview { margin-top: 10px; font-size: 12px; color: #666; }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover { background: #106ebe; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .status { margin-top: 20px; padding: 15px; border-radius: 4px; font-size: 14px; display: none; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .loading { display: none; text-align: center; }
+        .loading.active { display: block; }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0078d4;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .instructions { background: #f9f9f9; padding: 15px; border-radius: 4px; margin-bottom: 20px; font-size: 13px; color: #666; }
+        .field-required::after { content: " *"; color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 CRA Report Generator</h1>
+
+        <div class="instructions">
+            <strong>Instructions:</strong>
+            <ol style="margin-top: 10px;">
+                <li>Select an assessment from the dropdown</li>
+                <li>Upload your company logo (PNG, JPG, or SVG)</li>
+                <li>Enter your company name (will appear on cover page)</li>
+                <li>Enter your company address (will appear below name)</li>
+                <li>Choose report format (PDF or Word)</li>
+                <li>Click "Generate & Download Report"</li>
+                <li>Open the downloaded file to verify logo and company details appear</li>
+            </ol>
+        </div>
+
+        <form id="reportForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="assessmentId" class="field-required">Assessment</label>
+                <select id="assessmentId" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="">-- Loading assessments --</option>
+                </select>
+                <div class="file-preview" id="assessmentStatus"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="logo">Company Logo <span style="color: #999;">(PNG, JPG, or SVG)</span></label>
+                <input type="file" id="logo" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml">
+                <div class="file-preview" id="logoPreview"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="companyName" class="field-required">Company Name</label>
+                <input type="text" id="companyName" placeholder="e.g., Acme Corporation" required>
+                <div class="file-preview">This will appear on the cover page in large, bold text</div>
+            </div>
+
+            <div class="form-group">
+                <label for="companyAddress">Company Address</label>
+                <textarea id="companyAddress" placeholder="e.g., 123 Business Street, New York, NY 10001"></textarea>
+                <div class="file-preview">This will appear below company name on the cover page</div>
+            </div>
+
+            <div class="form-group">
+                <label for="reportFormat" class="field-required">Report Format</label>
+                <select id="reportFormat" required>
+                    <option value="pdf">PDF (recommended)</option>
+                    <option value="docx">Word Document (.docx)</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn">📥 Generate & Download Report</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div id="loadingText">Generating report...</div>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let assessments = [];
+
+        // Load assessments on page load
+        async function loadAssessments() {
+            try {
+                // Get auth token from session/local storage
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+                const response = await fetch(`${API_BASE}/api/v1/assessments`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                assessments = data.data || data.assessments || [];
+
+                const select = document.getElementById('assessmentId');
+                select.innerHTML = '';
+
+                if (assessments.length === 0) {
+                    select.innerHTML = '<option value="">No assessments available</option>';
+                    return;
+                }
+
+                assessments.forEach(assessment => {
+                    const option = document.createElement('option');
+                    option.value = assessment.id;
+                    option.textContent = `${assessment.tenant_name || 'Unnamed'} - Score: ${assessment.overall_score || '?'}`;
+                    select.appendChild(option);
+                });
+
+                // Update status when selection changes
+                select.addEventListener('change', (e) => {
+                    const selected = assessments.find(a => a.id === e.target.value);
+                    const statusDiv = document.getElementById('assessmentStatus');
+                    if (selected) {
+                        statusDiv.textContent = `✓ Selected: ${selected.tenant_name} (Score: ${selected.overall_score || 'N/A'}, Parameters: ${selected.parameter_count || 'N/A'})`;
+                    }
+                });
+
+            } catch (error) {
+                console.error('Failed to load assessments:', error);
+                document.getElementById('assessmentId').innerHTML = '<option value="">Error loading assessments</option>';
+            }
+        }
+
+        // Handle logo selection
+        document.getElementById('logo').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const preview = document.getElementById('logoPreview');
+                if (file.size > 5 * 1024 * 1024) {
+                    preview.textContent = '❌ File too large (max 5MB)';
+                    e.target.value = '';
+                } else if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
+                    preview.textContent = `❌ Invalid format: ${file.type}. Use PNG, JPG, or SVG`;
+                    e.target.value = '';
+                } else {
+                    preview.textContent = `✓ Logo selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                }
+            }
+        });
+
+        // Handle form submission
+        document.getElementById('reportForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const assessmentId = document.getElementById('assessmentId').value;
+            const companyName = document.getElementById('companyName').value;
+            const companyAddress = document.getElementById('companyAddress').value;
+            const reportFormat = document.getElementById('reportFormat').value;
+            const logo = document.getElementById('logo').files[0];
+
+            if (!assessmentId) {
+                showStatus('Please select an assessment', 'error');
+                return;
+            }
+
+            if (!companyName) {
+                showStatus('Please enter a company name', 'error');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                const formData = new FormData();
+                formData.append('company_name', companyName);
+                formData.append('company_address', companyAddress);
+                formData.append('report_format', reportFormat);
+                if (logo) formData.append('logo', logo);
+
+                showLoading(true, `Generating ${reportFormat.toUpperCase()} report for ${companyName}...`);
+
+                const response = await fetch(
+                    `${API_BASE}/api/v1/reports/assessments/${assessmentId}/generate`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    }
+                );
+
+                showLoading(false);
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error || `HTTP ${response.status}`);
+                }
+
+                // Download file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Assessment_Report_${companyName}_${new Date().getTime()}.${reportFormat === 'pdf' ? 'pdf' : 'docx'}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showStatus(`✅ Report generated successfully! Check your Downloads folder.`, 'success');
+            } catch (error) {
+                console.error('Report generation failed:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                showLoading(false);
+            }
+        });
+
+        function showStatus(message, type) {
+            const div = document.getElementById('status');
+            div.textContent = message;
+            div.className = `status ${type}`;
+            div.style.display = 'block';
+        }
+
+        function showLoading(show, text = 'Generating report...') {
+            const div = document.getElementById('loading');
+            if (show) {
+                document.getElementById('loadingText').textContent = text;
+                div.classList.add('active');
+                document.getElementById('submitBtn').disabled = true;
+            } else {
+                div.classList.remove('active');
+                document.getElementById('submitBtn').disabled = false;
+            }
+        }
+
+        // Load assessments when page loads
+        window.addEventListener('load', loadAssessments);
+    </script>
+</body>
+</html>

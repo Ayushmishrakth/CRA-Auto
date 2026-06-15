@@ -11,6 +11,7 @@ import ProgressPage        from "../pages/ProgressPage";
 import ResultsPage         from "../pages/ResultsPage";
 import ReportsPage         from "../pages/ReportsPage";
 import SettingsPage        from "../pages/SettingsPage";
+import TenantDeploymentSuccessPage from "../pages/TenantDeploymentSuccessPage";
 
 // Legacy pages (still functional, now wrapped in AppShell)
 import AssessmentDetailPage  from "../pages/AssessmentDetailPage";
@@ -37,6 +38,7 @@ export default function AppRoutes() {
           <Route path="/assessments"  element={<AssessmentsPage />} />
           {/* /new must come before /:assessmentId so it is not captured as an id */}
           <Route path="/assessments/new"                          element={<NewAssessmentPage />} />
+          <Route path="/tenant/deployment-success"               element={<TenantDeploymentSuccessPage />} />
           <Route path="/assessments/:assessmentId/progress"       element={<ProgressPage />} />
           <Route path="/assessments/:assessmentId/results"        element={<ResultsPage />} />
           {/* Legacy detail routes kept as-is */}

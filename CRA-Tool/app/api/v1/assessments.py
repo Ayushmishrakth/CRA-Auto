@@ -4,7 +4,7 @@ Assessment API routes.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,10 +29,174 @@ from app.schemas.dashboard import (
     AssessmentResultsResponse,
 )
 from app.schemas.report import GenerateReportResponse, ReportBundleResponse
+from app.schemas.report_customization import ReportCustomization, ReportCustomizationResponse
 from app.services import assessment_service, dashboard_service
 from app.services.reporting import cra_report_service
 
+from fastapi import UploadFile, File
+from pathlib import Path
+import uuid as uuid_module
+
 router = APIRouter(tags=["Assessments"])
+
+
+@router.post("/assessments/customize/upload-logo")
+async def upload_report_logo(
+    file: UploadFile = File(...),
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload company logo for white-label reports."""
+    try:
+        # Validate file type
+        allowed_types = {"image/png", "image/jpeg", "image/svg+xml"}
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type. Allowed: PNG, JPG, SVG"
+            )
+
+        # Validate file size (max 5MB)
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+
+        # Create logo directory
+        logo_dir = Path("storage/logos")
+        logo_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save with unique filename
+        file_extension = Path(file.filename).suffix
+        logo_filename = f"{current_user.id}_{uuid_module.uuid4()}{file_extension}"
+        logo_path = logo_dir / logo_filename
+
+        with open(logo_path, "wb") as f:
+            f.write(content)
+
+        return success_response(
+            message="Logo uploaded successfully",
+            data={
+                "logo_path": str(logo_path),
+                "filename": logo_filename,
+                "size": len(content)
+            },
+            request_id=request.state.request_id if request else None,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Logo upload failed: {str(e)}")
+
+
+@router.post("/assessments/{assessment_id}/customize")
+async def customize_report(
+    assessment_id: UUID,
+    company_name: str = Form(None),
+    company_address: str = Form(None),
+    report_format: str = Form("docx"),
+    logo: UploadFile = File(None),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Save report customization settings for assessment - NOW ACCEPTS FILE UPLOADS!"""
+    try:
+        import logging
+        from pathlib import Path as PathlibPath
+        logger = logging.getLogger(__name__)
+
+        # Verify assessment exists
+        from sqlalchemy import select
+        import app.db.base  # noqa
+        from app.db.models.assessment import Assessment
+        from app.services.reporting.report_customization import store_customization
+
+        stmt = select(Assessment).where(Assessment.id == assessment_id)
+        result = await db.execute(stmt)
+        assessment = result.scalar_one_or_none()
+
+        if not assessment:
+            raise HTTPException(status_code=404, detail="Assessment not found")
+
+        # Handle logo file upload if provided
+        logo_path = None
+        if logo and logo.filename:
+            logger.info(f"[CUSTOMIZE] Logo file received: {logo.filename}")
+
+            # Validate file type
+            allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/svg+xml"}
+            if logo.content_type not in allowed_types:
+                raise HTTPException(status_code=400, detail=f"Invalid file type. Use PNG, JPG, or SVG")
+
+            # Read and validate size
+            content = await logo.read()
+            if len(content) > 5 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Logo too large (max 5MB)")
+
+            # Save logo file
+            logo_dir = PathlibPath("storage/temp/logos").resolve()
+            logo_dir.mkdir(parents=True, exist_ok=True)
+
+            import uuid as uuid_module
+            file_ext = PathlibPath(logo.filename).suffix
+            logo_filename = f"{assessment_id}_{uuid_module.uuid4()}{file_ext}"
+            logo_path = logo_dir / logo_filename
+
+            with open(logo_path, "wb") as f:
+                f.write(content)
+
+            logger.info(f"[CUSTOMIZE] Logo saved (absolute): {logo_path.resolve()}")
+            logger.info(f"[CUSTOMIZE] File exists after save: {logo_path.exists()}")
+
+        # Store customization in the cache for report generation
+        logger.info(f"[CUSTOMIZE] ========================================")
+        logger.info(f"[CUSTOMIZE] STORING CUSTOMIZATION FOR {assessment_id}")
+        logger.info(f"[CUSTOMIZE] ========================================")
+        logger.info(f"[CUSTOMIZE]   company_name: {company_name}")
+        logger.info(f"[CUSTOMIZE]   company_address: {company_address}")
+        logger.info(f"[CUSTOMIZE]   logo_path: {logo_path}")
+        logger.info(f"[CUSTOMIZE]   report_format: {report_format}")
+
+        # Print to console
+        print(f"\n{'='*60}")
+        print(f"✅ CUSTOMIZATION RECEIVED:")
+        print(f"  company_name: {company_name}")
+        print(f"  company_address: {company_address}")
+        print(f"  logo_path: {logo_path}")
+        print(f"  report_format: {report_format}")
+        print(f"{'='*60}\n")
+
+        # Save to cache
+        store_customization(
+            assessment_id,
+            logo_path=str(logo_path) if logo_path else None,
+            address=company_address,
+            company_name=company_name,
+            output_format=report_format
+        )
+
+        logger.info(f"[CUSTOMIZE] ✅ Customization stored in cache")
+
+        return success_response(
+            message="Report customization saved",
+            data={
+                "assessment_id": str(assessment_id),
+                "company_name": company_name,
+                "company_address": company_address,
+                "logo_path": str(logo_path) if logo_path else None,
+                "report_format": report_format,
+            },
+            request_id=request.state.request_id if request else None,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"[CUSTOMIZE] ❌ Failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Customization failed: {str(e)}")
 
 
 @router.post(
@@ -366,38 +530,161 @@ async def get_assessment_report_debug(
     )
 
 
+@router.post("/assessments/{assessment_id}/report/generate-debug")
+async def generate_report_debug(
+    assessment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Debug endpoint to test simple report generation."""
+    import logging
+    import traceback
+    from pathlib import Path as _Path
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info(f"[DEBUG] Testing simple report generation")
+
+        from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
+
+        # Create minimal data
+        data = {
+            'id': str(assessment_id),
+            'tenant_id': str(assessment_id),
+            'tenant_name': 'Test',
+            'partner_name': 'Test',
+            'created_at': __import__('datetime').datetime.now(),
+            'overall_score': 50.0,
+            'findings': [],
+            'summary': {'total_parameters': 0, 'pass_count': 0, 'fail_count': 0,
+                       'critical_count': 0, 'high_count': 0, 'medium_count': 0, 'low_count': 0},
+        }
+
+        gen = EnhancedReportGenerator(data)
+        report_bytes = gen.generate()
+
+        _Path("storage/reports").mkdir(parents=True, exist_ok=True)
+        test_file = _Path("storage/reports/debug_test.docx")
+        with open(test_file, 'wb') as f:
+            f.write(report_bytes.getvalue())
+
+        return {
+            "status": "success",
+            "message": "Report generated",
+            "file_size": len(report_bytes.getvalue()),
+            "file_path": str(test_file),
+            "file_exists": test_file.exists(),
+        }
+
+    except Exception as exc:
+        logger.error(f"[DEBUG] Failed: {exc}")
+        logger.error(traceback.format_exc())
+
+        return {
+            "status": "error",
+            "message": str(exc),
+            "type": type(exc).__name__,
+        }
+
+
 @router.get("/assessments/{assessment_id}/report/download")
 async def download_assessment_report(
     assessment_id: UUID,
     report_type: str = Query(default="pdf", pattern="^(pdf|docx)$"),
+    company_name: str = Query(default=None),
+    company_address: str = Query(default=None),
+    logo_path: str = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-) -> FileResponse:
-    try:
-        artifact = await cra_report_service.get_report_artifact(
-            db,
-            current_user=current_user,
-            assessment_id=assessment_id,
-            report_type=report_type,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    media_type = (
-        "application/pdf"
-        if report_type == "pdf"
-        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
-    import re
+):
+    """Download report - fetches real assessment data and generates report with optional white-label customization."""
     from pathlib import Path as _Path
-    artifact_path = _Path(artifact.storage_path)
-    # Use the stored filename (already has tenant name) or fall back
-    safe_filename = artifact_path.name if artifact_path.name.endswith(f".{report_type}") else f"copilot-readiness-assessment.{report_type}"
-    return FileResponse(
-        artifact.storage_path,
-        media_type=media_type,
-        filename=safe_filename,
-        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
-    )
+    import logging
+    import asyncio
+    import io as _io
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info(f"[DOWNLOAD] Starting for {assessment_id}, type={report_type}")
+        logger.info(f"[DOWNLOAD] White-label: company={company_name}, address={company_address}")
+
+        # Fetch real assessment data
+        from app.services.reporting.assessment_report_data_service import AssessmentReportDataService
+        from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
+
+        logger.info(f"[DOWNLOAD] Fetching assessment data from database...")
+        assessment_data = await AssessmentReportDataService.get_assessment_report_data(db, assessment_id)
+
+        # Apply customization to assessment data
+        if company_name:
+            logger.info(f"[DOWNLOAD] Applying company name: {company_name}")
+            assessment_data['tenant_name'] = company_name
+            assessment_data['summary']['tenant_name'] = company_name
+            assessment_data['summary']['organization_name'] = company_name
+
+        if company_address:
+            logger.info(f"[DOWNLOAD] Applying company address: {company_address}")
+            assessment_data['company_address'] = company_address
+
+        logger.info(f"[DOWNLOAD] Got {len(assessment_data.get('findings', []))} findings, generating report...")
+        logger.info(f"[DOWNLOAD] Using logo: {logo_path if logo_path else 'None'}")
+        logger.info(f"[DOWNLOAD] Company: {assessment_data.get('tenant_name')}")
+
+        # Generate in thread to avoid blocking
+        def gen_report():
+            gen = EnhancedReportGenerator(assessment_data, logo_path=logo_path)
+            return gen.generate()
+
+        report_bytes = await asyncio.to_thread(gen_report)
+
+        logger.info(f"[DOWNLOAD] Generated {len(report_bytes.getvalue())} bytes")
+
+        # Save to disk
+        _Path("storage/reports").mkdir(parents=True, exist_ok=True)
+        timestamp = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        if report_type == "pdf":
+            # Convert to PDF
+            word_path = _Path(f"storage/reports/report_{timestamp}.docx")
+            with open(word_path, 'wb') as f:
+                f.write(report_bytes.getvalue())
+
+            logger.info(f"[DOWNLOAD] Converting to PDF...")
+            pdf_path = _Path(f"storage/reports/report_{timestamp}.pdf")
+
+            def convert_pdf():
+                from docx2pdf import convert
+                convert(str(word_path), str(pdf_path))
+                return pdf_path
+
+            file_path = await asyncio.to_thread(convert_pdf)
+            logger.info(f"[DOWNLOAD] PDF ready: {file_path}")
+
+            media_type = "application/pdf"
+            filename = file_path.name
+        else:
+            # Save Word directly
+            file_path = _Path(f"storage/reports/report_{timestamp}.docx")
+            with open(file_path, 'wb') as f:
+                f.write(report_bytes.getvalue())
+
+            logger.info(f"[DOWNLOAD] DOCX ready: {file_path}")
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            filename = file_path.name
+
+        return FileResponse(
+            path=str(file_path),
+            media_type=media_type,
+            filename=filename,
+        )
+
+    except Exception as exc:
+        logger.exception(f"[DOWNLOAD] Failed: {exc}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(exc)}")
 
 
 @router.get(

@@ -4,6 +4,7 @@ Report API business logic.
 
 import os
 import shutil
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -16,7 +17,8 @@ from app.services.assessment_service import get_assessment
 from app.services.reporting.cra_report_service import get_report_bundle
 from app.services.reporting.report_customization import store_customization
 
-
+logger = logging.getLogger(__name__)
+LOGO_STORAGE_DIR = Path("storage/logos")
 LOGO_TEMP_DIR = Path("storage/temp/logos")
 
 
@@ -40,6 +42,47 @@ async def get_report_status(
     )
 
 
+async def validate_and_save_logo(
+    logo_file: UploadFile,
+    user_id: UUID,
+    max_size_bytes: int = 5 * 1024 * 1024,
+) -> Path:
+    """Validate and save logo file. Returns path to saved logo."""
+    if not logo_file or not logo_file.filename:
+        return None
+
+    # Validate file type
+    allowed_mime_types = {"image/png", "image/jpeg", "image/svg+xml"}
+    if logo_file.content_type not in allowed_mime_types:
+        raise ValueError(f"Invalid logo format. Allowed: PNG, JPG, SVG (got {logo_file.content_type})")
+
+    # Read and validate file size
+    content = await logo_file.read()
+    if len(content) > max_size_bytes:
+        raise ValueError(f"Logo file too large. Maximum size: {max_size_bytes / (1024*1024):.1f}MB")
+
+    if len(content) == 0:
+        raise ValueError("Logo file is empty")
+
+    # Validate file extension
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".svg"}
+    file_ext = Path(logo_file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise ValueError(f"Invalid file extension. Allowed: {allowed_extensions}")
+
+    # Save logo with sanitized filename
+    LOGO_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    import uuid as uuid_module
+    safe_filename = f"logo_{user_id}_{uuid_module.uuid4()}{file_ext}"
+    logo_path = LOGO_STORAGE_DIR / safe_filename
+
+    with open(logo_path, "wb") as f:
+        f.write(content)
+
+    logger.info(f"Logo saved for user {user_id}: {logo_path} ({len(content)} bytes)")
+    return logo_path
+
+
 async def handle_report_customization(
     db: AsyncSession,
     *,
@@ -55,22 +98,17 @@ async def handle_report_customization(
     if output_format not in {"docx", "pdf", "both"}:
         raise ValueError("Invalid report output format. Allowed: docx, pdf, both")
 
-    LOGO_TEMP_DIR.mkdir(parents=True, exist_ok=True)
-
     logo_path = None
-    if logo_file:
-        allowed_formats = os.getenv("LOGO_ALLOWED_FORMATS", "png,jpg,jpeg,svg").split(",")
-        file_ext = logo_file.filename.split(".")[-1].lower()
+    try:
+        if logo_file:
+            logo_path = await validate_and_save_logo(logo_file, current_user.id)
+    except ValueError as e:
+        logger.error(f"Logo validation failed: {e}")
+        raise
 
-        if file_ext not in allowed_formats:
-            raise ValueError(f"Invalid file format. Allowed: {allowed_formats}")
-
-        logo_filename = f"{assessment_id}_{logo_file.filename}"
-        logo_path = LOGO_TEMP_DIR / logo_filename
-
-        with open(logo_path, "wb") as f:
-            content = await logo_file.read()
-            f.write(content)
+    # Sanitize company name and address
+    company_name = (company_name or "").strip()[:200] if company_name else None
+    address = (address or "").strip()[:500] if address else None
 
     # Store in-memory for use during report generation
     store_customization(assessment_id, str(logo_path) if logo_path else None, address, company_name, output_format)

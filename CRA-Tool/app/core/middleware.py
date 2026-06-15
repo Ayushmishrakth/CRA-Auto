@@ -10,6 +10,8 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 
 from app.core.config import settings
 from app.core.responses import ErrorDetail, ErrorResponse
@@ -92,7 +94,34 @@ async def security_headers_middleware(
     return response
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        if not settings.debug:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains; preload"
+            )
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' https://graph.microsoft.com "
+            "https://login.microsoftonline.com; "
+            "frame-ancestors 'none';"
+        )
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), camera=(), microphone=(), payment=()"
+        )
+        return response
+
+
 def register_middleware(app: FastAPI) -> None:
+    app.add_middleware(SecurityHeadersMiddleware)
     app.middleware("http")(request_context_middleware)
     app.middleware("http")(security_headers_middleware)
     app.middleware("http")(rate_limit_middleware)
@@ -101,6 +130,12 @@ def register_middleware(app: FastAPI) -> None:
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["*"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "X-Requested-With",
+            "X-Request-ID",
+        ],
         expose_headers=["Content-Disposition"],
     )

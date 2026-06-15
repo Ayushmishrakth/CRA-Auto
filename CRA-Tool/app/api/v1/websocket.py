@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from redis.asyncio import Redis
 
 from app.core.config import settings
@@ -83,11 +83,12 @@ async def _run_socket(websocket: WebSocket, *, channel: str, connected_payload: 
 
 
 @router.websocket("/ws/assessment/{assessment_id}")
-async def assessment_socket(websocket: WebSocket, assessment_id: str) -> None:
-    context = await get_assessment_channel_context(
-        websocket.query_params.get("token"),
-        assessment_id,
-    )
+async def assessment_socket(
+    websocket: WebSocket,
+    assessment_id: str,
+    token: str = Query(...),
+) -> None:
+    context = await get_assessment_channel_context(token, assessment_id)
     if context is None:
         await websocket.close(code=1008, reason="Assessment channel is not available")
         return
@@ -129,8 +130,12 @@ async def assessment_socket(websocket: WebSocket, assessment_id: str) -> None:
 
 
 @router.websocket("/ws/tenant/{job_id}")
-async def tenant_job_socket(websocket: WebSocket, job_id: str) -> None:
-    context = await get_tenant_job_channel_context(websocket.query_params.get("token"), job_id)
+async def tenant_job_socket(
+    websocket: WebSocket,
+    job_id: str,
+    token: str = Query(...),
+) -> None:
+    context = await get_tenant_job_channel_context(token, job_id)
     if context is None:
         await websocket.close(code=1008, reason="Job channel is not available")
         return

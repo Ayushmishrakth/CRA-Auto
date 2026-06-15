@@ -1256,6 +1256,31 @@ async def run_assessment_job(job_id: str, *, worker_id: str | None = None) -> di
                 "findings": len(findings),
                 "recommendations": len(recommendations),
             }
+        except (asyncio.CancelledError, GeneratorExit):
+            logger.warning(
+                f"Assessment task cancelled/interrupted: job_id={job_id} assessment_id={assessment.id if 'assessment' in locals() else 'unknown'}"
+            )
+            try:
+                await db.rollback()
+                job = await _load_job(db, job_id)
+                assessment = await _load_assessment(db, job.assessment_id)
+                assessment.status = "failed"
+                job.status = "failed"
+                job.current_stage = "failed"
+                job.error_message = "Assessment interrupted — server restarted or task cancelled"
+                job.completed_at = _utc_now()
+                await emit_event(
+                    db,
+                    assessment_id=assessment.id,
+                    tenant_id=assessment.tenant_id,
+                    event_type="assessment.failed",
+                    severity="error",
+                    payload={"error": "Task cancelled", "job_id": str(job.id)},
+                )
+                await db.commit()
+            except Exception as cleanup_err:
+                logger.error(f"Failed to mark assessment as failed after cancellation: {cleanup_err}")
+            raise
         except Exception as exc:
             await db.rollback()
             job = await _load_job(db, job_id)

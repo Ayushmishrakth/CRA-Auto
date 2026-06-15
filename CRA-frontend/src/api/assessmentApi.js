@@ -140,10 +140,28 @@ export async function customizeAssessmentReport(assessmentId, { logoFile, addres
     formData.append("company_name", companyName);
   }
   formData.append("output_format", outputFormat);
-  const response = await api.post(`/reports/assessments/${assessmentId}/customize`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-  return unwrapApiData(response);
+
+  try {
+    // ✅ FIX: Do NOT manually set Content-Type header
+    // When Axios detects FormData, it automatically sets:
+    // "Content-Type": "multipart/form-data; boundary=..."
+    // If you manually set the header, Axios won't add the boundary marker,
+    // which breaks multipart parsing on the backend.
+
+    const response = await api.post(
+      `/reports/assessments/${assessmentId}/customize`,
+      formData
+      // ✅ CORRECT: No headers object - let Axios handle it
+    );
+    return unwrapApiData(response);
+  } catch (error) {
+    console.error("[CUSTOMIZE API] customizeAssessmentReport failed", {
+      assessmentId,
+      hasLogo: !!logoFile,
+      errorMessage: error.message,
+      errorStatus: error.response?.status,
+      errorData: error.response?.data,
+    });
+    throw error;
+  }
 }

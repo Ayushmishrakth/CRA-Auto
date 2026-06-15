@@ -7,6 +7,7 @@ PowerShell runtime. Microsoft Graph collectors plug into this lifecycle later.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 import traceback
 from typing import Any

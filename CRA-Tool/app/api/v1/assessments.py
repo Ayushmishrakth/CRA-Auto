@@ -546,8 +546,6 @@ async def generate_report_debug(
     try:
         logger.info(f"[DEBUG] Testing simple report generation")
 
-        from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
-
         # Create minimal data
         data = {
             'id': str(assessment_id),
@@ -610,74 +608,62 @@ async def download_assessment_report(
         logger.info(f"[DOWNLOAD] Starting for {assessment_id}, type={report_type}")
         logger.info(f"[DOWNLOAD] White-label: company={company_name}, address={company_address}")
 
-        # Fetch real assessment data
-        from app.services.reporting.assessment_report_data_service import AssessmentReportDataService
-        from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
+        # Fetch full report data using the proper pipeline
+        from app.services.reporting.cra_report_service import build_report_data
 
-        logger.info(f"[DOWNLOAD] Fetching assessment data from database...")
-        assessment_data = await AssessmentReportDataService.get_assessment_report_data(db, assessment_id)
+        logger.info(f"[DOWNLOAD] Fetching complete assessment data from database...")
+        assessment_data = await build_report_data(db, current_user=current_user, assessment_id=assessment_id)
 
-        # Apply customization to assessment data
-        if company_name:
-            logger.info(f"[DOWNLOAD] Applying company name: {company_name}")
-            assessment_data['tenant_name'] = company_name
-            assessment_data['summary']['tenant_name'] = company_name
-            assessment_data['summary']['organization_name'] = company_name
-
-        if company_address:
-            logger.info(f"[DOWNLOAD] Applying company address: {company_address}")
-            assessment_data['company_address'] = company_address
-
-        logger.info(f"[DOWNLOAD] Got {len(assessment_data.get('findings', []))} findings, generating report...")
+        logger.info(f"[DOWNLOAD] Got {len(assessment_data.get('parameter_rows', []))} parameters, generating report...")
         logger.info(f"[DOWNLOAD] Using logo: {logo_path if logo_path else 'None'}")
-        logger.info(f"[DOWNLOAD] Company: {assessment_data.get('tenant_name')}")
+        logger.info(f"[DOWNLOAD] Company: {assessment_data.get('summary', {}).get('tenant_name')}")
 
-        # Generate in thread to avoid blocking
-        def gen_report():
-            gen = EnhancedReportGenerator(assessment_data, logo_path=logo_path)
-            return gen.generate()
+        # Generate DOCX using report_builder
+        from app.services.reporting.report_builder import build_docx_report
 
-        report_bytes = await asyncio.to_thread(gen_report)
-
-        logger.info(f"[DOWNLOAD] Generated {len(report_bytes.getvalue())} bytes")
-
-        # Save to disk
         _Path("storage/reports").mkdir(parents=True, exist_ok=True)
         timestamp = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
 
-        if report_type == "pdf":
-            # Convert to PDF
-            word_path = _Path(f"storage/reports/report_{timestamp}.docx")
-            with open(word_path, 'wb') as f:
-                f.write(report_bytes.getvalue())
+        # Build DOCX
+        docx_path = _Path(f"storage/reports/Assessment_{assessment_id}_{timestamp}.docx")
+        logger.info(f"[DOWNLOAD] Building DOCX at {docx_path}...")
 
-            logger.info(f"[DOWNLOAD] Converting to PDF...")
-            pdf_path = _Path(f"storage/reports/report_{timestamp}.pdf")
+        def build_report():
+            return build_docx_report(
+                assessment_data=assessment_data,
+                output_path=str(docx_path),
+                company_name=company_name,
+                company_address=company_address,
+                logo_path=logo_path,
+            )
 
-            def convert_pdf():
-                from docx2pdf import convert
-                convert(str(word_path), str(pdf_path))
-                return pdf_path
+        generated_path = await asyncio.to_thread(build_report)
+        logger.info(f"[DOWNLOAD] DOCX generated: {generated_path}")
 
-            file_path = await asyncio.to_thread(convert_pdf)
-            logger.info(f"[DOWNLOAD] PDF ready: {file_path}")
+        if report_type == "docx":
+            logger.info(f"[DOWNLOAD] Returning DOCX: {docx_path}")
+            return FileResponse(
+                path=str(docx_path),
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                filename=f"Assessment_{timestamp}.docx",
+            )
 
-            media_type = "application/pdf"
-            filename = file_path.name
-        else:
-            # Save Word directly
-            file_path = _Path(f"storage/reports/report_{timestamp}.docx")
-            with open(file_path, 'wb') as f:
-                f.write(report_bytes.getvalue())
+        # Convert to PDF if requested
+        logger.info(f"[DOWNLOAD] Converting DOCX to PDF...")
+        pdf_path = _Path(f"storage/reports/Assessment_{assessment_id}_{timestamp}.pdf")
 
-            logger.info(f"[DOWNLOAD] DOCX ready: {file_path}")
-            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            filename = file_path.name
+        def convert_pdf():
+            from docx2pdf import convert
+            convert(str(docx_path), str(pdf_path))
+            return pdf_path
+
+        file_path = await asyncio.to_thread(convert_pdf)
+        logger.info(f"[DOWNLOAD] PDF ready: {file_path}")
 
         return FileResponse(
             path=str(file_path),
-            media_type=media_type,
-            filename=filename,
+            media_type="application/pdf",
+            filename=f"Assessment_{timestamp}.pdf",
         )
 
     except Exception as exc:

@@ -22,7 +22,6 @@ from app.services.reporting.cra_chart_service import build_chart_data
 from app.services.reporting.cra_narrative_service import build_narrative
 from app.services.reporting.cra_risk_engine import aggregate_findings
 from app.services.reporting.cra_summary_service import build_summary
-from app.services.reporting.word_report_generator import render_word_report
 from app.services.reporting.report_customization import get_customization_for_pdf, clear_customization
 from app.services.registry_service import get_registry
 
@@ -66,58 +65,29 @@ async def generate_report_bundle(
     generated_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     report_stem = f"Copilot_Readiness_Assessment_{tenant_name}_{generated_stamp}"
 
-    # Generate DOCX using docxtpl with fallback
-    docx_bytes = None
-    try:
-        logger.info(f"[REPORT] Calling render_word_report with customization")
-        docx_bytes = await asyncio.to_thread(
-            render_word_report,
-            report_data,
-            logo_path=customization.get("logo_path"),
-            company_name=customization.get("company_name"),
-            address=customization.get("address"),
-        )
-    except Exception as docx_err:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"docxtpl generation failed: {docx_err}, using enhanced generator")
+    # Generate DOCX using report_builder
+    from app.services.reporting.report_builder import build_docx_report
 
-        # Fallback to enhanced generator
-        try:
-            from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
-
-            # Convert ORM data to dict format for enhanced generator
-            assessment_dict = {
-                'id': str(assessment.id),
-                'tenant_id': str(assessment.tenant_id),
-                'tenant_name': customization.get("company_name") or report_data["summary"].get("tenant_name", "Organization"),
-                'partner_name': report_data["summary"].get("partner_name", "Assessment Team"),
-                'created_at': assessment.created_at,
-                'overall_score': assessment.overall_score or 0.0,
-                'findings': [],
-                'summary': report_data["summary"],
-                'company_address': customization.get("address"),  # Add address
-                'logo_path': customization.get("logo_path"),  # Add logo path
-            }
-
-            logger.info(f"[REPORT] Creating EnhancedReportGenerator with:")
-            logger.info(f"[REPORT]   tenant_name: {assessment_dict['tenant_name']}")
-            logger.info(f"[REPORT]   company_address: {assessment_dict.get('company_address')}")
-            logger.info(f"[REPORT]   logo_path param: {customization.get('logo_path')}")
-
-            generator = EnhancedReportGenerator(assessment_dict, logo_path=customization.get("logo_path"))
-            docx_bytes = await asyncio.to_thread(generator.generate)
-            docx_bytes = __import__('io').BytesIO(docx_bytes) if isinstance(docx_bytes, bytes) else docx_bytes
-            logger.info(f"[REPORT] Enhanced generator succeeded, generated {len(docx_bytes.getvalue())} bytes")
-        except Exception as fallback_err:
-            logger.error(f"Both generators failed: {fallback_err}")
-            raise
-
-    # Save DOCX to disk
     target_dir.mkdir(parents=True, exist_ok=True)
     docx_path = target_dir / f"{report_stem}.docx"
-    with open(docx_path, 'wb') as f:
-        f.write(docx_bytes.getvalue())
+
+    # DEBUG: Log report_data structure
+    logger.info(f"[REPORT] report_data keys: {list(report_data.keys())}")
+    logger.info(f"[REPORT] parameter_rows count: {len(report_data.get('parameter_rows', []))}")
+    if report_data.get('parameter_rows'):
+        logger.info(f"[REPORT] first row: {report_data['parameter_rows'][0]}")
+    logger.info(f"[REPORT] sections keys: {list(report_data.get('sections', {}).keys())}")
+
+    # Build the report with customization
+    build_docx_report(
+        assessment_data=report_data,
+        output_path=str(docx_path),
+        company_name=customization.get("company_name"),
+        company_address=customization.get("address"),
+        logo_path=customization.get("logo_path"),
+    )
+
+    logger.info(f"[REPORT] DOCX generated successfully: {docx_path}")
 
     await db.execute(delete(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id))
     artifacts: list[AssessmentReport] = []

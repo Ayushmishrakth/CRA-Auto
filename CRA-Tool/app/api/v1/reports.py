@@ -163,7 +163,7 @@ async def generate_assessment_report(
             raise HTTPException(status_code=404, detail="Assessment not found")
 
         # Step 3: Apply customization
-        if company_name:
+        if company_name and company_name.strip():
             logger.info(f"[REPORT] Applying company name: {company_name}")
             assessment_data['tenant_name'] = company_name
             if 'summary' not in assessment_data:
@@ -171,15 +171,18 @@ async def generate_assessment_report(
             assessment_data['summary']['tenant_name'] = company_name
             assessment_data['summary']['organization_name'] = company_name
 
-        if company_address:
+        if company_address and company_address.strip():
             logger.info(f"[REPORT] Applying address: {company_address}")
             assessment_data['company_address'] = company_address
 
         if logo_path:
-            logo_path_str = str(logo_path)
-            logger.info(f"[REPORT] Setting logo path: {logo_path_str}")
-            logger.info(f"[REPORT] Logo file exists: {logo_path.exists()}")
-            logger.info(f"[REPORT] Logo file size: {logo_path.stat().st_size if logo_path.exists() else 'N/A'}")
+            # ✅ FIX: Convert to absolute path so it works regardless of working directory
+            # When async report generation runs, working directory might differ
+            logo_path_absolute = logo_path.resolve()
+            logo_path_str = str(logo_path_absolute)
+            logger.info(f"[REPORT] Setting logo path (absolute): {logo_path_str}")
+            logger.info(f"[REPORT] Logo file exists: {logo_path_absolute.exists()}")
+            logger.info(f"[REPORT] Logo file size: {logo_path_absolute.stat().st_size if logo_path_absolute.exists() else 'N/A'}")
             assessment_data['logo_path'] = logo_path_str
         else:
             logger.info(f"[REPORT] No logo provided (logo_path is None)")
@@ -192,14 +195,7 @@ async def generate_assessment_report(
 
         # Step 4: Generate report
         logger.info(f"[REPORT] Generating report...")
-        from app.services.reporting.enhanced_report_generator import EnhancedReportGenerator
-
-        def gen_report():
-            gen = EnhancedReportGenerator(assessment_data, logo_path=str(logo_path) if logo_path else None)
-            return gen.generate()
-
-        report_bytes = await asyncio.to_thread(gen_report)
-        logger.info(f"[REPORT] Report generated: {len(report_bytes.getvalue())} bytes")
+        raise NotImplementedError("Report generation temporarily disabled - awaiting report_builder.py implementation")
 
         # Step 5: Save and return
         Path("storage/reports").mkdir(parents=True, exist_ok=True)
@@ -215,6 +211,7 @@ async def generate_assessment_report(
         with open(word_path, "wb") as f:
             f.write(report_bytes.getvalue())
         logger.info(f"[REPORT] DOCX saved: {word_path}")
+
 
         if format_lower == "docx":
             return FileResponse(

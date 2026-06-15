@@ -2,6 +2,9 @@ import { useState, useRef } from "react";
 import { Upload, X, AlertCircle } from "lucide-react";
 import Button from "../ui/Button";
 import { useToast } from "../../context/ToastContext";
+import { injectBrandingIntoDocx } from "../../utils/reportBranding";
+import { saveAs } from "file-saver";
+import axios from "axios";
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/svg+xml"];
@@ -77,13 +80,32 @@ export default function CustomizeReportModal({ assessmentId, onClose, onGenerate
 
   const handleGenerate = async () => {
     try {
-      await onGenerate({
-        logoFile: formState.logoFile,
-        companyName: formState.companyName.trim(),
-        companyAddress: formState.companyAddress.trim(),
-        format: formState.format,
+      const companyName = formState.companyName.trim();
+      const companyAddress = formState.companyAddress.trim();
+      const logoFile = formState.logoFile;
+
+      // Download plain DOCX from backend
+      const response = await axios.get(
+        `/api/v1/assessments/${assessmentId}/report/download?report_type=docx`,
+        { responseType: 'blob' }
+      );
+
+      // Inject branding in browser
+      const brandedBlob = await injectBrandingIntoDocx(response.data, {
+        logoFile: logoFile,
+        companyName: companyName,
+        companyAddress: companyAddress,
       });
+
+      // Save to user's computer
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `CRA_Report_${companyName || 'Report'}_${timestamp}.docx`;
+      saveAs(brandedBlob, filename);
+
+      toast.success("Report generated and downloaded successfully!");
+      onClose();
     } catch (error) {
+      console.error('Report generation failed:', error);
       toast.error(error.message || "Failed to generate report");
     }
   };

@@ -4517,6 +4517,9 @@ def _add_toc_page(doc, config=None):
     for kind, text in page4:
         add_entry(text, toc_level(kind, text))
 
+    # PAGE BREAK after page 4: Separate TOC from Executive Summary
+    insert_manual_page_break()
+
 
 def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     """PAGE 5: Executive Summary with consulting-report typography and spacing."""

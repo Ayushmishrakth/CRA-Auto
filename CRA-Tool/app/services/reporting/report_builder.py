@@ -4938,29 +4938,44 @@ def build_docx_report(assessment_data: dict, output_path: str, company_name: str
                       company_address: str = None, logo_path: str = None, partner_name: str = None) -> str:
     """Build the first 9 pages of the CRA report."""
     try:
-        # Set display variables with fallbacks
-        display_name = (company_name or '').strip() or assessment_data.get('tenant_name', 'Client')
-        partner = (partner_name or '').strip() or 'CRA Assessment Team'
+        # CRITICAL: Prioritize assessment data for customer names
+        # Use parameters only for optional branding (logos, addresses)
+        tenant_name_from_data = assessment_data.get('tenant_name', '').strip()
+        customer_name_from_data = assessment_data.get('customer_name', '').strip()
+        org_name_from_data = assessment_data.get('organization_name', '').strip()
+        partner_name_from_data = assessment_data.get('partner_name', '').strip()
+
+        # Priority: organization_name > customer_name > tenant_name > parameter > fallback
+        display_name = (
+            org_name_from_data or
+            customer_name_from_data or
+            tenant_name_from_data or
+            (company_name or '').strip() or
+            'Client'
+        )
+
+        # Partner: use assessment data if available, fall back to parameter
+        partner = (
+            partner_name_from_data or
+            (partner_name or '').strip() or
+            'CRA Assessment Team'
+        )
+
         address = (company_address or '').strip() or None
         logo = logo_path or None
 
-        # VALIDATION: Print data binding before generation (no hardcoded names)
-        tenant_name = assessment_data.get('tenant_name', '[Not Available]')
-        org_name = assessment_data.get('organization_name', '[Not Available]')
+        # VALIDATION: Print data binding before generation
         logger.info(f"[REPORT_BUILDER] Data Binding Validation")
-        logger.info(f"  Customer Name = {display_name}")
-        logger.info(f"  Tenant Name = {tenant_name}")
-        logger.info(f"  Organization = {org_name}")
-        logger.info(f"  Partner = {partner}")
+        logger.info(f"  Customer Name = {display_name} (source: {('org' if org_name_from_data else 'customer' if customer_name_from_data else 'tenant' if tenant_name_from_data else 'parameter')})")
+        logger.info(f"  Tenant Name = {tenant_name_from_data or '[Not Available]'}")
+        logger.info(f"  Organization = {org_name_from_data or '[Not Available]'}")
+        logger.info(f"  Partner = {partner} (source: {('data' if partner_name_from_data else 'parameter')})")
 
-        # FAIL if hardcoded values are used
-        if display_name in ['TPT', 'Client Name', 'Company Name', 'Demo', 'Sample', 'Client']:
-            logger.error(f"[REPORT_BUILDER] FAILED: Hardcoded customer name '{display_name}' detected")
-            raise ValueError(f"Report generation failed: using hardcoded customer name '{display_name}'. Assessment data must contain customer information.")
-
-        if partner in ['TPT', 'Demo Partner', 'Sample Partner']:
-            logger.error(f"[REPORT_BUILDER] FAILED: Hardcoded partner name '{partner}' detected")
-            raise ValueError(f"Report generation failed: using hardcoded partner name '{partner}'")
+        # FAIL if TechPlusTalent is used as customer name when it's NOT the actual tenant
+        from app.services.reporting.cra_report_service import DEFAULT_REPORT_COMPANY_NAME
+        if display_name == DEFAULT_REPORT_COMPANY_NAME and tenant_name_from_data != DEFAULT_REPORT_COMPANY_NAME:
+            logger.error(f"[REPORT_BUILDER] FAILED: DEFAULT_REPORT_COMPANY_NAME '{display_name}' used as customer name for tenant '{tenant_name_from_data}'")
+            raise ValueError(f"Report generation failed: Using DEFAULT_REPORT_COMPANY_NAME '{display_name}' as customer name for assessment tenant '{tenant_name_from_data}'. Assessment data must contain correct customer information.")
 
         logger.info("[REPORT_BUILDER] Starting report generation")
         content_manifest = _load_yaml_config(REPORT_CONTENT_MANIFEST)

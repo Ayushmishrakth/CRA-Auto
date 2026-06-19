@@ -40,13 +40,13 @@ def resolve_report_branding(
     logo_path: str | None = None,
     company_address: str | None = None,
 ) -> dict[str, str | None]:
-    """Apply default report branding when no customization is supplied."""
+    """Apply default report branding when no customization is supplied. Logo only, NOT customer names."""
     resolved_logo = (logo_path or "").strip() or None
     if not resolved_logo and DEFAULT_REPORT_LOGO_PATH.exists():
         resolved_logo = str(DEFAULT_REPORT_LOGO_PATH)
 
     return {
-        "partner_name": (partner_name or "").strip() or DEFAULT_REPORT_COMPANY_NAME,
+        "partner_name": (partner_name or "").strip() or None,
         "logo_path": resolved_logo,
         "company_address": (company_address or "").strip() or None,
     }
@@ -546,8 +546,12 @@ async def generate_report_bundle(
         report_data = await build_report_data(db, current_user=current_user, assessment_id=assessment_id)
         print(f'[SERVICE] build_report_data completed successfully')
 
-        # Add to assessment_data
-        report_data['partner_name'] = partner_name
+        # CRITICAL: Do NOT override assessment data with branding defaults
+        # Use assessment data for customer names (from actual tenant being assessed)
+        # Only use branding for logos and company address
+        if partner_name:
+            # Only override if explicitly provided (custom branding)
+            report_data['partner_name'] = partner_name
 
         assessment = report_data["assessment"]
         target_dir = REPORT_ROOT / str(assessment.id)
@@ -563,10 +567,11 @@ async def generate_report_bundle(
         print(f'[SERVICE] Building DOCX to {docx_path}')
 
         # Build report
+        # CRITICAL: Pass None for company_name/partner_name so build_docx_report uses assessment data
         build_docx_report(
             assessment_data=report_data,
             output_path=str(docx_path),
-            company_name=partner_name,
+            company_name=None,
             company_address=company_address,
             logo_path=logo_path,
             partner_name=partner_name,

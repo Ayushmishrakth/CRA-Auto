@@ -2750,12 +2750,8 @@ def _build_cover_page(doc, report_data):
     br.set(qn('w:type'), 'page')
     pbr._r.append(br)
 
-    # Reset margins for rest of document
-    ns = doc.add_section()
-    ns.top_margin = Inches(1.0)
-    ns.bottom_margin = Inches(1.0)
-    ns.left_margin = Inches(1.25)
-    ns.right_margin = Inches(1.0)
+    # Note: Section break removed. Use native page break only.
+    # Section breaks cause Word to recalculate layout and move content to previous pages.
 
 def _build_cover_fallback(doc, report_data):
     from docx.shared import Pt
@@ -3215,12 +3211,13 @@ def _build_cover_page_impl(doc, report_data):
     clear(c4)
     c4.add_paragraph()
 
-    # PAGE BREAK + RESET MARGINS
-    ns = doc.add_section()
-    ns.top_margin = Inches(1.0)
-    ns.bottom_margin = Inches(1.0)
-    ns.left_margin = Inches(1.25)
-    ns.right_margin = Inches(1.0)
+    # PAGE BREAK (using native Word API, NOT section break)
+    # Section breaks cause Word to recalculate layout and move content to previous pages
+    pb = doc.add_paragraph()
+    pb.paragraph_format.space_before = Pt(0)
+    pb.paragraph_format.space_after = Pt(0)
+    pbr = pb.add_run()
+    pbr.add_break(WD_BREAK.PAGE)
 
 def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     """PAGE 5: Executive Summary - AAA structure with Calibri Light 16pt headings, Calibri 11pt body."""

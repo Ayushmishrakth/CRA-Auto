@@ -361,6 +361,28 @@ executive_summary:
   before_paragraph: "paragraph default"
   after_paragraph: "Default spacing_after_twips 0"
 
+  # Content: Executive Summary paragraphs with placeholders
+  content:
+    paragraphs:
+      - "As part of its digital transformation strategy, {organization_context}. {company_name} engaged {partner_name} for a Microsoft 365 Copilot Readiness Assessment."
+      - "The assessment covered critical services including Entra ID, Exchange Online, Microsoft Purview, Microsoft Teams, OneDrive for Business, and SharePoint Online. {readiness_coverage}."
+      - "The findings serve as a strategic foundation for {company_name} to enhance its digital readiness for secure, responsible Copilot deployment."
+      - "This report prioritizes remediation efforts to mitigate risks before enabling Copilot in production environments, ensuring organizational compliance and governance readiness."
+
+purpose:
+  # Content: Purpose section heading and bullets (8 items)
+  content:
+    heading: "Purpose"
+    bullets:
+      - "Evaluate the organization's environment for alignment with Microsoft 365 and Copilot deployment best practices."
+      - "Assess the environment across Microsoft 365 products and services including identity, collaboration, compliance, and governance capabilities."
+      - "Identify gaps that could pose security or compliance risks upon integrating Microsoft 365 Copilot."
+      - "Establish a baseline for future audits and compliance tracking related to AI usage within the organization."
+      - "Highlight licensing readiness and user eligibility for Microsoft 365 Copilot deployment."
+      - "Provide a risk-based prioritization of remediation efforts to guide Copilot enablement planning."
+      - "Offer actionable insights to strengthen governance, data protection, and identity management practices."
+      - "Support strategic decision-making by outlining Copilot deployment prerequisites and dependencies."
+
 evaluation_summary:
   title_style:
     style_id: "Heading1"

@@ -4525,18 +4525,26 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     """PAGE 5: Executive Summary with consulting-report typography and spacing."""
     assessment_data = assessment_data or {}
     config = _report_config(assessment_data)
+    blueprint = _load_aaa_report_blueprint()
+
     _styled_heading(doc, "Executive Summary", config, level=1, after=12)
     summary = assessment_data.get("summary", {}) if isinstance(assessment_data.get("summary"), dict) else {}
     score = assessment_data.get("readiness_score") or assessment_data.get("overall_score") or summary.get("readiness_score") or summary.get("overall_score") or 0
     status, status_color = _readiness_badge(score, assessment_data.get("readiness_level") or summary.get("readiness_status"), config)
 
-    intro = [
-        f"{company_name} engaged {partner_name} to evaluate Microsoft 365 readiness for secure, governed Microsoft 365 Copilot adoption.",
-        "The assessment reviewed identity, collaboration, compliance, governance, and operational readiness signals across Microsoft 365 services.",
-        "Findings in this report prioritize remediation activity that reduces exposure before Copilot is enabled for production users.",
-    ]
-    for text in intro:
-        _body_paragraph(doc, text, config, after=8)
+    # Load Executive Summary content from YAML blueprint
+    exec_summary_content = _cfg(blueprint, "executive_summary", "content", {})
+    exec_paragraphs = exec_summary_content.get("paragraphs", [])
+
+    # Render all Executive Summary paragraphs with placeholder resolution
+    for para_text in exec_paragraphs:
+        resolved_text = para_text.format(
+            company_name=company_name or "the organization",
+            partner_name=partner_name or "the assessment team",
+            organization_context=assessment_data.get("organization_context", "pursuing digital transformation"),
+            readiness_coverage=assessment_data.get("readiness_coverage", "The assessment identifies configuration gaps, policy deficiencies, and compliance gaps")
+        )
+        _body_paragraph(doc, resolved_text, config, after=8)
 
     table = _card_table(doc, 3, widths=[2.1, 2.1, 2.1], row_height=0.78)
     table.autofit = False
@@ -4553,16 +4561,17 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
         _set_cell_text(cell, label, config, "caption_size", True, _cfg(config, "branding", "muted_color", "6B7280"), WD_ALIGN_PARAGRAPH.CENTER)
         _set_cell_text(cell, value, config, "h2_size", True, color, WD_ALIGN_PARAGRAPH.CENTER)
 
+    # Load Purpose content from YAML blueprint
+    purpose_content = _cfg(blueprint, "purpose", "content", {})
+    purpose_bullets = purpose_content.get("bullets", [])
+
     _styled_heading(doc, "Purpose", config, level=2, before=14, after=7)
-    purpose_items = [
-        "Evaluate Microsoft 365 services against Copilot readiness expectations.",
-        "Identify configuration, policy, licensing, and activity gaps that could affect rollout.",
-        "Provide a prioritized executive view for remediation and deployment planning.",
-    ]
-    for item in purpose_items:
+    # Render all Purpose bullets
+    for bullet_text in purpose_bullets:
         p = doc.add_paragraph(style='List Bullet')
         p.paragraph_format.space_after = Pt(4)
-        _apply_run_style(p.add_run(item), config)
+        _apply_run_style(p.add_run(bullet_text), config)
+
     doc.add_page_break()
 
 def _add_evaluation_page(doc, findings, config=None):

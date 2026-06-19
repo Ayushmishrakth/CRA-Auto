@@ -4522,7 +4522,11 @@ def _add_toc_page(doc, config=None):
 
 
 def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
-    """PAGE 5: Executive Summary with consulting-report typography and spacing."""
+    """PAGE 5: Executive Summary with consulting-report typography and spacing.
+
+    Renders EXACT content from YAML blueprint with placeholder replacement only.
+    No content generation or rewriting.
+    """
     assessment_data = assessment_data or {}
     config = _report_config(assessment_data)
     blueprint = _load_aaa_report_blueprint()
@@ -4536,14 +4540,20 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     exec_summary_content = _cfg(blueprint, "executive_summary", "content", {})
     exec_paragraphs = exec_summary_content.get("paragraphs", [])
 
-    # Render all Executive Summary paragraphs with placeholder resolution
+    # Define placeholder mapping - ONLY placeholder replacement, no generation
+    placeholder_values = {
+        "{{customer_name}}": company_name or "{{customer_name}}",
+        "{{prepared_by}}": partner_name or "{{prepared_by}}",
+        "{{assessment_date}}": assessment_data.get("assessment_date", "{{assessment_date}}"),
+        "{{tenant_name}}": assessment_data.get("tenant_name", "{{tenant_name}}"),
+        "{{readiness_score}}": str(score) if score else "{{readiness_score}}"
+    }
+
+    # Render all Executive Summary paragraphs with EXACT YAML text and placeholder replacement only
     for para_text in exec_paragraphs:
-        resolved_text = para_text.format(
-            company_name=company_name or "the organization",
-            partner_name=partner_name or "the assessment team",
-            organization_context=assessment_data.get("organization_context", "pursuing digital transformation"),
-            readiness_coverage=assessment_data.get("readiness_coverage", "The assessment identifies configuration gaps, policy deficiencies, and compliance gaps")
-        )
+        resolved_text = para_text
+        for placeholder, value in placeholder_values.items():
+            resolved_text = resolved_text.replace(placeholder, value)
         _body_paragraph(doc, resolved_text, config, after=8)
 
     table = _card_table(doc, 3, widths=[2.1, 2.1, 2.1], row_height=0.78)
@@ -4566,11 +4576,14 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     purpose_bullets = purpose_content.get("bullets", [])
 
     _styled_heading(doc, "Purpose", config, level=2, before=14, after=7)
-    # Render all Purpose bullets
+    # Render all Purpose bullets - EXACT YAML text with placeholder replacement only
     for bullet_text in purpose_bullets:
+        resolved_bullet = bullet_text
+        for placeholder, value in placeholder_values.items():
+            resolved_bullet = resolved_bullet.replace(placeholder, value)
         p = doc.add_paragraph(style='List Bullet')
         p.paragraph_format.space_after = Pt(4)
-        _apply_run_style(p.add_run(bullet_text), config)
+        _apply_run_style(p.add_run(resolved_bullet), config)
 
     doc.add_page_break()
 

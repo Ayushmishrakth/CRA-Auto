@@ -361,26 +361,26 @@ executive_summary:
   before_paragraph: "paragraph default"
   after_paragraph: "Default spacing_after_twips 0"
 
-  # Content: Executive Summary paragraphs with placeholders
+  # Content: Executive Summary paragraphs - EXACT TEXT FROM AAA REFERENCE
+  # Placeholders: {{customer_name}}, {{prepared_by}}, {{assessment_date}}, {{tenant_name}}, {{readiness_score}}
   content:
     paragraphs:
-      - "As part of its digital transformation strategy, {organization_context}. {company_name} engaged {partner_name} for a Microsoft 365 Copilot Readiness Assessment."
-      - "The assessment covered critical services including Entra ID, Exchange Online, Microsoft Purview, Microsoft Teams, OneDrive for Business, and SharePoint Online. {readiness_coverage}."
-      - "The findings serve as a strategic foundation for {company_name} to enhance its digital readiness for secure, responsible Copilot deployment."
-      - "This report prioritizes remediation efforts to mitigate risks before enabling Copilot in production environments, ensuring organizational compliance and governance readiness."
+      - "As part of its digital transformation strategy, {{customer_name}}. engaged {{prepared_by}} for a Copilot Readiness Assessment. The purpose of this engagement was to evaluate the Client's Microsoft 365 environment across areas including security, governance, and best practices to determine readiness for the secure and responsible adoption of Microsoft 365 Copilot."
+      - "The assessment covered critical services including Entra ID, Exchange Online, Microsoft Teams, SharePoint Online, OneDrive for Business, and Microsoft Purview. It aimed to identify configuration gaps, policy misalignments, and potential vulnerabilities that could impact the responsible use of AI-powered tools like Copilot. By benchmarking the current environment against industry standards and Microsoft's Copilot deployment criteria, the assessment provides a clear roadmap for remediation and optimization."
+      - "The findings serve as a strategic foundation for {{customer_name}} to enhance its digital workplace, mitigate operational and compliance risks, and unlock the full potential of Microsoft 365 Copilot. With targeted improvements, the organization can ensure a secure and scalable AI integration that aligns with its long-term business goals."
 
 purpose:
-  # Content: Purpose section heading and bullets (8 items)
+  # Content: Purpose section - EXACT TEXT FROM AAA REFERENCE (8 bullets)
   content:
     heading: "Purpose"
     bullets:
-      - "Evaluate the organization's environment for alignment with Microsoft 365 and Copilot deployment best practices."
-      - "Assess the environment across Microsoft 365 products and services including identity, collaboration, compliance, and governance capabilities."
-      - "Identify gaps that could pose security or compliance risks upon integrating Microsoft 365 Copilot."
-      - "Establish a baseline for future audits and compliance tracking related to AI usage within the organization."
+      - "Evaluate the __________ environment for alignment with industry best practices."
+      - "Assess the environment across Microsoft 365 products and services like SharePoint, Teams, OneDrive for business etc."
+      - "Identify gaps that could pose security or compliance risks upon integrating Copilot."
+      - "Establish a baseline for future audits and compliance tracking related to AI usage within Microsoft 365."
       - "Highlight licensing readiness and user eligibility for Microsoft 365 Copilot deployment."
       - "Provide a risk-based prioritization of remediation efforts to guide Copilot enablement planning."
-      - "Offer actionable insights to strengthen governance, data protection, and identity management practices."
+      - "Offer actionable insights to strengthen governance, data protection, and identity management in preparation for AI integration."
       - "Support strategic decision-making by outlining Copilot deployment prerequisites and dependencies."
 
 evaluation_summary:

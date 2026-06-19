@@ -4529,9 +4529,10 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     blueprint = _load_aaa_report_blueprint()
 
     _styled_heading(doc, "Executive Summary", config, level=1, after=12)
+
+    # Get readiness score for placeholder resolution (even though not displayed on this page)
     summary = assessment_data.get("summary", {}) if isinstance(assessment_data.get("summary"), dict) else {}
     score = assessment_data.get("readiness_score") or assessment_data.get("overall_score") or summary.get("readiness_score") or summary.get("overall_score") or 0
-    status, status_color = _readiness_badge(score, assessment_data.get("readiness_level") or summary.get("readiness_status"), config)
 
     # Load Executive Summary content from YAML blueprint
     exec_summary_content = _cfg(blueprint, "executive_summary", "content", {})
@@ -4553,20 +4554,9 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
             resolved_text = resolved_text.replace(placeholder, value)
         _body_paragraph(doc, resolved_text, config, after=8)
 
-    table = _card_table(doc, 3, widths=[2.1, 2.1, 2.1], row_height=0.78)
-    table.autofit = False
-    metrics = [
-        ("READINESS", f"{float(score or 0):.1f}%", _cfg(config, "branding", "primary_color", "0078D4")),
-        ("STATUS", status, status_color),
-        ("GAPS", str(assessment_data.get("gaps_count", 0)), _cfg(config, "branding", "fail_color", "C00000")),
-    ]
-    for idx, (label, value, color) in enumerate(metrics):
-        cell = table.rows[0].cells[idx]
-        _set_cell_bg(cell, "F5F9FD")
-        set_cell_padding(cell, top=105, right=90, bottom=95, left=90)
-        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-        _set_cell_text(cell, label, config, "caption_size", True, _cfg(config, "branding", "muted_color", "6B7280"), WD_ALIGN_PARAGRAPH.CENTER)
-        _set_cell_text(cell, value, config, "h2_size", True, color, WD_ALIGN_PARAGRAPH.CENTER)
+    # NOTE: Readiness card (READINESS/STATUS/GAPS) is NOT part of Executive Summary page
+    # per YAML blueprint. Readiness metrics appear only in "Summary of Assessment" page.
+    # Executive Summary contains ONLY: heading + 3 paragraphs + purpose section
 
     # Load Purpose content from YAML blueprint
     purpose_content = _cfg(blueprint, "purpose", "content", {})

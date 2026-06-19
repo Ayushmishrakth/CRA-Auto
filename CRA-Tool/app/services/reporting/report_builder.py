@@ -4539,12 +4539,17 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     exec_paragraphs = exec_summary_content.get("paragraphs", [])
 
     # Define placeholder mapping - ONLY placeholder replacement, no generation
+    # Placeholder values for all content sections (executive summary, purpose, etc)
     placeholder_values = {
         "{{customer_name}}": company_name or "{{customer_name}}",
         "{{prepared_by}}": partner_name or "{{prepared_by}}",
         "{{assessment_date}}": assessment_data.get("assessment_date", "{{assessment_date}}"),
         "{{tenant_name}}": assessment_data.get("tenant_name", "{{tenant_name}}"),
-        "{{readiness_score}}": str(score) if score else "{{readiness_score}}"
+        "{{readiness_score}}": str(score) if score else "{{readiness_score}}",
+        # CRITICAL: Replace underscore placeholder with customer display name for Purpose section
+        "__________": company_name or "Client",
+        # Also handle "Client's" in Executive Summary paragraphs
+        "Client's": f"{company_name}'s" if company_name else "Client's",
     }
 
     # Render all Executive Summary paragraphs with EXACT YAML text and placeholder replacement only
@@ -4934,6 +4939,36 @@ def _remove_blank_page_breaks(docx_path):
     temp_path.replace(docx_path)
     return {"removed": len(remove_indices), "root_causes": sorted(set(root_causes))}
 
+
+def _validate_no_unfilled_placeholders(docx_path, customer_name):
+    """VALIDATION: Check that report contains no unfilled placeholders."""
+    doc = Document(docx_path)
+    all_text = "\n".join(p.text for p in doc.paragraphs)
+
+    # Check for common unfilled placeholder patterns
+    unfilled_patterns = [
+        "__________",           # Purpose section placeholder
+        "{{customer_name}}",    # Unresolved template
+        "{{prepared_by}}",      # Unresolved template
+        "{{assessment_date}}",  # Unresolved template
+        "{{tenant_name}}",      # Unresolved template
+        "{{readiness_score}}",  # Unresolved template
+    ]
+
+    found_unfilled = []
+    for pattern in unfilled_patterns:
+        if pattern in all_text:
+            found_unfilled.append(pattern)
+
+    if found_unfilled:
+        logger.error(f"[REPORT_BUILDER] VALIDATION FAILED: Found unfilled placeholders: {found_unfilled}")
+        raise ValueError(f"Report validation failed: Found unfilled placeholders in document: {found_unfilled}. All placeholders must be resolved before report generation completes.")
+
+    logger.info(f"[REPORT_BUILDER] Placeholder Validation: PASS")
+    logger.info(f"  Customer Name = {customer_name}")
+    logger.info(f"  All placeholders resolved successfully")
+
+
 def build_docx_report(assessment_data: dict, output_path: str, company_name: str = None,
                       company_address: str = None, logo_path: str = None, partner_name: str = None) -> str:
     """Build the first 9 pages of the CRA report."""
@@ -5055,6 +5090,9 @@ def build_docx_report(assessment_data: dict, output_path: str, company_name: str
         if cleanup.get("removed"):
             logger.info("[REPORT_BUILDER] Removed blank page breaks: %s", cleanup)
         _inject_legacy_chart3_xml(output_path_obj, assessment_data)
+
+        # VALIDATION: Check for unfilled placeholders before returning
+        _validate_no_unfilled_placeholders(output_path_obj, display_name)
 
         file_size = output_path_obj.stat().st_size
         logger.info(f"[REPORT_BUILDER] Report saved: {file_size} bytes")

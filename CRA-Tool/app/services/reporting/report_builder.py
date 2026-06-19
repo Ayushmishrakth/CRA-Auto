@@ -2294,9 +2294,9 @@ def _build_cover_page(doc, report_data):
 
     logger = logging.getLogger('cra')
 
-    # -- DATA --------------------------------------
-    company = str(report_data.get('company_name', 'Client'))
-    partner = str(report_data.get('partner_name', 'TPT'))
+    # -- DATA (use actual assessment data, no hardcoded fallbacks) -----
+    company = str(report_data.get('company_name', '[Organization Name Not Available]'))
+    partner = str(report_data.get('partner_name', '[Partner Not Available]'))
     try:
         score = float(report_data.get('readiness_score', 0) or 0)
     except (TypeError, ValueError):
@@ -2795,9 +2795,9 @@ def _build_cover_page_impl(doc, report_data):
 
     logger = logging.getLogger('cra')
 
-    # -- 1. EXTRACT DATA ---------------------------
-    company = str(report_data.get('company_name', 'Client'))
-    partner = str(report_data.get('partner_name', 'TPT'))
+    # -- 1. EXTRACT DATA (use actual assessment data, no hardcoded fallbacks) -----
+    company = str(report_data.get('company_name', '[Organization Name Not Available]'))
+    partner = str(report_data.get('partner_name', '[Partner Not Available]'))
     score = float(report_data.get('readiness_score', 0))
     level = str(report_data.get('readiness_level', 'Not Ready'))
     logo_path = report_data.get('logo_path')
@@ -4943,6 +4943,24 @@ def build_docx_report(assessment_data: dict, output_path: str, company_name: str
         partner = (partner_name or '').strip() or 'CRA Assessment Team'
         address = (company_address or '').strip() or None
         logo = logo_path or None
+
+        # VALIDATION: Print data binding before generation (no hardcoded names)
+        tenant_name = assessment_data.get('tenant_name', '[Not Available]')
+        org_name = assessment_data.get('organization_name', '[Not Available]')
+        logger.info(f"[REPORT_BUILDER] Data Binding Validation")
+        logger.info(f"  Customer Name = {display_name}")
+        logger.info(f"  Tenant Name = {tenant_name}")
+        logger.info(f"  Organization = {org_name}")
+        logger.info(f"  Partner = {partner}")
+
+        # FAIL if hardcoded values are used
+        if display_name in ['TPT', 'Client Name', 'Company Name', 'Demo', 'Sample', 'Client']:
+            logger.error(f"[REPORT_BUILDER] FAILED: Hardcoded customer name '{display_name}' detected")
+            raise ValueError(f"Report generation failed: using hardcoded customer name '{display_name}'. Assessment data must contain customer information.")
+
+        if partner in ['TPT', 'Demo Partner', 'Sample Partner']:
+            logger.error(f"[REPORT_BUILDER] FAILED: Hardcoded partner name '{partner}' detected")
+            raise ValueError(f"Report generation failed: using hardcoded partner name '{partner}'")
 
         logger.info("[REPORT_BUILDER] Starting report generation")
         content_manifest = _load_yaml_config(REPORT_CONTENT_MANIFEST)

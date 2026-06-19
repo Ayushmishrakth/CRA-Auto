@@ -5,8 +5,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Cleaning up inactive channels removes clutter, helping Copilot focus on useful conversations.",
-    "display_name": "Active /Inactive teams",
-    "domain": "collaboration",
+    "display_name": "Active/Inactive teams",
+    "domain": "Security",
     "expected_output": "List of inactive teams channels",
     "fail_criteria": "When a tenant has inactive teams",
     "graph_endpoint": "",
@@ -29,7 +29,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "No teams are inactive.",
+    "risk": "Many active Teams expands the data pool that Copilot interacts with. Without effective classification and access controls, this broad surface area increases the likelihood of irrelevant or sensitive information being exposed to unintended users."
   },
   {
     "category": "SharePoint Online",
@@ -38,7 +40,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Active sites give Copilot more data to work with, making it more useful.",
     "display_name": "Active Sites count",
-    "domain": "collaboration",
+    "domain": "Governance",
     "expected_output": "List of active SharePoint site in the tenant",
     "fail_criteria": "When the number active sites on SharePoint are less than 85%",
     "graph_endpoint": "/reports/getSharePointSiteUsageDetail(period='D30')",
@@ -69,8 +71,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Active SharePoint use means lots of data for Copilot to provide smart, helpful assistance and boost productivity.",
-    "display_name": "Active users on SharePoint",
-    "domain": "collaboration",
+    "display_name": "Active Users on SharePoint",
+    "domain": "Governance",
     "expected_output": "List of active users on SharePoint in the tenant",
     "fail_criteria": "When the number active users on SharePoint are less than 85%",
     "graph_endpoint": "",
@@ -93,7 +95,8 @@
       }
     ],
     "technology": "SharePoint Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "[X] out of [Y]([Z]%) users are active."
   },
   {
     "category": "Microsoft Teams",
@@ -101,8 +104,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Knowing who is active helps deploy Copilot to users who will benefit the most.",
-    "display_name": "Activer/Inactive Teams users",
-    "domain": "collaboration",
+    "display_name": "Active/Inactive Teams Users",
+    "domain": "Best Practice",
     "expected_output": "List of inactive teams user",
     "fail_criteria": "When the number of active Teams users are more than 15% for the tenant",
     "graph_endpoint": "",
@@ -125,7 +128,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "0 out of [X] team users are active ([Y]%).",
+    "risk": "Inactive users who maintain access may have their content surfaced by Copilot within collaborative environments. This raises the risk of reintroducing outdated or irrelevant information and, more critically, the potential malicious exploitation of their accounts to misuse AI capabilities."
   },
   {
     "category": "Microsoft Teams",
@@ -133,8 +138,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "To utilize Copilot features in teams app, It is rquired Copilot to have necessary configurations in place.",
-    "display_name": "Copilot integration enabled",
-    "domain": "collaboration",
+    "display_name": "Copilot Integration Enabled",
+    "domain": "Governance",
     "expected_output": "Configuration of Teams app (Copilot) integration with teams. (Identity, CopilotFromHomeTenant)",
     "fail_criteria": "When it is disabled",
     "graph_endpoint": "",
@@ -157,7 +162,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Copilot integration is enabled.",
+    "risk": "If Copilot is not fully enabled across core workloads like Teams, Word, or Outlook, it signals incomplete readiness and limits Copilot's utility. Gaps in licensing, onboarding, or workload configuration can reduce Copilot's effectiveness and may lead to inconsistent user experiences or missed productivity gains."
   },
   {
     "category": "Exchange Online",
@@ -165,8 +172,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "No Direct Integration",
-    "display_name": "External Storage Providers In OWA",
-    "domain": "collaboration",
+    "display_name": "External Storage providers in OWA",
+    "domain": "Security",
     "expected_output": "To see its enabled or disabled",
     "fail_criteria": "When enabled, users can connect third-party storage services to Outlook Web App and: Attach files from those services Share links to external files via email Access cloud-based documents directly from their emai",
     "graph_endpoint": "",
@@ -189,7 +196,10 @@
       }
     ],
     "technology": "Exchange Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Additional storage providers are allowed.",
+    "risk": "Enabling third-party storage services in Outlook Web App may allow Copilot to access or recommend content stored outside the Microsoft 365 environment. This reduces control over data governance and increases the risk of exposing unsanctioned or non-compliant information through AI-generated insights.",
+    "documentation_url": "https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/outlook-on-the-web/owa-policies"
   },
   {
     "category": "OneDrive for Business",
@@ -197,8 +207,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Restricting external sharing reduces the risk of data leaks through Copilot-generated content.",
-    "display_name": "External sharing settings",
-    "domain": "collaboration",
+    "display_name": "External Sharing Settings",
+    "domain": "Security",
     "expected_output": "Level of external sharing configured",
     "fail_criteria": "When it is set to Anyone(Least restrictive)",
     "graph_endpoint": "",
@@ -221,7 +231,8 @@
       }
     ],
     "technology": "OneDrive for Business",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "External sharing is set to only people in your organization."
   },
   {
     "category": "Exchange Online",
@@ -229,8 +240,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "No Direct Integration",
-    "display_name": "Full Calendar Schedules Able To Be Shared Externally",
-    "domain": "collaboration",
+    "display_name": "Full Calendar Schedules able to be shared Externally",
+    "domain": "Security",
     "expected_output": "To see its enabled or disabled",
     "fail_criteria": "If True, calendar sharing is enabled for the organization, allowing users to share their calendars with external users (or with internal users, depending on other settings).",
     "graph_endpoint": "",
@@ -253,7 +264,9 @@
       }
     ],
     "technology": "Exchange Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Policy for individual sharing is set to least information shared.",
+    "risk": "Sharing full calendar access externally may enable Copilot to include sensitive scheduling information in its responses or meeting suggestions. This raises privacy concerns and increases the risk of organizational exposure through automated content summaries."
   },
   {
     "category": "SharePoint Online",
@@ -261,8 +274,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Copilot can help to gather information related to sensitive files etc",
-    "display_name": "Getting all sites with Sensitivity keywords on a Tenant",
-    "domain": "collaboration",
+    "display_name": "Sensitive SharePoint sites excluded from Copilot",
+    "domain": "Security",
     "expected_output": "",
     "fail_criteria": "If there is no sites with sensitivity keywords then we can consider there are no sites with sensitive information.",
     "graph_endpoint": "",
@@ -271,7 +284,7 @@
     "portal_mapping": "",
     "powershell_mapping": "Getting all sites with Sensitivity keywords on a Tenant",
     "scoring_weight": 1.0,
-    "severity": "info",
+    "severity": "critical",
     "source_refs": [
       {
         "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
@@ -288,8 +301,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Disabling guest access prevents external users from interacting with Copilot and sensitive data.",
-    "display_name": "Guest access enabled / disabled",
-    "domain": "collaboration",
+    "display_name": "Guest access Enabled/Disabled",
+    "domain": "Security",
     "expected_output": "Whether Guest access is enabled or disabled.",
     "fail_criteria": "When it is enabled",
     "graph_endpoint": "",
@@ -321,7 +334,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Monitoring storage ensures Copilot has smooth access to necessary data without delays.",
     "display_name": "Mailbox Storage usage",
-    "domain": "collaboration",
+    "domain": "Best Practice",
     "expected_output": "",
     "fail_criteria": "When the active storage on mailbox is more than 75%",
     "graph_endpoint": "",
@@ -344,7 +357,9 @@
       }
     ],
     "technology": "Exchange Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "All mailboxes are in good condition.",
+    "risk": "Excessive mailbox storage in the absence of appropriate retention policies may lead Copilot to surface outdated or irrelevant content. Additionally, it increases processing overhead and the likelihood of sensitive legacy data being included in AI-generated responses."
   },
   {
     "category": "Exchange Online",
@@ -352,8 +367,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "Active mailboxes are important because Copilot needs them to give helpful email-based support",
-    "display_name": "Mailboxes Status (Active/Inactive)",
-    "domain": "collaboration",
+    "display_name": "Mailbox status (Active/Inactive)",
+    "domain": "Governance",
     "expected_output": "List of active mailboxes in the tenant",
     "fail_criteria": "When the number active mailboxes are less than 85%",
     "graph_endpoint": "",
@@ -376,7 +391,10 @@
       }
     ],
     "technology": "Exchange Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "[X] users out of [Y]([Z]%) are active.",
+    "risk": "Copilot retrieves data from active mailboxes to support features like email summarisation and task extraction; however, unused or poorly monitored mailboxes can increase the risk of exposing outdated, sensitive, or non-critical business data through its outputs.",
+    "documentation_url": "https://learn.microsoft.com/en-us/exchange/recipients/mailboxes"
   },
   {
     "category": "Microsoft Teams",
@@ -384,8 +402,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Proper configurations ensure that Copilot can access necessary meeting data while maintaining compliance.",
-    "display_name": "Meeting Policies configuration",
-    "domain": "collaboration",
+    "display_name": "Meeting Policies Configuration",
+    "domain": "Governance",
     "expected_output": "List of Teams meetings policies. (Identity, AllowCloudRecording, AutoAdmittedUsers, AllowMeetingReactions, MeetingChatEnabledType, AllowTranscription, AllowIPVideo, ExplicitRecordingConsent, AllowExternalNonTrustedMeetingChat, AllowBreakoutRooms)",
     "fail_criteria": "When recommended settings aren't setup",
     "graph_endpoint": "",
@@ -408,7 +426,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Recommended settings are configured.",
+    "risk": "Inadequate or inconsistent meeting policies may allow Copilot to access recordings, chats, or transcriptions from meetings that were not intended for retention. This elevates the risk of private or confidential discussions being inadvertently surfaced in the future."
   },
   {
     "category": "Microsoft Teams",
@@ -416,8 +436,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Ensures that Copilot has access to relevant meeting data for generating summaries or insights by expiring recordings out of date.",
-    "display_name": "Meeting recording retention policies",
-    "domain": "collaboration",
+    "display_name": "Meeting Recording Retention Policies",
+    "domain": "Best Practice",
     "expected_output": "From Teams meeting policies configuration of recording expiry duration.(Identity, RecordingStorageMode, NewMeetingRecordingExpirationDays)",
     "fail_criteria": "When it is disabled",
     "graph_endpoint": "",
@@ -440,7 +460,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "It is enabled and meeting recordings are set to automatically expire after [X] days.",
+    "risk": "Without strict enforcement of retention policies, Copilot may continuously process and reference outdated recordings. This poses a risk of inappropriate reuse of sensitive historical meeting data, potentially resulting in violations of organisational compliance standards."
   },
   {
     "category": "Microsoft Teams",
@@ -448,8 +470,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Copilot requires transcripts to analyze and generate meeing summaries and action items",
-    "display_name": "Meeting transcription enabled",
-    "domain": "collaboration",
+    "display_name": "Meeting Transcription enabled",
+    "domain": "Governance",
     "expected_output": "From Teams meeting policies configuration of transcription. (Identity, AllowTranscription)",
     "fail_criteria": "When it is disabled",
     "graph_endpoint": "",
@@ -472,7 +494,10 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Meeting transcription is enabled.",
+    "risk": "Enabled transcriptions create accessible content that Copilot can process. Without appropriate governance, this heightens the risk of confidential spoken information being incorporated into Copilot's suggestions, potentially violating privacy boundaries.",
+    "documentation_url": "https://learn.microsoft.com/en-us/microsoftteams/cloud-recording"
   },
   {
     "category": "Microsoft Teams",
@@ -480,8 +505,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Prevents orphaned teams, ensuring that Copilot has access to managed and active resources.",
-    "display_name": "Minimum number of owners",
-    "domain": "collaboration",
+    "display_name": "Minimum number of Owners",
+    "domain": "Governance",
     "expected_output": "List of Teams with the number of owners and also the number of teams with less than 2 owners(Team Name, Number of Owners, TotalTeamswithLessThan2Owners)",
     "fail_criteria": "When teams have less than 2 Owner",
     "graph_endpoint": "",
@@ -504,7 +529,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "There are no teams that have less than 2 owners.",
+    "risk": "Teams or groups lacking a minimum number of designated owners risk becoming orphaned, complicating the management and oversight of data surfaced by Copilot. This absence of ownership can lead to unmanaged access to legacy or sensitive information."
   },
   {
     "category": "Exchange Online",
@@ -512,8 +539,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "High engagement with emails suggests that Copilot's email summarization and drafting features will be beneficial.",
-    "display_name": "Number of emails read/received",
-    "domain": "collaboration",
+    "display_name": "Number of Emails read/received",
+    "domain": "Best Practice",
     "expected_output": "Number of emails read by the users",
     "fail_criteria": "Less than 75% of users have read more than 70% of their emails.",
     "graph_endpoint": "",
@@ -536,7 +563,9 @@
       }
     ],
     "technology": "Exchange Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "[X] out of [Y]([Z]%) have read [W]% of their mail.",
+    "risk": "Copilot may analyse read emails to generate context-aware suggestions and insights. If these emails contain sensitive information, there is a risk of data exposure in the absence of adequate classification, retention, and monitoring controls."
   },
   {
     "category": "Exchange Online",
@@ -545,7 +574,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "High outgoing email activity shows Copilot’s drafting and reply suggestions can boost efficiency.",
     "display_name": "Number of emails sent",
-    "domain": "collaboration",
+    "domain": "Best Practice",
     "expected_output": "Number of emails sent by the users",
     "fail_criteria": "When the number of emails sent by the users are less than 30",
     "graph_endpoint": "",
@@ -568,7 +597,9 @@
       }
     ],
     "technology": "Exchange Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "[X] out of [Y]([Z]%) have sent more than 30 mails.",
+    "risk": "Sent emails are included in the dataset accessible to Copilot for analysing communication patterns. Without strong governance, Copilot may inadvertently reuse sensitive or private correspondence in its suggestions, summaries, or generated responses."
   },
   {
     "category": "Microsoft Teams",
@@ -577,7 +608,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Orphaned teams may contain outdated or unmanaged data, which could affect Copilot's outputs.",
     "display_name": "Orphan Teams",
-    "domain": "collaboration",
+    "domain": "Governance",
     "expected_output": "List and Number of Orphan teams.(TeamName,TeamID,Total Orphan Teams)",
     "fail_criteria": "When orphan teams are present",
     "graph_endpoint": "",
@@ -600,7 +631,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "There are no orphan teams.",
+    "risk": "Orphaned Teams without owners may still hold sensitive content accessible by Copilot. Without proper oversight, these Teams become unmanaged data sources, raising the risk of outdated or confidential information being surfaced unintentionally."
   },
   {
     "category": "SharePoint Online",
@@ -608,8 +641,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "No Direct Integration",
-    "display_name": "SharePoint & OneDrive Guest Access Expiry",
-    "domain": "collaboration",
+    "display_name": "SharePoint and OneDrive Guest Access Expiry",
+    "domain": "Security",
     "expected_output": "SharingExpirationPeriod - how many days",
     "fail_criteria": "SharingExpirationPeriod not enabled",
     "graph_endpoint": "",
@@ -632,7 +665,8 @@
       }
     ],
     "technology": "SharePoint Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Expiration Policy for SharePoint and OneDrive guest access links is enabled and set for [X] days."
   },
   {
     "category": "SharePoint Online",
@@ -641,7 +675,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Modern authentication improves security, keeping Copilot’s access to SharePoint data safe.",
     "display_name": "SharePoint - Modern Authentication",
-    "domain": "collaboration",
+    "domain": "Best Practice",
     "expected_output": "Mordern Authentication method should be enabled",
     "fail_criteria": "When it is disabled",
     "graph_endpoint": "",
@@ -664,7 +698,8 @@
       }
     ],
     "technology": "SharePoint Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Apps using legacy authentication are disabled."
   },
   {
     "category": "SharePoint Online",
@@ -673,7 +708,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "Restricting access to sharepoint and onedrive documents, prevents unauthorized access to data.",
     "display_name": "Sharing Settings (External/Internal)",
-    "domain": "collaboration",
+    "domain": "Security",
     "expected_output": "Configuration of External sharing setting preventing external user from resharing (Allow Guests to Share Items They Don't Own)",
     "fail_criteria": "When restrictive setting no set up",
     "graph_endpoint": "",
@@ -696,7 +731,9 @@
       }
     ],
     "technology": "SharePoint Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "External sharing is disabled.",
+    "documentation_url": "https://learn.microsoft.com/en-us/sharepoint/external-sharing-overview"
   },
   {
     "category": "SharePoint Online",
@@ -704,8 +741,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Monitoring storage ensures Copilot can access data smoothly without performance problems.",
-    "display_name": "Storage Quota consumption",
-    "domain": "collaboration",
+    "display_name": "Storage Quota Consumption",
+    "domain": "Governance",
     "expected_output": "Details of SharePoint storage which is utilized",
     "fail_criteria": "When it is more than or equal to 90%",
     "graph_endpoint": "",
@@ -728,7 +765,8 @@
       }
     ],
     "technology": "SharePoint Online",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Total storage consumption of the tenant is [X] GB out of [Y] TB."
   },
   {
     "category": "Microsoft Teams",
@@ -737,7 +775,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Copilot can help write the SMTP/email code that delivers messages to the Teams channel email address",
     "display_name": "Teams - Channel Email Addresses",
-    "domain": "collaboration",
+    "domain": "Governance",
     "expected_output": "AllowEmailIntoChannel - True means Users can send emails to a channel email address AllowEmailIntoChannel - False means Users cannot send emails to a channel email address",
     "fail_criteria": "This will not restrict Teams channels to allow accepting channel emails only from these Restricted Domains",
     "graph_endpoint": "",
@@ -769,7 +807,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Ensures that Copilot accesses files stored in approved and secure locations.",
     "display_name": "Teams - File Storage Option",
-    "domain": "collaboration",
+    "domain": "Security",
     "expected_output": "Third Party storge should be disabled",
     "fail_criteria": "When the files are stored outside the Microsoft suit",
     "graph_endpoint": "",
@@ -792,7 +830,8 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "documentation_url": "https://learn.microsoft.com/en-us/microsoftteams/sharepoint-onedrive-interact"
   },
   {
     "category": "Microsoft Teams",
@@ -801,7 +840,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "No Direct Integration",
     "display_name": "Teams - Lobby Bypass",
-    "domain": "collaboration",
+    "domain": "Governance",
     "expected_output": "• AllowParticipantsToBypassLobby: Specifies whether participants can bypass the lobby when joining the meeting. The possible values are: o Always: Participants can always bypass the lobby. o Organizer: Only the organizer can bypass the lobby (default). o Never: No one can bypass the lobby.",
     "fail_criteria": "Specifies whether participants can bypass the lobby when joining the meeting - Anyone",
     "graph_endpoint": "",
@@ -824,7 +863,8 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "documentation_url": "https://learn.microsoft.com/en-us/microsoftteams/meeting-policies-participants-and-guests"
   },
   {
     "category": "Microsoft Teams",
@@ -833,7 +873,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "No Direct Integration",
     "display_name": "Teams - Meeting Chat",
-    "domain": "collaboration",
+    "domain": "Governance",
     "expected_output": "• AllowMeetingChat: This setting controls whether chat is allowed during and after meetings. Possible values include: o Enabled: Participants are allowed to use chat during and after the meeting. o Disabled: Meeting chat is disabled. o In-meeting only: Chat is allowed only during the meeting but not after the meeting ends.",
     "fail_criteria": "Disabled: Meeting chat is disabled",
     "graph_endpoint": "",
@@ -856,7 +896,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Meeting chats are enabled on global policy.",
+    "risk": "Meeting chat messages frequently include important contextual information and follow-up actions. When retained and accessible, Copilot may utilize this data to generate summaries or recommendations. Without adequate governance controls, there is a risk that sensitive information casually shared in these chats could be inadvertently exposed by Copilot."
   },
   {
     "category": "Microsoft Teams",
@@ -864,8 +906,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Teams with external users involve sharing data outside the organization, requiring secure management for Copilot to work safely.",
-    "display_name": "Teams with external users",
-    "domain": "collaboration",
+    "display_name": "Teams with External Users",
+    "domain": "Governance",
     "expected_output": "List of external users",
     "fail_criteria": "When it is more than to 20%",
     "graph_endpoint": "",
@@ -888,7 +930,9 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "There are no teams with external users.",
+    "risk": "External users in Teams have access to shared files, chats, and meeting content that Copilot can process. This increases the risk of sensitive or proprietary information being included in AI-generated outputs. Without strict controls, external collaboration can blur tenant boundaries and compromise organisational data privacy."
   },
   {
     "category": "Microsoft Teams",
@@ -896,8 +940,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "No Direct Integration",
-    "display_name": "Third-party apps allowed",
-    "domain": "collaboration",
+    "display_name": "Third Party Apps allowed",
+    "domain": "Governance",
     "expected_output": "• Get the value of Custom Apps Setting. The value in the example is False, so custom apps are unavailable in the organization's app",
     "fail_criteria": "Enabled- custom apps are available in the organization's app",
     "graph_endpoint": "",
@@ -920,7 +964,8 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "documentation_url": "https://learn.microsoft.com/en-us/microsoftteams/manage-apps"
   },
   {
     "category": "OneDrive for Business",
@@ -928,8 +973,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Total active users on OneDrive show how many people use it, indicating how much data Copilot can access to assist users.",
-    "display_name": "Total active users on OneDrive",
-    "domain": "collaboration",
+    "display_name": "Total Active users on OneDrive",
+    "domain": "Governance",
     "expected_output": "List of Active users on OneDrive",
     "fail_criteria": "When the total active user on OneDrive are more than than 80%",
     "graph_endpoint": "",
@@ -952,7 +997,8 @@
       }
     ],
     "technology": "OneDrive for Business",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "[X] out of [Y] ([Z]%) users have shown activity in the last 2 months."
   },
   {
     "category": "Microsoft Purview",
@@ -960,8 +1006,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "Audit logs help track who used Copilot, when, and where (e.g., in which repository or organization).",
-    "display_name": "Audit Logs enabled",
-    "domain": "compliance",
+    "display_name": "Audit Logs Enabled",
+    "domain": "Security",
     "expected_output": "Audit logs enabled or not - True or False",
     "fail_criteria": "If audit logs not enabled we cannot get the logs for the query",
     "graph_endpoint": "",
@@ -984,7 +1030,10 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Audit logs are not currently enabled.",
+    "risk": "Audit logs play a crucial role in monitoring and tracing AI interactions. Disabling audit logging prevents the review and tracking of Copilot activities, thereby hindering incident response capabilities and increasing the likelihood of undetected data misuse or unauthorized behaviour.",
+    "documentation_url": "https://learn.microsoft.com/en-us/purview/audit-log-enable-disable"
   },
   {
     "category": "Microsoft Purview",
@@ -992,8 +1041,8 @@
     "collector_type": "graph",
     "copilot_blocker": false,
     "copilot_relevance": "Sufficient retention ensures visibility into how Copilot is being used, helping detect misuse or data access anomalies.",
-    "display_name": "Audit log retention duration",
-    "domain": "compliance",
+    "display_name": "Audit Log Retention Duration",
+    "domain": "Governance",
     "expected_output": "List of Audit log retention policies",
     "fail_criteria": "When no policies are set up",
     "graph_endpoint": "/auditLogs/directoryAudits",
@@ -1016,7 +1065,10 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "No Audit log retention duration.",
+    "risk": "Copilot relies on extended retention of user activity logs to derive behavioural insights. Retaining audit logs for insufficient durations may result in the loss of critical risk signals and contextual history, whereas excessively long retention periods can increase the risk of data exposure if adequate safeguards are not in place.",
+    "documentation_url": "https://learn.microsoft.com/en-us/purview/audit-log-retention-policies"
   },
   {
     "category": "Microsoft Purview",
@@ -1024,8 +1076,8 @@
     "collector_type": "graph",
     "copilot_blocker": true,
     "copilot_relevance": "A higher compliance score means better data control, helping Copilot work safely and within rules.",
-    "display_name": "Compliance Score overview",
-    "domain": "compliance",
+    "display_name": "Compliance Score Overview",
+    "domain": "Governance",
     "expected_output": "Compliance Score percentage of the tenant",
     "fail_criteria": "When it is less than 80%",
     "graph_endpoint": "",
@@ -1048,7 +1100,9 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Compliance score is only [X]% which is less than the recommended industry standard (80%).",
+    "risk": "A low compliance score may signal inadequate policy enforcement, indicating weak controls over the data accessible to Copilot. This can result in the inadvertent exposure of non-compliant or unprotected content through AI-driven recommendations."
   },
   {
     "category": "Microsoft Purview",
@@ -1056,8 +1110,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "DLP can detect if Copilot-suggested code includes secrets, PII, or confidential patterns (e.g., keys, passwords).",
-    "display_name": "DLP rules configured",
-    "domain": "compliance",
+    "display_name": "DLP Rules configured",
+    "domain": "Security",
     "expected_output": "List of DLP rules applied and configured with settings",
     "fail_criteria": "If DLP rules is not configured and applied correctly to exchange,sharepoint,teams etc",
     "graph_endpoint": "",
@@ -1080,7 +1134,10 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Data Loss Prevention (DLP) rules are not configured.",
+    "risk": "Copilot has the capability to access and present sensitive content across Microsoft 365 applications. In the absence of well-defined Data Loss Prevention (DLP) policies, it may inadvertently expose or share sensitive information, potentially violating data protection and compliance requirements.",
+    "documentation_url": "https://learn.microsoft.com/en-us/purview/dlp-create-deploy-policy"
   },
   {
     "category": "Microsoft Purview",
@@ -1089,7 +1146,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
     "display_name": "Information Protection Labels applied",
-    "domain": "compliance",
+    "domain": "Security",
     "expected_output": "List of labels applied and configured with settings",
     "fail_criteria": "If labels is not configured and applied",
     "graph_endpoint": "",
@@ -1112,7 +1169,9 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Information Protection labels have not been applied.",
+    "risk": "Without the consistent application of sensitivity and protection labels, Copilot may inadvertently expose unclassified sensitive data through search, summarization, or recommendations. These labels establish critical boundaries for AI processing, and their absence undermines the organization's overall data protection posture."
   },
   {
     "category": "Microsoft Purview",
@@ -1120,8 +1179,8 @@
     "collector_type": "graph",
     "copilot_blocker": true,
     "copilot_relevance": "A higher Secure Score means stronger security, creating a safer environment for Copilot.",
-    "display_name": "Secure Score percentage",
-    "domain": "compliance",
+    "display_name": "Secure Score Percentage",
+    "domain": "Security",
     "expected_output": "Secure Score Percentage of the Tenant",
     "fail_criteria": "When it is less than 70%",
     "graph_endpoint": "/security/secureScores",
@@ -1144,7 +1203,10 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Secure score is only [X]% which is less than the recommended industry standard (80%).",
+    "risk": "A low secure score reflects weak security practices, heightening the risk of data leakage or misuse when Copilot accesses tenant data. It indicates potential misconfigurations or policy gaps that may impact Copilot's security posture.",
+    "documentation_url": "https://learn.microsoft.com/en-us/microsoft-365/security/defender/microsoft-secure-score"
   },
   {
     "category": "Microsoft Purview",
@@ -1153,7 +1215,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
     "display_name": "Sensitivity Labels applied to Teams",
-    "domain": "compliance",
+    "domain": "Security",
     "expected_output": "List of labels applied and configured with Teams settings",
     "fail_criteria": "If labels is not configured and applied",
     "graph_endpoint": "",
@@ -1176,7 +1238,10 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "No sensitivity labels have been applied to Teams.",
+    "risk": "Without proper labelling of Teams, Copilot may access or surface sensitive content without the necessary controls. This elevates the risk of data leakage, particularly in cross-team suggestions or summaries.",
+    "documentation_url": "https://learn.microsoft.com/en-us/purview/sensitivity-labels-teams-groups-sites"
   },
   {
     "category": "Microsoft Purview",
@@ -1185,7 +1250,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "\"Sites labeled with sensitive information (e.g., confidential or highly confidential) ensure that Copilot can only access and generate insights from data the user is permitted to view. Example: A Confidential – HR label ensures Copilot won't generate summaries or responses based on HR-related documents unless the user has the appropriate permissions to view that content. Adding appropriate labels gives clarity on copilot assessment to have this done.\"",
     "display_name": "Sensitivity Labels configured and applied",
-    "domain": "compliance",
+    "domain": "Security",
     "expected_output": "List of labels applied and configured with settings",
     "fail_criteria": "If labels is not configured and applied",
     "graph_endpoint": "",
@@ -1208,7 +1273,10 @@
       }
     ],
     "technology": "Microsoft Purview",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Sensitivity labels are not applied.",
+    "risk": "Even when labels are configured, inconsistent application may prevent Copilot from respecting intended data boundaries. This can lead to partial or unintended access to confidential information during content generation.",
+    "documentation_url": "https://learn.microsoft.com/en-us/purview/create-sensitivity-labels"
   },
   {
     "category": "OneDrive for Business",
@@ -1216,8 +1284,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Retention settings affect whether deleted-user content remains recoverable, auditable, and governed before Copilot rollout.",
-    "display_name": "Days to retain a deleted user’s OneDrive",
-    "domain": "governance",
+    "display_name": "Days to retain a deleted user's OneDrive",
+    "domain": "Governance",
     "expected_output": "Deleted user's OneDrive retention is configured for an approved duration",
     "fail_criteria": "Deleted user's OneDrive retention period is not configured or is below the expected baseline",
     "graph_endpoint": "",
@@ -1235,7 +1303,8 @@
       }
     ],
     "technology": "OneDrive",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "OneDrive retention for deleted users is set to [X] days."
   },
   {
     "category": "SharePoint Online",
@@ -1243,8 +1312,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Inactive sites can contain stale or ungoverned content. Inactive site policies reduce irrelevant data surfaced by Copilot.",
-    "display_name": "Inactive site policies",
-    "domain": "best_practice",
+    "display_name": "Inactive Site Policies",
+    "domain": "Best Practice",
     "expected_output": "Inactive site policy is configured",
     "fail_criteria": "Inactive site policies are not configured",
     "graph_endpoint": "",
@@ -1271,7 +1340,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Site ownership helps ensure content governance and accountability for information Copilot can access.",
     "display_name": "Site Ownership policies",
-    "domain": "governance",
+    "domain": "Governance",
     "expected_output": "Site ownership policies are configured",
     "fail_criteria": "Site ownership policies are not configured or sites lack accountable ownership",
     "graph_endpoint": "",
@@ -1297,8 +1366,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Copilot relies on active user accounts to deliver personalized and contextual assistance. Only enabled accounts can interact with Copilot’s AI features and receive insights based on their usage and data.",
-    "display_name": "Account enabled",
-    "domain": "identity_access",
+    "display_name": "Number of accounts enabled",
+    "domain": "Security",
     "expected_output": "List of users and their account status",
     "fail_criteria": "When number of enabled account is less than 85 %",
     "graph_endpoint": "",
@@ -1321,7 +1390,9 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "[X] accounts are enabled out of [Y] accounts.",
+    "risk": "Copilot engages with all active accounts to deliver AI-driven insights. If inactive or unauthorised accounts remain enabled, there is a potential risk that Copilot may inadvertently expose sensitive organisational data to individuals who should no longer have access."
   },
   {
     "category": "Entra ID",
@@ -1329,8 +1400,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Ensures that only trusted applications can access Copilot data, maintaining security and compliance",
-    "display_name": "Admin Consent Workflow",
-    "domain": "identity_access",
+    "display_name": "Administrator Consent Workflows",
+    "domain": "Best Practice",
     "expected_output": "Admin workflow for consent requests configurations(Users can request admin consent, Selected users will receive email notifications for requests , Selected users will receive request expiration reminders , Consent request expires after (days))",
     "fail_criteria": "When it is not configured",
     "graph_endpoint": "",
@@ -1353,7 +1424,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "User cannot request admin consent.",
+    "risk": "Without an admin consent workflow, users may inadvertently grant permissions to malicious or risky applications, potentially exposing sensitive data and enabling unauthorised access to Copilot-integrated services.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow"
   },
   {
     "category": "Entra ID",
@@ -1361,8 +1435,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "Enforcing strong authentication ensures only verified users can use Copilot, safeguarding against misuse or data leaks via compromised accounts.",
-    "display_name": "Authentication methods enabled",
-    "domain": "identity_access",
+    "display_name": "Authentication Methods Enabled",
+    "domain": "Security",
     "expected_output": "List of Authentication methods and state.(Authentication method, State)",
     "fail_criteria": "When authentication method has less than 2 authentication methods",
     "graph_endpoint": "",
@@ -1385,7 +1459,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "All authentication methods are enabled.",
+    "risk": "Copilot depends on robust user identity verification to ensure secure data access. Weak or outdated authentication mechanisms increase the risk of account compromise, potentially allowing malicious actors to exploit Copilot and access sensitive organisational information.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-methods"
   },
   {
     "category": "Entra ID",
@@ -1393,8 +1470,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "These policies ensure Copilot isn't accessed under suspicious conditions, preventing unauthorized use and protecting sensitive data Copilot might surface during such sessions.",
-    "display_name": "CAP policies for risky sign-ins",
-    "domain": "identity_access",
+    "display_name": "CAP Policies for Risky Sign-Ins",
+    "domain": "Governance",
     "expected_output": "List of CAP with conditions for risky sign ins. (Name, State, SignInRiskLevels, UserRiskLevels, GrantControls)",
     "fail_criteria": "When CAP policy for Risky Sign -Ins are not configured",
     "graph_endpoint": "",
@@ -1417,7 +1494,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "CAP policy for risky sign-ins is not enabled.",
+    "risk": "Conditional Access Policies (CAP) are critical for mitigating risky sign-ins. In the absence of stringent CAP enforcement, Copilot may be accessed during compromised sessions, heightening the risk of data leakage via AI-assisted functionalities.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/howto-conditional-access-policy-risk"
   },
   {
     "category": "Entra ID",
@@ -1426,7 +1506,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Loosely scoped exclusions can allow Copilot access from risky or unmanaged devices or users who have been excluded from various Conditional Access policies.",
     "display_name": "Conditional Access Policies (Exclusion)",
-    "domain": "identity_access",
+    "domain": "Best Practice",
     "expected_output": "List of Condiotional access policies with details including all exclusions.",
     "fail_criteria": "If users are excluded from conditional access policies",
     "graph_endpoint": "",
@@ -1449,7 +1529,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Conditional Access Policies have [X] excluded user(s).",
+    "risk": "Excluding users or applications from Conditional Access policies compromises identity security. Granting Copilot access to these excluded users can permit access to sensitive data without the enforcement of essential security measures like multi-factor authentication (MFA), thereby elevating the risk of misuse.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-migration-mfa"
   },
   {
     "category": "Entra ID",
@@ -1458,7 +1541,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "Enforcing strong passwords (via a custom banned list) helps prevent unauthorized access to accounts that have access to Copilot.",
     "display_name": "Custom Banned Password List",
-    "domain": "identity_access",
+    "domain": "Best Practice",
     "expected_output": "We can see what custom banned password is being used.",
     "fail_criteria": "If custom banned password is not enabled then users can use banned password which is not security best practise (example : welcome,Happy,Password etc",
     "graph_endpoint": "https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy",
@@ -1481,7 +1564,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Custom-banned password list is currently not enforced.",
+    "risk": "Weak or commonly used passwords increase the risk of account compromise. In the absence of a robust, customized banned password list, attackers may hijack accounts and exploit Copilot features to access sensitive data or impersonate users.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-configure-custom-password-protection"
   },
   {
     "category": "Entra ID",
@@ -1489,8 +1575,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Unmanaged devices can be risky. Enforcing rules helps keep Copilot's data safe.",
-    "display_name": "Devices without compliance policies",
-    "domain": "identity_access",
+    "display_name": "Device without Compliance Policies",
+    "domain": "Best Practice",
     "expected_output": "List of non complient devices in the tenant",
     "fail_criteria": "When compliance policy is not configured",
     "graph_endpoint": "",
@@ -1499,7 +1585,7 @@
     "portal_mapping": "",
     "powershell_mapping": "Devices without compliance policies",
     "scoring_weight": 1.0,
-    "severity": "info",
+    "severity": "critical",
     "source_refs": [
       {
         "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
@@ -1508,7 +1594,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Intune is not being utilized.",
+    "risk": "Devices that are not governed by compliance policies pose a significant security risk when accessing Copilot features. In the absence of essential protections such as encryption and threat detection, data surfaced by Copilot may be exposed to theft, loss, or unauthorised disclosure.",
+    "documentation_url": "https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-get-started"
   },
   {
     "category": "Entra ID",
@@ -1516,8 +1605,8 @@
     "collector_type": "graph",
     "copilot_blocker": true,
     "copilot_relevance": "These accounts are required to avoid tenant lock out",
-    "display_name": "Emergency Access Accounts",
-    "domain": "identity_access",
+    "display_name": "Emergency Access Account",
+    "domain": "Best Practice",
     "expected_output": "",
     "fail_criteria": "When not present",
     "graph_endpoint": "/directoryRoles + /directoryRoles/{id}/members",
@@ -1540,7 +1629,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "No Break glass accounts are present.",
+    "risk": "If emergency access accounts are not properly monitored or restricted, they can be exploited to bypass security controls and access Copilot-generated insights. This creates a potential backdoor to sensitive information, circumventing standard identity protection measures.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access"
   },
   {
     "category": "Entra ID",
@@ -1548,8 +1640,8 @@
     "collector_type": "powershell",
     "copilot_blocker": true,
     "copilot_relevance": "Restricting this prevents unauthorized or unmanaged tenants that could misuse Copilot services.",
-    "display_name": "Entra - Tenant Creation By Non-Admin",
-    "domain": "identity_access",
+    "display_name": "Entra – Tenant Creation by Non-Admins",
+    "domain": "Best Practice",
     "expected_output": "Whether tenant creation by non-admin is enabled or disabled.",
     "fail_criteria": "When non-admins are allowed to create tenants",
     "graph_endpoint": "",
@@ -1572,7 +1664,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Non-Admin Users are not allowed to create tenants.",
+    "risk": "Allowing non-administrators to create tenants can lead to unmanaged environments where Copilot may be enabled by default. This increases the risk of uncontrolled data exposure and inconsistent security configurations across shadow tenants.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/fundamentals/users-default-permissions"
   },
   {
     "category": "Entra ID",
@@ -1580,8 +1675,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Ensuring only trusted applications are integrated helps maintain data integrity, which is crucial for Copilot's accurate functioning.",
-    "display_name": "Entra - Third Party App Integrations",
-    "domain": "identity_access",
+    "display_name": "Entra - Third-Party App Integrations",
+    "domain": "Governance",
     "expected_output": "Third party app integration should be enabled",
     "fail_criteria": "When it is enabled for users",
     "graph_endpoint": "",
@@ -1604,7 +1699,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Users are allowed to register third-party applications.",
+    "risk": "Integrating with inadequately managed third-party applications can expose sensitive user data and permissions accessible to Copilot. These applications may interact with Microsoft 365 services—either contributing or extracting content—which Copilot could process without oversight. This increases the risk of data leakage, compromised data integrity, and diminished control over the information Copilot accesses and shares.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions"
   },
   {
     "category": "Entra ID",
@@ -1613,7 +1711,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "Global Admin is the account with the highest privilages. Limiting and securing these accounts prevents unauthorized configurations or access to Copilot settings.",
     "display_name": "Global Administrator Accounts",
-    "domain": "identity_access",
+    "domain": "Security",
     "expected_output": "List of Global admins with Type(User/Service Princpal), Display Name, UPN and object ID",
     "fail_criteria": "When tenant has less than 2 or more then 5 global admins",
     "graph_endpoint": "",
@@ -1636,7 +1734,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "There are a total of [X] Global Administrator accounts.",
+    "risk": "An excessive number of unmonitored global admin accounts presents a significant security risk. If compromised, these accounts can exploit Copilot's capabilities to access extensive organizational data, circumventing standard user restrictions and controls.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices"
   },
   {
     "category": "Entra ID",
@@ -1645,7 +1746,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Guest invite settings control who can invite external users, impacting Copilot’s access and security in collaborative environments.",
     "display_name": "Guest Invite Settings",
-    "domain": "identity_access",
+    "domain": "Security",
     "expected_output": "",
     "fail_criteria": "Anyone in the organization can invite guest users including guests and non-admins] ,Member users and users assigned to specific admin roles can invite guest users including guests with member permissions",
     "graph_endpoint": "",
@@ -1668,7 +1769,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Anyone in the organisation can invite guest users, including guests and non-admins (most inclusive).",
+    "risk": "Permissive invitation settings may permit unintended guests to join the tenant. Once inside, these guests could access content surfaced by Copilot features, thereby increasing the risk of internal data leakage or misuse.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure"
   },
   {
     "category": "Entra ID",
@@ -1676,8 +1780,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Monitoring guest users ensures that only authorized individuals have access, reducing potential data exposure through Copilot.",
-    "display_name": "Guest users count",
-    "domain": "identity_access",
+    "display_name": "Guest Users count",
+    "domain": "Governance",
     "expected_output": "List and number of Guest users(Display name , Username, Mail ID , ID)",
     "fail_criteria": "When the ratio of guest accounts to total accounts is more than 15%",
     "graph_endpoint": "",
@@ -1700,7 +1804,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "There are [X] guest users out of [Y] total users.",
+    "risk": "Many guest users increase the risk that Copilot may inadvertently expose sensitive data to unintended recipients. In the absence of clear segmentation and strict data access controls, AI tools may treat guests as internal users, potentially revealing critical information.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/external-id/user-properties"
   },
   {
     "category": "Entra ID",
@@ -1708,8 +1815,8 @@
     "collector_type": "graph",
     "copilot_blocker": false,
     "copilot_relevance": "No Direct Integration",
-    "display_name": "Restricted Access To Microsoft Entra Admin Centre",
-    "domain": "identity_access",
+    "display_name": "Restricted Access to Microsoft Entra Admin Centre",
+    "domain": "Best Practice",
     "expected_output": "To see its enabled or disabled",
     "fail_criteria": "Non-Admin Users have access to Microsoft Entra Admin Centre",
     "graph_endpoint": "/policies/authorizationPolicy",
@@ -1718,7 +1825,7 @@
     "portal_mapping": "",
     "powershell_mapping": "",
     "scoring_weight": 1.0,
-    "severity": "info",
+    "severity": "critical",
     "source_refs": [
       {
         "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
@@ -1727,7 +1834,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Access to the Microsoft Entra Admin Center is not restricted.",
+    "risk": "Without strict access controls, unauthorised administrators may alter configurations that influence Copilot's data access across the tenant. This elevates the risk of misconfigurations or unintended over-permission of Copilot.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/fundamentals/users-default-permissions"
   },
   {
     "category": "Entra ID",
@@ -1736,7 +1846,7 @@
     "copilot_blocker": true,
     "copilot_relevance": "No Direct Integration",
     "display_name": "Self-Service Password Reset Authentication Method",
-    "domain": "identity_access",
+    "domain": "Security",
     "expected_output": "To see how many and what methods registered",
     "fail_criteria": "No methods enabled",
     "graph_endpoint": "https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy",
@@ -1759,7 +1869,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Self-Service Password Reset Authentication is enabled.",
+    "risk": "Weak or poorly monitored self-service password reset (SSPR) methods increase the risk of account takeovers. If compromised accounts retain access to Copilot, sensitive data may be exposed or manipulated through AI-driven interactions.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-enable-sspr"
   },
   {
     "category": "Entra ID",
@@ -1767,8 +1880,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Proper management ensures that only authorized users can access data processed by Copilot",
-    "display_name": "Tenant Collaboration Invitations",
-    "domain": "identity_access",
+    "display_name": "Tenant Collaboration Invitation",
+    "domain": "Security",
     "expected_output": "Setting configuration(AllowInvitesFrom)",
     "fail_criteria": "When it is set to (Allow invitations to be sent to any domain )",
     "graph_endpoint": "",
@@ -1791,7 +1904,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Set to 'Allow invitation to be sent to any domain' (Most inclusive).",
+    "risk": "Uncontrolled collaboration invitations can cause tenant sprawl and broaden external access. Copilot may inadvertently access or generate responses using external content introduced through these collaborations, increasing the risk of data leakage and diminishing control over the information Copilot references or exposes.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure"
   },
   {
     "category": "Entra ID",
@@ -1799,8 +1915,8 @@
     "collector_type": "graph",
     "copilot_blocker": false,
     "copilot_relevance": "Security by limiting access to only consent for approved application data ensures data protection.",
-    "display_name": "User Consent For Applications",
-    "domain": "identity_access",
+    "display_name": "User Consent for Applications",
+    "domain": "Security",
     "expected_output": "Screenshot of User consent for application setting",
     "fail_criteria": "When it is set to Users can consent",
     "graph_endpoint": "/policies/authorizationPolicy",
@@ -1823,7 +1939,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "User consent for applications is not set.",
+    "risk": "Permissive user consent settings can lead to widespread access to third-party applications, increasing the risk of data leakage and unauthorised use of Copilot features.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent"
   },
   {
     "category": "Entra ID",
@@ -1832,7 +1951,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "If user dat is not correctly configured, copilot can provide irrevelent or wrong information.",
     "display_name": "User Information",
-    "domain": "identity_access",
+    "domain": "Best Practice",
     "expected_output": "List of all users and their detailed information",
     "fail_criteria": "When the user information is not configured for all users",
     "graph_endpoint": "",
@@ -1855,7 +1974,9 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "User information details are not complete for all users.",
+    "risk": "User profiles lacking accurate details such as department or role may compromise the relevance and precision of insights generated by Copilot. This misalignment can result in inappropriate content suggestions or accidental access to data outside a user's intended scope."
   },
   {
     "category": "Entra ID",
@@ -1864,7 +1985,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Enforcing MFA enhances security for Copilot access.",
     "display_name": "Users without MFA",
-    "domain": "identity_access",
+    "domain": "Security",
     "expected_output": "List of Users and MFA methods enrolled (UserPrincipalName, AuthMethodTypes)",
     "fail_criteria": "When MFA is not configured for some capable user",
     "graph_endpoint": "",
@@ -1873,7 +1994,7 @@
     "portal_mapping": "On the Admin portal, Admin Centers -> Identity --> Authentication Methods --> User Registration Details --> Download Export",
     "powershell_mapping": "Users without MFA",
     "scoring_weight": 4.0,
-    "severity": "high",
+    "severity": "medium",
     "source_refs": [
       {
         "file": "CRA_Parameters_PassFailCriteria 3.xlsx",
@@ -1887,7 +2008,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "All MFA-capable users have MFA registered.",
+    "risk": "The absence of MFA significantly weakens account security, increasing the risk of unauthorised access to user accounts. As Copilot can surface and interact with sensitive content across Microsoft 365 applications, accounts without MFA represent a heightened security vulnerability and may lead to unintentional data exposure.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-enable-azure-mfa"
   },
   {
     "category": "Entra ID",
@@ -1895,8 +2019,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "Inactive Microsoft 365 groups can retain data that Copilot may surface. Expiration policies reduce stale collaboration data exposure.",
-    "display_name": "Auto-expiration policy for M365 Groups",
-    "domain": "security",
+    "display_name": "Auto-expiration policy for inactive m365 groups",
+    "domain": "Security",
     "expected_output": "Auto-expiration policy for inactive Microsoft 365 groups is configured",
     "fail_criteria": "Auto-expiration policy for inactive M365 groups is not configured",
     "graph_endpoint": "",
@@ -1914,7 +2038,10 @@
       }
     ],
     "technology": "Entra ID",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Auto-expiration policy for inactive groups is not configured.",
+    "risk": "Inactive M365 Groups may retain sensitive data unnecessarily, increasing exposure risk. Copilot may surface outdated or irrelevant content from these teams.",
+    "documentation_url": "https://learn.microsoft.com/en-us/entra/identity/users/groups-lifecycle"
   },
   {
     "category": "SharePoint Online",
@@ -1923,7 +2050,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Expiring anonymous links limits long-lived content exposure that Copilot could otherwise index or surface.",
     "display_name": "Expiration Policy for Anyone links",
-    "domain": "security",
+    "domain": "Security",
     "expected_output": "Anyone links have an expiration policy configured",
     "fail_criteria": "Anyone links do not expire or exceed the approved duration",
     "graph_endpoint": "",
@@ -1941,7 +2068,8 @@
       }
     ],
     "technology": "SharePoint",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "Expiration policy is set for [X] days."
   },
   {
     "category": "SharePoint Online",
@@ -1950,7 +2078,7 @@
     "copilot_blocker": false,
     "copilot_relevance": "Anyone links with broad permissions can expose SharePoint content that Copilot may index or surface to unintended users.",
     "display_name": "Permission Settings for anyone links",
-    "domain": "security",
+    "domain": "Security",
     "expected_output": "Anyone links are disabled or restricted to least privilege permissions",
     "fail_criteria": "Anyone links allow edit or overly permissive access",
     "graph_endpoint": "",
@@ -1968,7 +2096,8 @@
       }
     ],
     "technology": "SharePoint",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "documentation_url": "https://learn.microsoft.com/en-us/sharepoint/turn-external-sharing-on-or-off"
   },
   {
     "category": "Microsoft Teams",
@@ -1976,8 +2105,8 @@
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "External guest owners can influence Teams content and access boundaries that Copilot may use for summaries and responses.",
-    "display_name": "Teams with external guest as owner",
-    "domain": "collaboration",
+    "display_name": "Teams with guest as owner",
+    "domain": "Security",
     "expected_output": "No Teams have an external guest assigned as owner",
     "fail_criteria": "One or more Teams have external guests as owners",
     "graph_endpoint": "",
@@ -1995,16 +2124,18 @@
       }
     ],
     "technology": "Microsoft Teams",
-    "warning_threshold": ""
+    "warning_threshold": "",
+    "description": "No teams have external user assigned as owner.",
+    "risk": "Proper ownership control reduces the risk of external manipulation of team settings or misuse of Copilot features within Microsoft Teams."
   },
   {
-    "category": "M365",
+    "category": "Entra ID",
     "collection_method": "powershell",
     "collector_type": "powershell",
     "copilot_blocker": false,
     "copilot_relevance": "No relation",
     "display_name": "Customer Lockbox",
-    "domain": "purview",
+    "domain": "Security",
     "expected_output": "We can see if enabled or disabled",
     "fail_criteria": "Microsoft support staff can access your content without your explicit approval. You get a Lockbox request, and only if you approve it can Microsoft proceed",
     "graph_endpoint": "",
@@ -2026,7 +2157,10 @@
         "sheet": "Sheet1"
       }
     ],
-    "technology": "M365",
-    "warning_threshold": ""
+    "technology": "Entra ID",
+    "warning_threshold": "",
+    "description": "Customer Lockbox is not enabled.",
+    "risk": "Without Customer Lockbox, Microsoft support engineers may access tenant data during troubleshooting without explicit approval. In a Copilot-enabled environment, this increases the risk of unintentionally exposing AI-accessible content to external personnel.",
+    "documentation_url": "https://learn.microsoft.com/en-us/purview/customer-lockbox-overview"
   }
 ]

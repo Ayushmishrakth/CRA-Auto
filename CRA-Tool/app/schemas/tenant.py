@@ -22,6 +22,7 @@ class TenantDeploymentRequest(BaseModel):
 
 
 class TenantDeploymentResponse(BaseModel):
+    exchange_admin_role: str | None = None
     tenant_id: str
     tenant_name: str | None
     status: str
@@ -125,3 +126,4 @@ class TenantRepairResponse(BaseModel):
     app_client_id: str | None
     permissions_patched: bool
     primary_domain: str | None
+    exchange_admin_role: str | None = None

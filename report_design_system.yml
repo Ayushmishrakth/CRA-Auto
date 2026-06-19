@@ -1,0 +1,86 @@
+document:
+  page:
+    size: A4
+    width_emu: 7560310
+    height_emu: 10692130
+
+  margins:
+    top: 1in
+    bottom: 1in
+    left: 1in
+    right: 1in
+
+fonts:
+  body:
+    family: Calibri
+    size: 11
+
+  heading1:
+    family: Calibri Light
+    size: 16
+    bold: true
+    color: "#2F5496"
+    line_spacing: 480
+
+  heading2:
+    family: Calibri Light
+    size: 13
+    bold: true
+    color: "#2F5496"
+
+  heading3:
+    family: Calibri Light
+    size: 12
+    bold: true
+    color: "#1F3763"
+
+colors:
+  primary_blue:
+    value: "#2F5496"
+  dark_navy:
+    value: "#1F3763"
+  table_blue:
+    value: "#2E74B5"
+  table_teal:
+    value: "#00759E"
+  pass:
+    value: "#00B050"
+  fail:
+    value: "#FF0000"
+  critical:
+    value: "#C00000"
+  high:
+    value: "#EE0000"
+  medium:
+    value: "#ED7D31"
+  low:
+    value: "#FFC000"
+
+tables:
+  default:
+    border_size: 4
+    header_text_color: "#FFFFFF"
+    cell_vertical_alignment: center
+
+  severity_styles:
+    Critical:
+      fill: "#C00000"
+      text: "#FFFFFF"
+    High:
+      fill: "#EE0000"
+      text: "#FFFFFF"
+    Medium:
+      fill: "#ED7D31"
+      text: "#FFFFFF"
+    Low:
+      fill: "#FFC000"
+      text: "#FFFFFF"
+
+header:
+  logo:
+    width_emu: 1722120
+    height_emu: 432533
+    align: right
+
+footer:
+  format: "Copilot Readiness Assessment [PAGE] | Page"

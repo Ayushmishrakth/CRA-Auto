@@ -1,0 +1,70 @@
+branding:
+  primary_color: "0078D4"
+  secondary_color: "2F5496"
+  accent_color: "00A4EF"
+  dark_color: "1F2937"
+  muted_color: "6B7280"
+  light_band: "EBF4FD"
+  success_color: "00B050"
+  fail_color: "C00000"
+  warning_color: "F79646"
+  partner_logo: "app/services/reporting/assets/techplustalent-logo.png"
+
+typography:
+  heading_font: "Calibri Light"
+  body_font: "Calibri"
+  h1_size: 18
+  h2_size: 14
+  body_size: 10.5
+  caption_size: 8
+
+layout:
+  top_margin: 0.68
+  bottom_margin: 0.62
+  left_margin: 0.72
+  right_margin: 0.72
+  chart_dpi: 220
+
+severity_definitions:
+  Critical:
+    color: "8B0000"
+    description: "Immediate remediation required before Copilot rollout."
+  High:
+    color: "FF0000"
+    description: "Material exposure that should be remediated as a priority."
+  Medium:
+    color: "F79646"
+    description: "Moderate risk that can affect readiness if left unresolved."
+  Low:
+    color: "FFD966"
+    description: "Limited risk to track in the remediation backlog."
+  Informational:
+    color: "70AD47"
+    description: "Contextual item for readiness planning."
+
+readiness_thresholds:
+  - label: "READY"
+    min: 80
+    color: "00B050"
+  - label: "PARTIALLY READY"
+    min: 50
+    color: "F79646"
+  - label: "NOT READY"
+    min: 0
+    color: "C00000"
+
+chart_palette:
+  pillars:
+    - "4472C4"
+    - "A5A5A5"
+    - "ED7D31"
+  services:
+    - "4472C4"
+    - "ED7D31"
+    - "A5A5A5"
+    - "FFC000"
+    - "5B9BD5"
+    - "70AD47"
+  status:
+    Pass: "00B050"
+    Fail: "C00000"

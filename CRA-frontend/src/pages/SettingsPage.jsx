@@ -160,59 +160,8 @@ function NotificationsTab() {
 
 // ── API & Integrations tab ───────────────────────────────────
 function ApiTab({ user }) {
-  const toast = useToast();
-  const [showKey, setShowKey] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showRegen, setShowRegen] = useState(false);
-  const [regenerating, setRegen] = useState(false);
-  const MOCK_KEY = "sk-cra-••••••••••••••••••••••••••••••••";
-  const DEMO_KEY = "sk-cra-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(DEMO_KEY);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleRegen = async () => {
-    setRegen(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setRegen(false);
-    setShowRegen(false);
-    toast.success("API key regenerated.");
-  };
-
   return (
     <div className="space-y-5">
-      {/* API Key card */}
-      <Card header={{ title: "Your API Key" }}>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2 h-10 px-3 bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg font-mono text-sm text-[#374151]">
-            {showKey ? DEMO_KEY : MOCK_KEY}
-          </div>
-          <button
-            onClick={() => setShowKey((v) => !v)}
-            className="p-2 rounded-md text-[#6B7280] hover:bg-[#F3F4F6] transition-colors"
-            title={showKey ? "Hide" : "Show"}
-          >
-            {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-          <button
-            onClick={handleCopy}
-            className="p-2 rounded-md text-[#6B7280] hover:bg-[#F3F4F6] transition-colors"
-            title="Copy"
-          >
-            {copied ? <Check size={16} className="text-[#107C10]" /> : <Copy size={16} />}
-          </button>
-        </div>
-        <div className="mt-3">
-          <Button variant="danger" size="sm" onClick={() => setShowRegen(true)}>
-            <RefreshCw size={13} /> Regenerate
-          </Button>
-        </div>
-      </Card>
-
-      {/* App Registration card */}
       <Card header={{ title: "App Registration" }}>
         <div className="space-y-3">
           {[
@@ -237,29 +186,6 @@ function ApiTab({ user }) {
           View in Azure Portal <ExternalLink size={13} />
         </a>
       </Card>
-
-      {/* Regen confirmation */}
-      {showRegen && (
-        <Modal
-          title="Regenerate API Key"
-          onClose={() => !regenerating && setShowRegen(false)}
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setShowRegen(false)} disabled={regenerating}>
-                Cancel
-              </Button>
-              <Button variant="danger" loading={regenerating} onClick={handleRegen}>
-                Confirm Regenerate
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-[#374151]">
-            This will <strong>invalidate your current API key</strong> immediately. Any integrations
-            using the current key will stop working. Continue?
-          </p>
-        </Modal>
-      )}
     </div>
   );
 }

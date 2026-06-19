@@ -43,8 +43,11 @@ def calculate_scores(findings: list[AssessmentFinding]) -> dict[str, Any]:
     high_count = 0
     blocker_count = 0
     total_findings = len(findings)
+    pass_count = 0
 
     for finding in findings:
+        if str(finding.status or "").strip().lower() == "pass":
+            pass_count += 1
         parameter_key = (finding.raw_value or {}).get("parameter_key", "")
         domain = _domain_for_parameter(parameter_key)
         domain_totals.setdefault(domain, 100.0)
@@ -78,19 +81,7 @@ def calculate_scores(findings: list[AssessmentFinding]) -> dict[str, Any]:
         if values:
             domain_scores[field] = round(sum(values) / len(values), 2)
 
-    weighted_total = 0.0
-    total_weight = 0.0
-    for domain, weight in domain_weights.items():
-        field = ASSESSMENT_FIELD_BY_DOMAIN.get(domain, "security_score")
-        weighted_total += domain_scores[field] * float(weight)
-        total_weight += float(weight)
-    overall = round(weighted_total / total_weight, 2) if total_weight else round(
-        sum(domain_scores.values()) / len(domain_scores),
-        2,
-    )
-    if blocker_count:
-        cap = scoring.get("blocker_logic", {}).get("critical_copilot_blockers_cap_score_at", 59)
-        overall = min(overall, float(cap))
+    overall = round((pass_count / total_findings) * 100, 2) if total_findings else 0.0
 
     return {
         **domain_scores,

@@ -124,7 +124,8 @@ function AssessmentReportContent() {
     setGenerating(true);
     setError(null);
     try {
-      const reportData = await generateAssessmentReport(assessmentId, outputFormat);
+      await generateAssessmentReport(assessmentId, outputFormat);
+      const reportData = await getAssessmentReport(assessmentId);
       setReport(reportData ?? {});
     } catch (err) {
       setError(extractApiError(err));

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,142 +30,603 @@ from app.services.registry_service import get_registry
 
 
 REPORT_ROOT = Path("storage/reports")
+DEFAULT_REPORT_COMPANY_NAME = "TechPlusTalent"
+DEFAULT_REPORT_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "techplustalent-logo.png"
+
+
+def resolve_report_branding(
+    *,
+    partner_name: str | None = None,
+    logo_path: str | None = None,
+    company_address: str | None = None,
+) -> dict[str, str | None]:
+    """Apply default report branding when no customization is supplied."""
+    resolved_logo = (logo_path or "").strip() or None
+    if not resolved_logo and DEFAULT_REPORT_LOGO_PATH.exists():
+        resolved_logo = str(DEFAULT_REPORT_LOGO_PATH)
+
+    return {
+        "partner_name": (partner_name or "").strip() or DEFAULT_REPORT_COMPANY_NAME,
+        "logo_path": resolved_logo,
+        "company_address": (company_address or "").strip() or None,
+    }
+
+
 SERVICE_ORDER = [
     "Entra ID",
     "Exchange Online",
     "Microsoft Purview",
-    "Teams",
+    "Microsoft Teams",
     "OneDrive",
     "SharePoint",
     "Licensing",
     "Microsoft 365",
 ]
+SEVERITY_MAP = {
+    'critical': 'Critical',
+    'high': 'High',
+    'medium': 'Medium',
+    'low': 'Low',
+    'info': 'Informational',
+    'informational': 'Informational',
+    'none': 'Informational',
+    '': 'Informational',
+}
+
+CANONICAL_PARAMETER_TITLES = {
+    "entra - tenant creation by non-admin": "Entra - Tenant Creation by Non-Admins",
+    "cap policies for risky sign-ins": "CAP Policies for Risky Sign-Ins",
+    "entra - third party app integrations": "Entra - Third-Party App Integrations",
+    "tenant collaboration invitations": "Tenant Collaboration Invitation",
+    "account enabled": "Number of accounts enabled",
+    "admin consent workflow": "Administrator Consent Workflows",
+    "devices without compliance policies": "Device without Compliance Policies",
+    "mailboxes status (active/inactive)": "Mailbox Status (Active/Inactive)",
+    "active /inactive teams": "Active/Inactive Teams",
+    "third-party apps allowed": "Third Party apps allowed",
+    "guest access enabled / disabled": "Guest access enabled/disabled",
+    "activer/inactive teams users": "Active/Inactive Teams Users",
+}
+
+CANONICAL_SERVICE_OVERRIDES = {
+    "teams - channel email addresses": "Microsoft Teams",
+    "customer lockbox": "Entra ID",
+}
+
+
+def _as_number(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_percent(value: Any) -> int:
+    number = _as_number(value, 0.0)
+    if 0 < number <= 1:
+        number *= 100
+    return round(number)
+
+
+def _evidence_actual(evidence: Any) -> Any:
+    if not isinstance(evidence, dict):
+        return {}
+    actual = evidence.get("actual_value")
+    if actual is not None:
+        return actual
+    payload = evidence.get("payload")
+    if isinstance(payload, dict):
+        result = payload.get("result")
+        if isinstance(result, dict):
+            raw = result.get("raw_value")
+            if isinstance(raw, dict):
+                return raw.get("actual_value", raw)
+    return evidence
+
+
+def _ratio_from_counts(actual: dict[str, Any]) -> int:
+    active = actual.get("active_users")
+    total = actual.get("total_users") or actual.get("all_users")
+    if isinstance(total, list):
+        total = len(total)
+    if isinstance(active, list):
+        active = len(active)
+    active_num = _as_number(active, 0.0)
+    total_num = _as_number(total, 0.0)
+    if total_num > 0:
+        return round((active_num / total_num) * 100)
+    return 0
+
+
+def _activity_pct(parameter_rows: list[dict[str, Any]], parameter_key: str, ratio_keys: tuple[str, ...]) -> int:
+    for row in parameter_rows:
+        if row.get("parameter_key") != parameter_key:
+            continue
+        actual = _evidence_actual(row.get("evidence"))
+        if not isinstance(actual, dict):
+            return 0
+        for ratio_key in ratio_keys:
+            if ratio_key in actual:
+                if ratio_key == "inactive_ratio":
+                    active = _as_number(actual.get("active_users"), 0.0)
+                    inactive = _as_number(actual.get("inactive_users"), 0.0)
+                    if active + inactive <= 0:
+                        return 0
+                    return round(100 - _normalize_percent(actual.get(ratio_key)))
+                return _normalize_percent(actual.get(ratio_key))
+        for pct_key in ("active_pct", "active_percent", "active_percentage", "percentage"):
+            if pct_key in actual:
+                return _normalize_percent(actual.get(pct_key))
+        return _ratio_from_counts(actual)
+    return 0
+
+
+def _copilot_license_counts(parameter_rows: list[dict[str, Any]]) -> tuple[int, int]:
+    keys = {
+        "copilot_prerequisite_licenses",
+        "copilot_license_eligibility",
+        "users_eligible_for_copilot_license",
+        "m365_copilot_license_eligibility",
+    }
+    for row in parameter_rows:
+        key = str(row.get("parameter_key") or "")
+        if key not in keys and "eligible" not in key and "license" not in key:
+            continue
+        actual = _evidence_actual(row.get("evidence"))
+        if not isinstance(actual, dict):
+            continue
+        eligible = actual.get("eligible_users") or actual.get("copilot_eligible_users") or actual.get("licensed_users")
+        total = actual.get("total_users") or actual.get("user_count") or actual.get("users")
+        if isinstance(eligible, list):
+            eligible = len(eligible)
+        if isinstance(total, list):
+            total = len(total)
+        eligible_num = int(_as_number(eligible, 0))
+        total_num = int(_as_number(total, 0))
+        if eligible_num or total_num:
+            return eligible_num, total_num
+    return 0, 0
+
+
+def _tenant_user_count(parameter_rows: list[dict[str, Any]]) -> int:
+    for preferred_key in ("user_information", "account_enabled", "users_without_mfa", "guest_users_count"):
+        for row in parameter_rows:
+            if row.get("parameter_key") != preferred_key:
+                continue
+            actual = _evidence_actual(row.get("evidence"))
+            if not isinstance(actual, dict):
+                continue
+            for key in ("total_users", "user_count", "users"):
+                value = actual.get(key)
+                if isinstance(value, list):
+                    value = len(value)
+                count = int(_as_number(value, 0))
+                if count:
+                    return count
+    return 0
+
+
+def _extract_active_pct(all_findings: list[dict[str, Any]], param_key: str) -> int:
+    """Extract active percentage from report finding evidence."""
+    for finding in all_findings:
+        if str(finding.get("parameter_key", "")) != param_key:
+            continue
+        try:
+            raw = finding.get("raw_value", {})
+            if isinstance(raw, str):
+                import json
+                raw = json.loads(raw)
+            if not isinstance(raw, dict):
+                continue
+            actual = raw.get("actual_value")
+            if isinstance(actual, dict):
+                raw = actual
+            if "active_ratio" in raw:
+                return round(float(raw["active_ratio"]) * 100)
+            if "read_ratio" in raw:
+                return round(float(raw["read_ratio"]) * 100)
+            if "active_pct" in raw:
+                return round(float(raw["active_pct"]))
+            if "active_percent" in raw:
+                return round(float(raw["active_percent"]))
+            if "inactive_ratio" in raw:
+                active = _as_number(raw.get("active_users"), 0.0)
+                inactive = _as_number(raw.get("inactive_users"), 0.0)
+                if active + inactive <= 0:
+                    return 0
+                return round(100 - (float(raw["inactive_ratio"]) * 100))
+            active_users = raw.get("active_users", 0)
+            total_users = raw.get("total_users", 0)
+            if total_users and float(total_users) > 0:
+                return round(float(active_users) / float(total_users) * 100)
+        except Exception:
+            pass
+    return 0
+
+SKU_FRIENDLY_NAMES = {
+    "6fd2c87f-b296-42f0-b197-1e91e994b900": "Office 365 E1",
+    "18181a46-0d4e-45cd-891e-60aabd171b4e": "Office 365 E1",
+    "c7df2760-2c81-4ef7-b578-5b5392b571df": "Office 365 E5",
+    "b05e124f-c7cc-45a0-a6aa-8cf78c946968": "Enterprise Mobility + Security E5",
+    "f30db892-07e9-47e9-837c-80727f46fd3d": "Microsoft Flow Free",
+    "bc946dac-7877-4271-b2f7-99d2db13cd2c": "Microsoft Forms (Plan E1)",
+    "57ff2da0-773e-42df-b2af-ffb7a2317929": "Microsoft Teams",
+    "0f9b09cb-62d1-4ff4-9129-43f4996f83f4": "Exchange Online (Kiosk)",
+    "o365biz": "Business Basic",
+    "spo_e1": "SharePoint Online (Plan 1)",
+}
+
+
+def _chart_actual(row: dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("evidence") or row.get("raw_value") or {}
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            return {}
+    if not isinstance(raw, dict):
+        return {}
+    actual = _evidence_actual(raw)
+    return actual if isinstance(actual, dict) else raw
+
+
+def _chart_lookup(parameter_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    lookup: dict[str, dict[str, Any]] = {}
+    for row in parameter_rows:
+        key = str(row.get("parameter_key") or "")
+        if key:
+            lookup[key] = _chart_actual(row)
+    return lookup
+
+
+def _assigned_licenses(user: dict[str, Any]) -> list[Any]:
+    for key in ("assignedLicenses", "assigned_licenses", "licenses", "licenseDetails"):
+        value = user.get(key)
+        if isinstance(value, list):
+            return value
+    return []
+
+
+def _license_name(plan: Any) -> str:
+    if isinstance(plan, dict):
+        sku = str(
+            plan.get("skuId")
+            or plan.get("sku_id")
+            or plan.get("skuPartNumber")
+            or plan.get("sku_part_number")
+            or plan.get("name")
+            or ""
+        )
+    else:
+        sku = str(plan or "")
+    return SKU_FRIENDLY_NAMES.get(sku, sku[:20] if sku else "Unknown")
+
+
+def _license_chart_counts(
+    rv_lookup: dict[str, dict[str, Any]],
+    *,
+    eligible_users: int,
+    total_users: int,
+) -> dict[str, int]:
+    users: list[Any] = []
+    for key in ("guest_users_count", "account_enabled", "user_information"):
+        raw_users = rv_lookup.get(key, {}).get("users")
+        if isinstance(raw_users, list) and raw_users:
+            users = raw_users
+            break
+
+    counts: dict[str, int] = {}
+    unlicensed = 0
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        plans = _assigned_licenses(user)
+        if not plans:
+            unlicensed += 1
+            continue
+        for plan in plans:
+            name = _license_name(plan)
+            counts[name] = counts.get(name, 0) + 1
+
+    if unlicensed:
+        counts["Unlicensed"] = unlicensed
+
+    if counts:
+        return {label: count for label, count in counts.items() if count > 0}
+
+    licensed = max(int(eligible_users or 0), 0)
+    total = max(int(total_users or 0), licensed)
+    unlicensed = max(total - licensed, 0)
+    fallback: dict[str, int] = {}
+    if licensed:
+        fallback["Licensed (M365)"] = licensed
+    if unlicensed:
+        fallback["Unlicensed"] = unlicensed
+    return fallback
+
+
+def _user_info_chart_data(rv_lookup: dict[str, dict[str, Any]]) -> tuple[dict[str, int], int]:
+    user_info = rv_lookup.get("user_information", {})
+    total_users = int(_as_number(user_info.get("total_users") or user_info.get("user_count"), 0))
+    field_completion = user_info.get("field_completion")
+    if isinstance(field_completion, dict) and field_completion:
+        fields = {
+            str(field): max(int(_as_number(value, 0)), 0)
+            for field, value in field_completion.items()
+        }
+        if not total_users:
+            total_users = max(fields.values(), default=0)
+        return fields, total_users
+
+    users = user_info.get("users")
+    if isinstance(users, list) and users:
+        field_keys = [
+            ("First Name", ("firstName", "givenName", "first_name")),
+            ("Last Name", ("lastName", "surname", "last_name")),
+            ("Job Title", ("jobTitle", "job_title")),
+            ("Department", ("department",)),
+            ("Manager", ("manager", "managerDisplayName", "manager_display_name")),
+            ("City", ("city",)),
+            ("Country", ("country", "countryOrRegion")),
+            ("Office Location", ("officeLocation", "office_location")),
+        ]
+        total_users = len(users)
+        fields: dict[str, int] = {}
+        for label, keys in field_keys:
+            fields[label] = sum(
+                1
+                for user in users
+                if isinstance(user, dict) and any(user.get(key) for key in keys)
+            )
+        return fields, total_users
+
+    complete_users = int(_as_number(user_info.get("complete_users"), 0))
+    total_users = total_users or int(_as_number(user_info.get("total_users"), complete_users))
+    if not total_users:
+        return {}, 0
+    return {
+        "First Name": total_users,
+        "Last Name": total_users,
+        "Job Title": complete_users,
+        "Department": complete_users,
+        "Manager": complete_users,
+        "City": complete_users,
+        "Country": complete_users,
+        "Office Location": complete_users,
+    }, total_users
+
+
+def _active_total(raw: dict[str, Any], *, active_key: str = "active_users", total_key: str = "total_users") -> tuple[int, int]:
+    active = raw.get(active_key, 0)
+    total = raw.get(total_key, 0)
+    if isinstance(active, list):
+        active = len(active)
+    if isinstance(total, list):
+        total = len(total)
+    active_num = int(_as_number(active, 0))
+    total_num = int(_as_number(total, 0))
+    if total_num <= 0 and "inactive_users" in raw:
+        total_num = active_num + int(_as_number(raw.get("inactive_users"), 0))
+    if total_num <= 0:
+        for ratio_key in ("active_ratio", "read_ratio"):
+            if ratio_key in raw:
+                return max(int(round(_normalize_percent(raw.get(ratio_key)))), 0), 100
+    return max(active_num, 0), max(total_num, 0)
+
+
+def _activity_chart_counts(rv_lookup: dict[str, dict[str, Any]]) -> dict[str, tuple[int, int]]:
+    outlook = rv_lookup.get("number_of_emails_read_received", {})
+    return {
+        "SharePoint": _active_total(rv_lookup.get("active_users_on_sharepoint", {})),
+        "OneDrive": _active_total(rv_lookup.get("total_active_users_on_onedrive", {})),
+        "Teams": _active_total(rv_lookup.get("activer_inactive_teams_users", {})),
+        "Outlook": _active_total(outlook, active_key="engaged_users", total_key="total_users"),
+    }
+
+REPORT_ORDER = {
+    # Entra ID
+    "custom_banned_password_list": 1,
+    "restricted_access_to_microsoft_entra_admin_centre": 2,
+    "emergency_access_accounts": 3,
+    "devices_without_compliance_policies": 4,
+    "authentication_methods_enabled": 5,
+    "entra_tenant_creation_by_non_admin": 6,
+    "global_administrator_accounts": 7,
+    "self_service_password_reset_authentication_method": 8,
+    "tenant_collaboration_invitations": 9,
+    "admin_consent_workflow": 10,
+    "cap_policies_for_risky_sign_ins": 11,
+    "conditional_access_policies_exclusion": 12,
+    "user_consent_for_applications": 13,
+    "entra_third_party_app_integrations": 14,
+    "users_without_mfa": 15,
+    "auto_expiration_policy_for_inactive_m365_groups": 16,
+    "customer_lockbox": 17,
+    "guest_invite_settings": 18,
+    "guest_users_count": 19,
+    "user_information": 20,
+    "account_enabled": 21,
+    # Exchange Online
+    "mailboxes_status_active_inactive": 101,
+    "external_storage_providers_in_owa": 102,
+    "mailbox_storage_usage": 103,
+    "full_calendar_schedules_able_to_be_shared_externally": 104,
+    "number_of_emails_read_received": 105,
+    "number_of_emails_sent": 106,
+    # Microsoft Purview
+    "audit_logs_enabled": 201,
+    "secure_score_percentage": 202,
+    "sensitivity_labels_configured_and_applied": 203,
+    "sensitivity_labels_applied_to_teams": 204,
+    "compliance_score_overview": 205,
+    "information_protection_labels_applied": 206,
+    "dlp_rules_configured": 207,
+    "audit_log_retention_duration": 208,
+    # Microsoft Teams
+    "copilot_integration_enabled": 301,
+    "third_party_apps_allowed": 302,
+    "active_inactive_teams": 303,
+    "minimum_number_of_owners": 304,
+    "teams_with_external_users": 305,
+    "meeting_policies_configuration": 306,
+    "orphan_teams": 307,
+    "teams_with_external_guest_as_owner": 308,
+    "meeting_transcription_enabled": 309,
+    "guest_access_enabled_disabled": 310,
+    "teams_lobby_bypass": 311,
+    "teams_file_storage_option": 312,
+    "activer_inactive_teams_users": 313,
+    "teams_meeting_chat": 314,
+    "meeting_recording_retention_policies": 315,
+    "teams_channel_email_addresses": 316,
+    # OneDrive
+    "external_sharing_settings": 401,
+    "days_to_retain_a_deleted_user_s_onedrive": 402,
+    "total_active_users_on_onedrive": 403,
+    # SharePoint
+    "permission_setting_for_anyone_links": 501,
+    "getting_all_sites_with_sensitivity_keywords_on_a_tenant": 502,
+    "sharing_settings_external_internal": 503,
+    "sharepoint_and_onedrive_guest_access_expiry": 504,
+    "expiration_policy_for_anyone_links": 505,
+    "inactive_site_policies": 506,
+    "active_sites_count": 507,
+    "site_ownership_policies": 508,
+    "active_users_on_sharepoint": 509,
+    "sharepoint_modern_authentication": 510,
+    "storage_quota_consumption": 511,
+}
 
 
 async def generate_report_bundle(
-    db: AsyncSession,
-    *,
-    current_user: User,
-    assessment_id: UUID,
-    report_type: str | None = None,
+    *args,
+    assessment_id: str | UUID | None = None,
+    db: AsyncSession | None = None,
+    current_user: User = None,
+    report_type: str = "docx",
+    partner_name: str = DEFAULT_REPORT_COMPANY_NAME,
+    logo_path: str = None,
+    company_address: str = None,
 ) -> dict[str, Any]:
     import logging
     logger = logging.getLogger(__name__)
 
-    report_data = await build_report_data(db, current_user=current_user, assessment_id=assessment_id)
-    customization = get_customization_for_pdf(assessment_id)
-    requested_report_type = _normalize_report_type(report_type or customization.get("output_format") or "docx")
-
-    # Log customization
-    logger.info(f"[REPORT] Customization for {assessment_id}:")
-    logger.info(f"[REPORT]   company_name: {customization.get('company_name')}")
-    logger.info(f"[REPORT]   address: {customization.get('address')}")
-    logger.info(f"[REPORT]   logo_path: {customization.get('logo_path')}")
-
-    assessment = report_data["assessment"]
-    target_dir = REPORT_ROOT / str(assessment.id)
-    tenant_name = _safe_report_filename(report_data["summary"].get("tenant_name") or report_data["summary"].get("customer_name") or assessment.tenant_id)
-    generated_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    report_stem = f"Copilot_Readiness_Assessment_{tenant_name}_{generated_stamp}"
-
-    # Generate DOCX using report_builder
-    from app.services.reporting.report_builder import build_docx_report
-
-    target_dir.mkdir(parents=True, exist_ok=True)
-    docx_path = target_dir / f"{report_stem}.docx"
-
-    # DEBUG: Log report_data structure
-    logger.info(f"[REPORT] report_data keys: {list(report_data.keys())}")
-    logger.info(f"[REPORT] parameter_rows count: {len(report_data.get('parameter_rows', []))}")
-    if report_data.get('parameter_rows'):
-        logger.info(f"[REPORT] first row: {report_data['parameter_rows'][0]}")
-    logger.info(f"[REPORT] sections keys: {list(report_data.get('sections', {}).keys())}")
-
-    # Build the report with customization
-    build_docx_report(
-        assessment_data=report_data,
-        output_path=str(docx_path),
-        company_name=customization.get("company_name"),
-        company_address=customization.get("address"),
-        logo_path=customization.get("logo_path"),
+    branding = resolve_report_branding(
+        partner_name=partner_name,
+        logo_path=logo_path,
+        company_address=company_address,
     )
+    partner_name = branding["partner_name"]
+    logo_path = branding["logo_path"]
+    company_address = branding["company_address"]
 
-    logger.info(f"[REPORT] DOCX generated successfully: {docx_path}")
+    print(f'[SERVICE] START partner={partner_name} logo={logo_path}')
 
-    await db.execute(delete(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id))
-    artifacts: list[AssessmentReport] = []
-    docx_artifact = AssessmentReport(
-        assessment_id=assessment.id,
-        report_type="docx",
-        report_status="generated",
-        storage_path=str(docx_path),
-        generated_by=current_user.id,
-        metadata_json={**report_data["metadata"], "source": "docx_template"},
-    )
-    db.add(docx_artifact)
-    artifacts.append(docx_artifact)
-    assessment.report_path = str(docx_path)
+    try:
+        if args:
+            if isinstance(args[0], AsyncSession):
+                db = args[0]
+                if len(args) > 1:
+                    assessment_id = args[1]
+            else:
+                assessment_id = args[0]
+                if len(args) > 1:
+                    db = args[1]
+        if db is None or assessment_id is None:
+            raise ValueError("generate_report_bundle requires db and assessment_id")
 
-    pdf_error = None
-    if requested_report_type in {"pdf", "both"}:
-        try:
-            pdf_path = await _convert_docx_to_pdf_async(
-                docx_path,
-                target_dir / f"{report_stem}.pdf",
-                report_data=report_data,
+        normalized_report_type = _normalize_report_type(report_type)
+
+        # Convert assessment_id string to UUID if needed
+        if isinstance(assessment_id, str):
+            assessment_id = UUID(assessment_id)
+
+        report_data = await build_report_data(db, current_user=current_user, assessment_id=assessment_id)
+        print(f'[SERVICE] build_report_data completed successfully')
+
+        # Add to assessment_data
+        report_data['partner_name'] = partner_name
+
+        assessment = report_data["assessment"]
+        target_dir = REPORT_ROOT / str(assessment.id)
+        tenant_name = _safe_report_filename(report_data["summary"].get("tenant_name") or report_data["summary"].get("customer_name") or assessment.tenant_id)
+        generated_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        report_stem = f"Copilot_Readiness_Assessment_{tenant_name}_{generated_stamp}"
+
+        # Generate DOCX using report_builder
+        from app.services.reporting.report_builder import build_docx_report
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+        docx_path = target_dir / f"{report_stem}.docx"
+        print(f'[SERVICE] Building DOCX to {docx_path}')
+
+        # Build report
+        build_docx_report(
+            assessment_data=report_data,
+            output_path=str(docx_path),
+            company_name=partner_name,
+            company_address=company_address,
+            logo_path=logo_path,
+            partner_name=partner_name,
+        )
+        print(f'[SERVICE] DOCX build completed')
+
+        logger.info(f"[REPORT] DOCX generated successfully: {docx_path}")
+
+        print(f'[SERVICE] Deleting old artifacts')
+        await db.execute(delete(AssessmentReport).where(AssessmentReport.assessment_id == assessment.id))
+        artifacts: list[AssessmentReport] = []
+        if normalized_report_type in {"docx", "both"}:
+            docx_artifact = AssessmentReport(
+                assessment_id=assessment.id,
+                report_type="docx",
+                report_status="generated",
+                storage_path=str(docx_path),
+                generated_by=current_user.id,
+                metadata_json={**report_data["metadata"], "source": "docx_template"},
             )
+            db.add(docx_artifact)
+            artifacts.append(docx_artifact)
+            assessment.report_path = str(docx_path)
+
+        if normalized_report_type in {"pdf", "both"}:
+            pdf_path = target_dir / f"{report_stem}.pdf"
+            generated_pdf = await _generate_pdf_from_docx(docx_path, pdf_path)
             pdf_artifact = AssessmentReport(
                 assessment_id=assessment.id,
                 report_type="pdf",
                 report_status="generated",
-                storage_path=str(pdf_path),
+                storage_path=str(generated_pdf),
                 generated_by=current_user.id,
                 metadata_json={**report_data["metadata"], "source": "docx_to_pdf"},
             )
             db.add(pdf_artifact)
             artifacts.append(pdf_artifact)
-            assessment.report_path = str(pdf_path)
-        except Exception as exc:
-            # If PDF conversion fails but DOCX succeeded, capture the error
-            # but still return DOCX successfully
-            pdf_error = str(exc)
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                f"PDF conversion failed for assessment {assessment_id}: {pdf_error}. "
-                "DOCX report is available."
-            )
+            if normalized_report_type == "pdf":
+                assessment.report_path = str(generated_pdf)
 
-    await db.commit()
-    for artifact in artifacts:
-        await db.refresh(artifact)
+        print(f'[SERVICE] Committing to database')
+        await db.commit()
+        for artifact in artifacts:
+            await db.refresh(artifact)
 
-    # Clear customization after report generation
-    clear_customization(assessment_id)
+        # Clear customization after report generation
+        clear_customization(assessment_id)
 
-    return {
-        "assessment_id": assessment.id,
-        "status": "generated" if not pdf_error else "partial",
-        "artifacts": [_artifact_payload(artifact) for artifact in artifacts],
-        "summary": report_data["summary"],
-        "analytics": report_data["analytics"],
-        "pdf_conversion_error": pdf_error,
-    }
-
-
-async def generate_legacy_pdf_report_bundle(
-    db: AsyncSession,
-    *,
-    current_user: User,
-    assessment_id: UUID,
-) -> dict[str, Any]:
-    """Compatibility wrapper for callers that still expect the old PDF-first behavior."""
-    return await generate_report_bundle(
-        db,
-        current_user=current_user,
-        assessment_id=assessment_id,
-        report_type="pdf",
-    )
+        print(f'[SERVICE] SUCCESS returning artifacts count={len(artifacts)}')
+        return {
+            "assessment_id": assessment.id,
+            "status": "generated",
+            "artifacts": [_artifact_payload(artifact) for artifact in artifacts],
+            "summary": report_data["summary"],
+            "analytics": report_data["analytics"],
+        }
+    except Exception as e:
+        logger.error(f'[SERVICE] FAILED: {e}', exc_info=True)
+        print(f'[SERVICE] EXCEPTION: {e}')
+        raise
 
 
 def _normalize_report_type(report_type: str) -> str:
@@ -296,14 +760,119 @@ async def build_report_data(
         recommendations=recommendations,
     )
     sections_generated = [section["title"] for section in report_model["sections"] if section["items"] or section.get("metrics")]
+
+    # FIX 1: READINESS SCORE - Build complete findings list from parameter_rows
+    findings_list = [
+        {
+            'service_name': row.get('service', 'Unknown'),
+            'service': row.get('service', 'Unknown'),
+            'parameter_key': row.get('parameter_key', ''),
+            'parameter': row.get('title', ''),
+            'pillar': row.get('pillar', ''),
+            'status': row.get('status', ''),
+            'finding': 'Fail' if str(row.get('status', '')).strip().lower() == 'fail' else 'Pass',
+            'severity': SEVERITY_MAP.get(str(row.get('severity', '')).lower().strip(), 'Informational'),
+            'description': row.get('description', ''),
+            'risk': row.get('risk', ''),
+            'raw_value': row.get('evidence', {}),
+            'evidence': row.get('evidence', {}),
+        }
+        for row in parameter_rows
+    ]
+
+
+    pass_count = len([
+        f for f in findings_list
+        if str(f.get('finding', '')).strip().lower() == 'pass'
+    ])
+    fail_count = len([
+        f for f in findings_list
+        if str(f.get('finding', '')).strip().lower() == 'fail'
+    ])
+    total = len(findings_list)
+
+    readiness_score = round(pass_count / total * 100, 2) if total > 0 else 0
+
+    if readiness_score >= 80:
+        level = 'Ready'
+    elif readiness_score >= 50:
+        level = 'Needs Improvement'
+    else:
+        level = 'Not Ready'
+
+    # Pillar breakdown
+    sec_f = [f for f in findings_list if 'security' in f.get('pillar', '').lower()]
+    gov_f = [f for f in findings_list if 'governance' in f.get('pillar', '').lower()]
+    bp_f = [f for f in findings_list if 'best' in f.get('pillar', '').lower()]
+
+    def fail_pct(lst):
+        if not lst: return 0
+        return round(len([
+            f for f in lst
+            if str(f.get('finding', '')).strip().lower() == 'fail'
+        ]) / len(lst) * 100)
+
+    eligible_users, eligible_total_users = _copilot_license_counts(parameter_rows)
+    total_users = eligible_total_users or _tenant_user_count(parameter_rows) or assessment.total_findings or total
+
+    # Build complete assessment_data
+    assessment_data = {
+        'tenant_name': summary.get('tenant_name', 'Unknown'),
+        'assessment_date': assessment.created_at.strftime('%d %B %Y').lstrip('0') if assessment.created_at else '',
+        'overall_score': readiness_score,
+        'readiness_score': readiness_score,
+        'readiness_level': level,
+        'partner_name': 'CRA Assessment Team',
+        'findings': findings_list,
+        'findings_list': findings_list,
+        'pass_count': pass_count,
+        'gaps_count': fail_count,
+        'total_params': total,
+        'security_pct': fail_pct(sec_f),
+        'governance_pct': fail_pct(gov_f),
+        'best_practices_pct': fail_pct(bp_f),
+        'eligible_users': eligible_users,
+        'total_users': total_users,
+        'onedrive_active_pct': _extract_active_pct(findings_list, 'total_active_users_on_onedrive'),
+        'teams_active_pct': _extract_active_pct(findings_list, 'activer_inactive_teams_users'),
+        'outlook_active_pct': _extract_active_pct(findings_list, 'number_of_emails_read_received'),
+        'sharepoint_active_pct': _extract_active_pct(findings_list, 'active_users_on_sharepoint'),
+    }
+    rv_lookup = _chart_lookup(parameter_rows)
+    user_info_fields, user_info_total = _user_info_chart_data(rv_lookup)
+    assessment_data.update({
+        'license_counts': _license_chart_counts(
+            rv_lookup,
+            eligible_users=eligible_users,
+            total_users=total_users,
+        ),
+        'user_info_fields': user_info_fields,
+        'user_info_total': user_info_total,
+        'activity_counts': _activity_chart_counts(rv_lookup),
+    })
+
+    import logging
+    logging.getLogger('cra').info(
+        f'[REPORT] Activity pcts: '
+        f'od={assessment_data["onedrive_active_pct"]} '
+        f'teams={assessment_data["teams_active_pct"]} '
+        f'outlook={assessment_data["outlook_active_pct"]} '
+        f'sp={assessment_data["sharepoint_active_pct"]}'
+    )
+
+    print(f"[SCORE] pass={pass_count} fail={fail_count} total={total} score={readiness_score}%")
+    print(f"[DATA] findings={len(findings_list)} pass={pass_count} fail={fail_count} score={readiness_score}% level={level}")
+    print(f"[DATA] sec={fail_pct(sec_f)}% gov={fail_pct(gov_f)}% bp={fail_pct(bp_f)}%")
+
     return {
         "assessment": assessment,
-        "summary": summary,
+        "summary": {**summary, **assessment_data},
         "analytics": analytics,
         "narrative": narrative,
         "sections": sections,
         "report_model": report_model,
         "parameter_rows": parameter_rows,
+        **assessment_data,
         "metadata": {
             "finding_count": len(findings),
             "recommendation_count": len(recommendations),
@@ -369,11 +938,12 @@ def _build_sections(
         parameter_key = raw.get("parameter_key") or getattr(parameter, "parameter_key", None) or ""
         service = _service_for_key(parameter_key, getattr(parameter, "category", None))
         recommendation = rec_by_key.get(parameter_key)
+        sev_raw = str(finding.severity or "info").lower().strip()
         item = {
             "title": getattr(parameter, "parameter_name", None) or parameter_key,
             "service": service,
             "pillar": getattr(parameter, "category", None) or "Best Practice",
-            "severity": (finding.severity or "info").lower(),
+            "severity": SEVERITY_MAP.get(sev_raw, "Informational"),
             "finding": finding.evaluated_value or finding.status,
             "description": getattr(parameter, "copilot_relevance", None) or "Assessment control evaluated for Copilot readiness.",
             "risk": _risk_text(finding),
@@ -395,7 +965,7 @@ def _build_sections(
                 "title": artifact.parameter_key,
                 "service": service,
                 "pillar": artifact.service or "Unknown",
-                "severity": "info",
+                "severity": "Informational",
                 "finding": "NOT COLLECTED",
                 "description": "Collector did not produce trusted evidence.",
                 "risk": "No readiness conclusion was generated for this control because evidence was unavailable.",
@@ -441,21 +1011,35 @@ def _build_parameter_rows(
         latest_artifact = parameter_artifacts[-1] if parameter_artifacts else None
         status = _row_status(finding, latest_artifact)
         evidence = (finding.raw_value if finding else None) or _artifact_evidence(latest_artifact)
-        service = _service_for_key(key, parameter.get("category") or parameter.get("domain"))
+        description = _parameter_description(
+            key=key,
+            evidence=evidence,
+            fallback=parameter.get("description") or parameter.get("copilot_relevance") or "",
+        )
+        title = _canonical_parameter_title(parameter.get("display_name") or key)
+        service = _canonical_parameter_service(
+            title,
+            _service_for_key(key, parameter.get("category") or parameter.get("domain")),
+        )
         row = {
             "parameter_key": key,
-            "title": parameter.get("display_name") or key,
+            "title": title,
             "service": service,
             "pillar": str(parameter.get("domain") or parameter.get("category") or "unclassified").replace("_", " ").title(),
             "category": parameter.get("category"),
             "technology": parameter.get("technology"),
-            "severity": (finding.severity if finding else parameter.get("severity") or "info").lower(),
+            "severity": SEVERITY_MAP.get(str(finding.severity if finding else parameter.get("severity") or "info").lower().strip(), "Informational"),
+            "display_severity": parameter.get("severity") or (finding.severity if finding else None) or "informational",
+            "registry_severity": parameter.get("severity") or "",
             "status": status,
+            "display_status": status,
+            "report_order": REPORT_ORDER.get(key),
             "score_contribution": finding.score_contribution if finding else None,
             "finding": finding.evaluated_value if finding else "NOT COLLECTED",
             "actual_result": _actual_result_text(finding, latest_artifact),
             "expected_result": parameter.get("pass_criteria") or parameter.get("expected_output") or "",
-            "description": parameter.get("copilot_relevance") or "",
+            "description": description,
+            "risk": parameter.get("risk") or "",
             "pass_criteria": parameter.get("pass_criteria") or "",
             "fail_criteria": parameter.get("fail_criteria") or "",
             "expected_output": parameter.get("expected_output") or "",
@@ -470,6 +1054,9 @@ def _build_parameter_rows(
                 else registry_recommendation.get("remediation_steps", [])
             ),
             "evidence": evidence,
+            "documentation_url": parameter.get("documentation_url") or parameter.get("microsoft_doc_url") or "",
+            "documentation_link": parameter.get("documentation_url") or parameter.get("microsoft_doc_url") or "",
+            "registry_param": parameter,
             "artifact_status": latest_artifact.status if latest_artifact else None,
             "artifact_error": latest_artifact.stderr if latest_artifact else None,
             "source_script": latest_artifact.source_script if latest_artifact else None,
@@ -477,6 +1064,20 @@ def _build_parameter_rows(
         }
         rows.append(row)
     return rows
+
+
+def _canonical_parameter_title(title: str) -> str:
+    text = str(title or "").strip()
+    return CANONICAL_PARAMETER_TITLES.get(text.lower(), text)
+
+
+def _canonical_parameter_service(title: str, service: str) -> str:
+    override = CANONICAL_SERVICE_OVERRIDES.get(str(title or "").strip().lower())
+    if override:
+        return override
+    if str(service or "").strip().lower() == "teams":
+        return "Microsoft Teams"
+    return service
 
 
 def _actual_result_text(finding: AssessmentFinding | None, artifact: AssessmentArtifact | None) -> str:
@@ -493,6 +1094,110 @@ def _actual_result_text(finding: AssessmentFinding | None, artifact: AssessmentA
             return artifact.stderr or "Collector execution failed"
         return str(artifact.status or "Evidence unavailable")
     return "Evidence was not collected for this assessment."
+
+
+def _actual_value(evidence: Any) -> dict[str, Any]:
+    if not isinstance(evidence, dict):
+        return {}
+    actual = evidence.get("actual_value")
+    if isinstance(actual, dict):
+        return actual
+    payload = evidence.get("payload")
+    if isinstance(payload, dict):
+        result = payload.get("result")
+        if isinstance(result, dict):
+            raw = result.get("raw_value")
+            if isinstance(raw, dict) and isinstance(raw.get("actual_value"), dict):
+                return raw["actual_value"]
+    return {}
+
+
+def _raw_actual_value(evidence: Any) -> Any:
+    if isinstance(evidence, dict) and "actual_value" in evidence:
+        return evidence.get("actual_value")
+    return _actual_value(evidence)
+
+
+def _intish(value: Any) -> int:
+    try:
+        return int(float(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _format_percent(value: Any) -> str:
+    try:
+        return f"{float(value):.2f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _licensing_gap_description(evidence: Any) -> str | None:
+    if not isinstance(evidence, dict):
+        return None
+    actual = _actual_value(evidence)
+    values = [evidence, actual]
+    raw_status = str(evidence.get("status") or actual.get("collection_status") or "").upper()
+    required_sku = actual.get("required_sku") or evidence.get("required_sku")
+    for item in values:
+        if isinstance(item, dict):
+            text = " ".join(str(v) for v in item.values() if isinstance(v, (str, int, float)))
+            if "LICENSING_GAP" in text.upper() and not required_sku:
+                required_sku = item.get("sku") or item.get("license") or item.get("required_license")
+    if raw_status == "LICENSING_GAP" or required_sku:
+        return (
+            "This parameter could not be assessed. The tenant does not have "
+            f"the required license: {required_sku or 'unknown'}."
+        )
+    return None
+
+
+def _parameter_description(*, key: str, evidence: Any, fallback: str) -> str:
+    licensing = _licensing_gap_description(evidence)
+    if licensing:
+        return licensing
+
+    actual = _actual_value(evidence)
+    if key == "users_without_mfa":
+        return f"{actual.get('users_without_mfa', 0)} out of {actual.get('total_users', 0)} users do not have MFA registered."
+    if key == "global_administrator_accounts":
+        raw_actual = _raw_actual_value(evidence)
+        value = raw_actual if not isinstance(raw_actual, dict) else raw_actual.get("global_admin_count", raw_actual.get("global_administrator_accounts", 0))
+        return f"There are {value} Global Administrator accounts."
+    if key == "guest_users_count":
+        return f"There are {actual.get('guest_count', 0)} guest users out of {actual.get('total_users', 0)} total users."
+    if key in {"activer_inactive_teams_users", "active_inactive_teams_users"}:
+        active = _intish(actual.get("active_users"))
+        inactive = _intish(actual.get("inactive_users"))
+        total = _intish(actual.get("total_users")) or active + inactive
+        percent = actual.get("active_percent")
+        if percent is None:
+            percent = (float(active) / float(total) * 100) if total else 0
+        return f"{active} out of {total} team users are active ({_format_percent(percent)}%)."
+    if key == "account_enabled":
+        enabled = _intish(actual.get("enabled_count"))
+        total = _intish(actual.get("total_users"))
+        percent = actual.get("enabled_percent")
+        if percent is None:
+            percent = (float(enabled) / float(total) * 100) if total else 0
+        return f"{enabled} out of {total} accounts are enabled ({_format_percent(percent)}%)."
+    if key == "user_information":
+        complete = _intish(actual.get("complete_users"))
+        total = _intish(actual.get("total_users"))
+        missing = max(total - complete, 0)
+        return f"{complete} out of {total} users have complete profile information. {missing} users are missing department or role."
+    if key == "secure_score_percentage":
+        score = actual.get("secure_score_percentage", 0)
+        return f"Secure score is {_format_percent(score)}% which meets the recommended industry standard (80%)."
+    if key == "compliance_score_overview":
+        score = actual.get("compliance_score_proxy", actual.get("compliance_score_proxy_percentage", 0))
+        return f"Compliance score proxy is {_format_percent(score)}% based on Secure Score."
+    if key == "audit_log_retention_duration" and actual.get("retention_policy_source"):
+        return (
+            "Audit log retention duration could not be determined. Purview PowerShell access is required "
+            "to verify the exact retention period. Manual verification needed."
+        )
+    return fallback
 
 
 def _display_value(value: Any) -> str:
@@ -573,13 +1278,18 @@ def _build_sections_from_rows(parameter_rows: list[dict[str, Any]]) -> dict[str,
             "service": row["service"],
             "pillar": row["pillar"],
             "severity": row["severity"],
+            "display_severity": row.get("display_severity") or row.get("registry_severity") or row["severity"],
+            "registry_severity": row.get("registry_severity") or "",
             "finding": row["finding"],
             "description": row["description"],
-            "risk": _risk_text_from_row(row),
+            "risk": row.get("risk") or _risk_text_from_row(row),
             "recommendation": row["recommendation"],
             "evidence": row["evidence"],
-            "documentation_link": "",
+            "documentation_url": row.get("documentation_url") or row.get("documentation_link") or "",
+            "documentation_link": row.get("documentation_url") or row.get("documentation_link") or "",
             "status": row["status"],
+            "display_status": row.get("display_status", row["status"]),
+            "report_order": row.get("report_order"),
         })
     return {service: items for service, items in sections.items() if items}
 
@@ -728,15 +1438,58 @@ def _risk_text_from_row(row: dict[str, Any]) -> str:
 
 
 def _service_for_key(parameter_key: str, category: str | None) -> str:
+    entra_keys = {
+        "custom_banned_password_list",
+        "restricted_access_to_microsoft_entra_admin_centre",
+        "emergency_access_accounts",
+        "devices_without_compliance_policies",
+        "authentication_methods_enabled",
+        "entra_tenant_creation_by_non_admin",
+        "global_administrator_accounts",
+        "self_service_password_reset_authentication_method",
+        "tenant_collaboration_invitations",
+        "admin_consent_workflow",
+        "cap_policies_for_risky_sign_ins",
+        "conditional_access_policies_exclusion",
+        "user_consent_for_applications",
+        "entra_third_party_app_integrations",
+        "users_without_mfa",
+        "auto_expiration_policy_for_inactive_m365_groups",
+        "customer_lockbox",
+        "guest_invite_settings",
+        "guest_users_count",
+        "user_information",
+        "account_enabled",
+    }
+    if parameter_key in entra_keys:
+        return "Entra ID"
+
+    category_text = str(category or "").strip().lower()
+    explicit_services = {
+        "entra id": "Entra ID",
+        "exchange online": "Exchange Online",
+        "microsoft purview": "Microsoft Purview",
+        "microsoft teams": "Microsoft Teams",
+        "onedrive for business": "OneDrive",
+        "onedrive": "OneDrive",
+        "sharepoint online": "SharePoint",
+        "sharepoint": "SharePoint",
+        "licensing": "Licensing",
+        "m365": "Microsoft 365",
+        "microsoft 365": "Microsoft 365",
+    }
+    if category_text in explicit_services:
+        return explicit_services[category_text]
+
     text = f"{parameter_key} {category or ''}".lower()
     if any(token in text for token in ["entra", "mfa", "identity", "admin", "guest_users"]):
         return "Entra ID"
     if any(token in text for token in ["exchange", "mailbox", "email", "calendar"]):
         return "Exchange Online"
-    if any(token in text for token in ["purview", "audit", "dlp", "secure_score", "sensitivity"]):
+    if any(token in text for token in ["purview", "audit", "dlp", "secure_score", "sensitivity", "lockbox"]):
         return "Microsoft Purview"
     if "teams" in text or "meeting" in text:
-        return "Teams"
+        return "Microsoft Teams"
     if "onedrive" in text:
         return "OneDrive"
     if any(token in text for token in ["sharepoint", "site", "sharing", "permission", "anyone_links", "anyone links"]):
@@ -773,26 +1526,117 @@ def _safe_report_filename(value: str) -> str:
     return cleaned.strip("._") or "tenant"
 
 
+def _is_valid_pdf(path: Path) -> bool:
+    try:
+        return path.exists() and path.stat().st_size > 1000 and path.read_bytes()[:5] == b"%PDF-"
+    except Exception:
+        return False
+
+
+async def _generate_pdf_from_docx(docx_path: str | Path, pdf_path: str | Path) -> Path:
+    """
+    Convert the finished DOCX report to PDF so PDF output matches Word output.
+    """
+    import shutil
+    import subprocess
+
+    logger = logging.getLogger("cra")
+    docx_path = Path(docx_path).resolve()
+    pdf_path = Path(pdf_path).resolve()
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    if pdf_path.exists():
+        try:
+            pdf_path.unlink()
+        except OSError:
+            pass
+
+    # Method 1: docx2pdf, backed by Microsoft Word on Windows.
+    try:
+        from docx2pdf import convert
+
+        await asyncio.get_event_loop().run_in_executor(None, convert, str(docx_path), str(pdf_path))
+        if _is_valid_pdf(pdf_path):
+            logger.info(f"[PDF] docx2pdf success: {pdf_path}")
+            return pdf_path
+        logger.warning(f"[PDF] docx2pdf did not create a valid PDF: {pdf_path}")
+    except Exception as e:
+        logger.warning(f"[PDF] docx2pdf failed: {e}")
+
+    # Method 2: LibreOffice, if installed now or added later.
+    soffice = shutil.which("soffice") or shutil.which("soffice.exe")
+    common_soffice = Path(r"C:\Program Files\LibreOffice\program\soffice.exe")
+    if not soffice and common_soffice.exists():
+        soffice = str(common_soffice)
+    if soffice:
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: subprocess.run(
+                    [
+                        soffice,
+                        "--headless",
+                        "--convert-to",
+                        "pdf",
+                        "--outdir",
+                        str(pdf_path.parent),
+                        str(docx_path),
+                    ],
+                    capture_output=True,
+                    timeout=120,
+                ),
+            )
+            if result.returncode == 0:
+                lo_output = pdf_path.parent / f"{docx_path.stem}.pdf"
+                if lo_output.exists() and lo_output.resolve() != pdf_path:
+                    os.replace(lo_output, pdf_path)
+                if _is_valid_pdf(pdf_path):
+                    logger.info(f"[PDF] LibreOffice success: {pdf_path}")
+                    return pdf_path
+            stderr = result.stderr.decode(errors="ignore")[:300]
+            logger.warning(f"[PDF] LibreOffice failed with exit {result.returncode}: {stderr}")
+        except Exception as e:
+            logger.warning(f"[PDF] LibreOffice failed: {e}")
+    else:
+        logger.warning("[PDF] LibreOffice not installed or not on PATH")
+
+    # Method 3: Microsoft Word COM automation on Windows.
+    try:
+        ps_docx = str(docx_path).replace("'", "''")
+        ps_pdf = str(pdf_path).replace("'", "''")
+        ps_script = f"""
+$word = New-Object -ComObject Word.Application
+$word.Visible = $false
+$doc = $word.Documents.Open('{ps_docx}')
+$doc.SaveAs('{ps_pdf}', 17)
+$doc.Close()
+$word.Quit()
+[System.Runtime.Interopservices.Marshal]::ReleaseComObject($word) | Out-Null
+"""
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_script],
+                capture_output=True,
+                timeout=120,
+            ),
+        )
+        if _is_valid_pdf(pdf_path):
+            logger.info(f"[PDF] PowerShell Word success: {pdf_path}")
+            return pdf_path
+        stderr = result.stderr.decode(errors="ignore")[:300]
+        logger.warning(f"[PDF] PowerShell Word failed with exit {result.returncode}: {stderr}")
+    except Exception as e:
+        logger.warning(f"[PDF] PowerShell Word failed: {e}")
+
+    raise RuntimeError(
+        "PDF conversion failed. Install Microsoft Word for docx2pdf/COM conversion "
+        "or install LibreOffice and ensure soffice is on PATH."
+    )
+
+
 async def _convert_docx_to_pdf_async(
     docx_path: Path,
     pdf_path: Path,
     report_data: dict = None,
 ) -> Path:
-    """
-    Generate PDF report using ReportLab (no LibreOffice dependency).
-    Uses the same report_data that generated the DOCX.
-    """
-    from app.services.reporting.pdf_report_generator import render_pdf_report
-
-    if report_data is None:
-        raise ValueError("report_data required for PDF generation")
-
-    try:
-        pdf_path = await asyncio.to_thread(
-            render_pdf_report,
-            pdf_path,
-            report_data,
-        )
-        return pdf_path
-    except Exception as exc:
-        raise RuntimeError(f"PDF generation failed: {exc}") from exc
+    return await _generate_pdf_from_docx(docx_path, pdf_path)

@@ -1191,9 +1191,9 @@ async def run_assessment_job(job_id: str, *, worker_id: str | None = None) -> di
             from app.services.reporting import cra_report_service
 
             report_payload = await cra_report_service.generate_report_bundle(
-                db,
-                current_user=report_user,
                 assessment_id=assessment.id,
+                db=db,
+                current_user=report_user,
             )
             await emit_event(
                 db,

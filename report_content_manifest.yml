@@ -1,0 +1,63 @@
+sections:
+  - id: cover
+    template: cover_page
+
+  - id: toc
+    template: table_of_contents
+
+  - id: executive_summary
+    template: executive_summary
+
+  - id: purpose
+    template: purpose
+
+  - id: evaluation_summary
+    template: evaluation_summary
+
+  - id: readiness_summary
+    template: readiness_summary
+
+  - id: key_observations
+    template: key_observations
+
+  - id: risks_and_recommendations
+    template: recommendations
+
+  - id: entra
+    template: service_assessment
+    service: Entra ID
+    parameter_count: 21
+    table_color: "#2E74B5"
+
+  - id: exchange
+    template: service_assessment
+    service: Exchange Online
+    parameter_count: 6
+    table_color: "#2E74B5"
+
+  - id: purview
+    template: service_assessment
+    service: Microsoft Purview
+    parameter_count: 8
+    table_color: "#2E74B5"
+
+  - id: teams
+    template: service_assessment
+    service: Microsoft Teams
+    parameter_count: 16
+    table_color: "#2E74B5"
+
+  - id: onedrive
+    template: service_assessment
+    service: OneDrive
+    parameter_count: 3
+    table_color: "#2E74B5"
+
+  - id: sharepoint
+    template: service_assessment
+    service: SharePoint Online
+    table_color: "#00759E"
+    parameter_count: 11
+
+  - id: conclusion
+    template: conclusion

@@ -142,7 +142,7 @@ class PowerShellExecutor:
         Run PowerShell synchronously via subprocess.run().
         Returns (stdout, stderr, returncode, timed_out).
         Using subprocess.run() inside asyncio.to_thread() bypasses the event loop's
-        subprocess transport entirely, which fixes NotImplementedError on Windows
+        subprocess transport entirely, which fixes Windows selector-loop failures
         where SelectorEventLoop does not support asyncio.create_subprocess_exec().
         """
         try:

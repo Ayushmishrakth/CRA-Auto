@@ -42,9 +42,9 @@ from app.utils.logger import logger
 
 DEPLOYMENT_SERVICE_VERSION = "2026-06-08.exchange-teams-app-auth.v4"
 
-# Exchange Administrator built-in Azure AD role — grants the service principal Exchange Online admin rights.
-# Required so Connect-ExchangeOnline with an app-only token can run Exchange cmdlets (Get-EXOMailbox, etc.).
-EXCHANGE_ADMIN_ROLE_ID = "29232cdf-9323-42fd-ade2-1d097af3e4de"
+# Exchange Administrator built-in role template. The role assignment API needs the
+# tenant-activated role id, not this template id.
+EXCHANGE_ADMIN_ROLE_TEMPLATE_ID = "29232cdf-9323-42fd-ade2-1d097af3e4de"
 
 TENANT_STATUS_NOT_DEPLOYED = "NOT_DEPLOYED"
 TENANT_STATUS_DEPLOYING = "DEPLOYING"
@@ -508,31 +508,147 @@ def _extract_primary_domain(organization: dict[str, Any]) -> str | None:
     return next((d.get("name") for d in domains if d.get("isDefault") and d.get("name")), None)
 
 
+def _graph_error_detail(exc: Exception) -> str:
+    try:
+        response = getattr(exc, "response", None)
+        if response is not None:
+            return response.text or str(exc)
+    except Exception:
+        pass
+    return str(exc)
+
+
+def _looks_like_duplicate_role_assignment(detail: str) -> bool:
+    lowered = str(detail or "").lower()
+    return any(
+        token in lowered
+        for token in (
+            "already exists",
+            "already assigned",
+            "conflicting object",
+            "permission being assigned already exists",
+            "role assignment already exists",
+        )
+    )
+
+
 async def _assign_exchange_admin_role(
     client: GraphClient,
     *,
     service_principal_id: str,
+    tenant_id: str,
 ) -> dict[str, Any]:
     """
     Assign the Exchange Administrator Azure AD directory role to the CRA service principal.
-    This grants Exchange Online admin rights so app-only auth via access token can run Exchange cmdlets.
-    409 = already assigned — treated as success.
+    Handles tenants without Exchange Online, inactive role templates, duplicates, and Graph
+    propagation timing as non-fatal deployment states.
     """
+    exchange_admin_role_id: str | None = None
+
+    try:
+        roles_response = await client.get(
+            "/directoryRoles",
+            params={
+                "$filter": "displayName eq 'Exchange Administrator'",
+                "$select": "id,displayName,roleTemplateId",
+            },
+        )
+        roles = roles_response.get("value") or []
+
+        if not roles:
+            logger.info(
+                "[DEPLOYMENT] Exchange Administrator role not active in tenant %s — attempting activation",
+                tenant_id,
+            )
+            try:
+                await client.post(
+                    "/directoryRoles",
+                    json={"roleTemplateId": EXCHANGE_ADMIN_ROLE_TEMPLATE_ID},
+                )
+                roles_response = await client.get(
+                    "/directoryRoles",
+                    params={
+                        "$filter": "displayName eq 'Exchange Administrator'",
+                        "$select": "id,displayName,roleTemplateId",
+                    },
+                )
+                roles = roles_response.get("value") or []
+            except Exception as activation_error:
+                logger.info(
+                    "[DEPLOYMENT] Exchange Online not licensed in tenant %s — Exchange parameters will use service availability detection. Detail: %s",
+                    tenant_id,
+                    _graph_error_detail(activation_error),
+                )
+                return {"status": "skipped_no_license", "reason": "no_exchange_license"}
+
+        if not roles:
+            logger.info(
+                "[DEPLOYMENT] Exchange Administrator role not available in tenant %s — no Exchange Online subscription detected",
+                tenant_id,
+            )
+            return {"status": "skipped_no_license", "reason": "role_not_available"}
+
+        exchange_admin_role_id = roles[0]["id"]
+    except Exception as exc:
+        detail = _graph_error_detail(exc)
+        logger.warning(
+            "[DEPLOYMENT] Could not check Exchange Administrator role in tenant %s — unexpected error: %s",
+            tenant_id,
+            detail,
+        )
+        return {"status": "failed", "reason": "role_check_failed", "error": detail}
+
+    try:
+        existing = await client.get(
+            "/roleManagement/directory/roleAssignments",
+            params={
+                "$filter": (
+                    f"principalId eq '{service_principal_id}' and "
+                    f"roleDefinitionId eq '{exchange_admin_role_id}'"
+                ),
+                "$select": "id",
+            },
+        )
+        if existing.get("value"):
+            logger.info("[DEPLOYMENT] Exchange Admin role already assigned — skipped")
+            return {"status": "already_assigned", "role_definition_id": exchange_admin_role_id}
+    except Exception as exc:
+        logger.warning(
+            "[DEPLOYMENT] Could not check existing Exchange role assignments: %s",
+            _graph_error_detail(exc),
+        )
+
     payload = {
         "@odata.type": "#microsoft.graph.unifiedRoleAssignment",
-        "roleDefinitionId": EXCHANGE_ADMIN_ROLE_ID,
         "principalId": service_principal_id,
+        "roleDefinitionId": exchange_admin_role_id,
         "directoryScopeId": "/",
     }
     try:
         result = await client.post("/roleManagement/directory/roleAssignments", json=payload)
-        _deployment_log("EXCHANGE_ADMIN_ROLE_ASSIGNED", service_principal_id=service_principal_id)
-        return {"status": "assigned", "result": result}
+        logger.info(
+            "[DEPLOYMENT] Exchange Administrator role assigned successfully to service principal %s in tenant %s",
+            service_principal_id,
+            tenant_id,
+        )
+        return {"status": "assigned", "role_definition_id": exchange_admin_role_id, "result": result}
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 409:
-            _deployment_log("EXCHANGE_ADMIN_ROLE_ALREADY_ASSIGNED", service_principal_id=service_principal_id)
-            return {"status": "already_assigned"}
-        raise
+        detail = _graph_error_detail(exc)
+        if exc.response.status_code in {400, 409} and _looks_like_duplicate_role_assignment(detail):
+            logger.info("[DEPLOYMENT] Exchange Admin role already assigned — skipped")
+            return {"status": "already_assigned", "role_definition_id": exchange_admin_role_id}
+        logger.warning(
+            "[DEPLOYMENT] Exchange Admin role assignment failed — unexpected error: %s",
+            detail,
+        )
+        return {"status": "failed", "role_definition_id": exchange_admin_role_id, "error": detail}
+    except Exception as exc:
+        detail = _graph_error_detail(exc)
+        logger.warning(
+            "[DEPLOYMENT] Exchange Admin role assignment failed — unexpected error: %s",
+            detail,
+        )
+        return {"status": "failed", "role_definition_id": exchange_admin_role_id, "error": detail}
 
 
 async def deploy_tenant_access(
@@ -1023,15 +1139,19 @@ async def validate_admin_consent(
     # Non-fatal: if the admin's token lacks RoleManagement.ReadWrite.Directory this will 403 and we log only.
     if tenant.service_principal_id:
         try:
-            role_result = await _assign_exchange_admin_role(client, service_principal_id=tenant.service_principal_id)
+            role_result = await _assign_exchange_admin_role(
+                client,
+                service_principal_id=tenant.service_principal_id,
+                tenant_id=tenant_id,
+            )
             _update_diagnostics(tenant, exchange_admin_role_assignment=role_result)
         except Exception as role_exc:
             logger.warning(
-                "[DEPLOYMENT] Exchange Admin role assignment failed (non-fatal): %s",
-                role_exc,
+                "[DEPLOYMENT] Exchange Admin role assignment failed — unexpected error: %s",
+                _graph_error_detail(role_exc),
                 extra={"tenant_id": tenant_id, "service_principal_id": tenant.service_principal_id},
             )
-            _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": str(role_exc)})
+            _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": _graph_error_detail(role_exc)})
 
     await audit_service.log_event(
         db,
@@ -1088,11 +1208,15 @@ async def repair_tenant_deployment(
     # Try role assignment with the admin's delegated token
     if tenant.service_principal_id:
         try:
-            role_result = await _assign_exchange_admin_role(client, service_principal_id=tenant.service_principal_id)
+            role_result = await _assign_exchange_admin_role(
+                client,
+                service_principal_id=tenant.service_principal_id,
+                tenant_id=tenant_id,
+            )
             _update_diagnostics(tenant, exchange_admin_role_assignment=role_result)
         except Exception as role_exc:
-            logger.warning("[DEPLOYMENT] Repair: Exchange Admin role assignment failed (non-fatal): %s", role_exc)
-            _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": str(role_exc)})
+            logger.warning("[DEPLOYMENT] Repair: Exchange Admin role assignment failed — unexpected error: %s", _graph_error_detail(role_exc))
+            _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": _graph_error_detail(role_exc)})
 
     expected_redirect_uri = tenant.redirect_uri or build_redirect_uri(settings.cra_frontend_url)
     consent_url = build_admin_consent_url(
@@ -1112,11 +1236,29 @@ async def repair_tenant_deployment(
         "app_client_id": tenant.app_client_id,
         "permissions_patched": bool(patch_result),
         "primary_domain": primary_domain,
+        "exchange_admin_role": _exchange_admin_role_payload_status(tenant),
     }
+
+
+def _exchange_admin_role_payload_status(tenant: ConnectedTenant) -> str | None:
+    diagnostics = tenant.deployment_diagnostics if isinstance(tenant.deployment_diagnostics, dict) else {}
+    assignment = diagnostics.get("exchange_admin_role_assignment")
+    if not isinstance(assignment, dict):
+        return None
+    status = str(assignment.get("status") or "").strip().lower()
+    reason = str(assignment.get("reason") or "").strip().lower()
+    if status in {"assigned", "already_assigned", "failed"}:
+        return status
+    if status == "skipped_no_license" or reason in {"no_exchange_license", "role_not_available"}:
+        return "skipped_no_license"
+    if status in {"skipped", "role_not_available"}:
+        return "skipped_no_license"
+    return status or None
 
 
 def deployment_payload(tenant: ConnectedTenant) -> dict[str, Any]:
     return {
+        "exchange_admin_role": _exchange_admin_role_payload_status(tenant),
         "tenant_id": tenant.tenant_id,
         "tenant_name": tenant.tenant_name,
         "status": tenant.status,

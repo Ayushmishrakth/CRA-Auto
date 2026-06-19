@@ -78,8 +78,8 @@ class Settings(BaseSettings):
     celery_broker_url: str | None = None
     celery_result_backend: str | None = None
     celery_task_always_eager: bool = False
-    celery_task_time_limit_seconds: int = 900
-    celery_task_soft_time_limit_seconds: int = 840
+    celery_task_time_limit_seconds: int = 1800
+    celery_task_soft_time_limit_seconds: int = 1740
 
     # --- CRA internal JWT ---
     secret_key: str = Field(

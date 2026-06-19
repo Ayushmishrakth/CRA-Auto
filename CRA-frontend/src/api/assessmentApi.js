@@ -72,9 +72,10 @@ export async function getTenantAssessments(tenantId, params = {}) {
 export async function generateAssessmentReport(assessmentId, reportType = "docx") {
   const response = await api.post(`/assessments/${assessmentId}/generate-report`, undefined, {
     params: { report_type: reportType },
+    responseType: 'blob',
     timeout: 180000,
   });
-  return unwrapApiData(response);
+  return response.data;
 }
 
 export async function getAssessmentReport(assessmentId) {

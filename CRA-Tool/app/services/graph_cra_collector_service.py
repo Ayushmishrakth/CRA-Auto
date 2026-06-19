@@ -2214,9 +2214,9 @@ async def collect_secure_score_percentage(tenant: ConnectedTenant) -> dict[str, 
             parameter_key=parameter_key,
             endpoint=endpoint,
             response={"ok": False, "status_code": exc.response.status_code, "error": payload.get("error") or payload},
-            expected_value="Secure score percentage >70%",
-            pass_criteria="When it is more than 70%",
-            fail_criteria="When it is less than 70%",
+            expected_value="Secure score percentage >=80%",
+            pass_criteria="When it is more than or equal to 80%",
+            fail_criteria="When it is less than 80%",
             severity="critical",
             scoring_weight=5.0,
         )
@@ -2225,15 +2225,15 @@ async def collect_secure_score_percentage(tenant: ConnectedTenant) -> dict[str, 
     current = float(latest.get("currentScore") or 0)
     maximum = float(latest.get("maxScore") or 0)
     percentage = round(current / maximum * 100, 2) if maximum else 0.0
-    status = "pass" if percentage > 70 else "fail"
+    status = "pass" if percentage >= 80 else "fail"
     reasoning = f"Secure score is {percentage}% ({current}/{maximum})"
     evidence = _evaluation_evidence(
-        pass_criteria="When it is more than 70%",
-        fail_criteria="When it is less than 70%",
+        pass_criteria="When it is more than or equal to 80%",
+        fail_criteria="When it is less than 80%",
         reasoning=reasoning,
         extra={"tenant_id": tenant.tenant_id, "secure_score": latest, "secure_score_percentage": percentage},
     )
-    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"current_score": current, "max_score": maximum, "secure_score_percentage": percentage}, expected_value="Secure score percentage >70%", finding=reasoning, graph_endpoint="/security/secureScores?$top=1", evidence=evidence, raw_response={"secureScores": response}, graph_calls=1, scoring_weight=5.0)
+    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"current_score": current, "max_score": maximum, "secure_score_percentage": percentage}, expected_value="Secure score percentage >=80%", finding=reasoning, graph_endpoint="/security/secureScores?$top=1", evidence=evidence, raw_response={"secureScores": response}, graph_calls=1, scoring_weight=5.0)
 
 
 async def collect_audit_logs_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -2867,7 +2867,7 @@ async def collect_getting_all_sites_with_sensitivity_keywords_on_a_tenant(tenant
     status = "pass" if matched else "fail"
     reasoning = f"{len(matched)} site(s) matched sensitivity keywords out of {len(sites)} site(s)"
     evidence = _evaluation_evidence(pass_criteria="This will give accurate result for sensitivity sites if anything exist", fail_criteria="If there is no sites with sensitivity keywords then we can consider there are no sites with sensitive information.", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "keywords": keywords, "matched_sites": matched, "sites": sites})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"sensitivity_keyword_site_count": len(matched), "site_count": len(sites)}, expected_value="Sites with sensitivity keywords identified when present", finding=reasoning, graph_endpoint="/sites?search=*", evidence=evidence, raw_response={"sites": response}, graph_calls=1, scoring_weight=1.0)
+    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"sensitivity_keyword_site_count": len(matched), "site_count": len(sites)}, expected_value="Sites with sensitivity keywords identified when present", finding=reasoning, graph_endpoint="/sites?search=*", evidence=evidence, raw_response={"sites": response}, graph_calls=1, scoring_weight=1.0)
 
 
 async def collect_compliance_score_overview(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -2997,11 +2997,14 @@ async def collect_audit_log_retention_duration(tenant: ConnectedTenant) -> dict[
             command="Connect-IPPSSession; Get-RetentionCompliancePolicy; Get-RetentionComplianceRule",
         )
     rows = (response.get("response") or {}).get("value") or []
-    status = "pass" if rows else "fail"
-    reasoning = f"Audit log endpoint returned {len(rows)} sample record(s); exact retention duration requires Purview policy PowerShell."
+    status = "fail"
+    reasoning = (
+        "Audit log retention duration could not be determined. Purview PowerShell access is required "
+        "to verify the exact retention period. Manual verification needed."
+    )
     evidence = _evaluation_evidence(
-        pass_criteria="When policies are set up",
-        fail_criteria="When no policies are set up",
+        pass_criteria="Retention duration is determinable and retention is at least 180 days",
+        fail_criteria="Retention duration cannot be determined or retention is less than 180 days",
         reasoning=reasoning,
         extra={
             "tenant_id": tenant.tenant_id,
@@ -3015,7 +3018,7 @@ async def collect_audit_log_retention_duration(tenant: ConnectedTenant) -> dict[
         status=status,
         severity="medium",
         actual_value={"audit_log_sample_count": len(rows), "retention_policy_source": "Purview PowerShell required for exact duration"},
-        expected_value="Audit retention policies configured",
+        expected_value="Audit log retention duration >=180 days",
         finding=reasoning,
         graph_endpoint=endpoint,
         evidence=evidence,

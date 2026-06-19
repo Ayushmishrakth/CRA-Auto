@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Shield, Lock, Mail, Users, FolderOpen, CreditCard,
   Check, ChevronRight, ChevronLeft, Clock, AlertCircle,
+  FileText, ChevronDown,
 } from "lucide-react";
 import { WizardProvider, useWizard } from "../context/WizardContext";
 import StepIndicator from "../components/ui/StepIndicator";
@@ -22,6 +23,95 @@ const PERMISSIONS = [
   "Read security and compliance configuration",
   "Read sign-in logs and audit events",
 ];
+
+const SOP_STEPS = [
+  "Verify that the Copilot Readiness Assessment has been completed and the report has been generated.",
+  "Sign in to the Microsoft Entra Admin Center or Azure Portal.",
+  "Navigate to Identity > Applications > App registrations.",
+  "Locate the application registration used for the Copilot Readiness Assessment.",
+  "Open the application and verify that it is no longer required.",
+  "Select Delete and confirm the deletion when prompted.",
+  "Ensure that the application no longer appears under App registrations.",
+  "Record the deletion activity in the administrative change log, including application name, Application (Client) ID, date, and administrator name.",
+];
+
+function AppRegistrationSop() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border border-[#E5E7EB] rounded-lg bg-white overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[#F8F9FA] transition-colors"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-2.5 min-w-0">
+          <FileText size={17} className="text-[#0078D4] flex-shrink-0" />
+          <span className="text-sm font-semibold text-[#111827]">
+            SOP: Delete app registration after report generation
+          </span>
+        </span>
+        <ChevronDown
+          size={18}
+          className={`text-[#6B7280] flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-[#F3F4F6]">
+          <div className="pt-4 space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">Purpose</p>
+              <p className="text-sm text-[#374151] leading-6">
+                Remove temporary Azure/Microsoft Entra app registrations created for the Copilot Readiness Assessment after the assessment report is generated, reducing unnecessary application objects and security risk.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">Prerequisites</p>
+              <ul className="space-y-1.5 text-sm text-[#374151]">
+                <li className="flex gap-2">
+                  <Check size={15} className="text-[#107C10] flex-shrink-0 mt-0.5" />
+                  Global Administrator, Cloud Application Administrator, or Application Administrator permissions.
+                </li>
+                <li className="flex gap-2">
+                  <Check size={15} className="text-[#107C10] flex-shrink-0 mt-0.5" />
+                  Confirmation that the Copilot Readiness Assessment report has been generated and downloaded or saved.
+                </li>
+                <li className="flex gap-2">
+                  <Check size={15} className="text-[#107C10] flex-shrink-0 mt-0.5" />
+                  Access to the Microsoft Entra Admin Center or Azure Portal.
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">Procedure</p>
+              <ol className="space-y-2 text-sm text-[#374151]">
+                {SOP_STEPS.map((step, index) => (
+                  <li key={step} className="flex gap-3">
+                    <span className="w-5 h-5 rounded-full bg-[#EFF6FC] text-[#0078D4] text-xs font-semibold flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {index + 1}
+                    </span>
+                    <span className="leading-6">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="flex gap-3 p-3 rounded-lg bg-[#FFF4CE] border border-[#FFB900]/40">
+              <AlertCircle size={17} className="text-[#8A5A00] flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[#6B4A00] leading-5">
+                Do not delete app registrations used by production services or integrations. Delete only after confirming the assessment is complete and no further access is required.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Step 1: Connect Tenant (All inline, no redirects) ──────────────────────────────────
 function Step1({ onNext }) {
@@ -174,6 +264,8 @@ function Step1({ onNext }) {
           A <strong>Global Administrator</strong> of the customer tenant must complete this step.
         </p>
       </div>
+
+      <AppRegistrationSop />
 
       {/* Phase: Idle */}
       {phase === "idle" && (

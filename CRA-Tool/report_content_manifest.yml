@@ -1,0 +1,113 @@
+report:
+  metadata:
+    title: "Copilot Readiness Assessment"
+    subtitle: "Microsoft 365 readiness report"
+    report_family: "Executive consulting report"
+
+sections:
+  - id: cover
+    title: "Cover"
+    page: 1
+    template: cover
+  - id: toc
+    title: "Table of Contents"
+    page: 2
+    template: toc
+  - id: executive_summary
+    title: "Executive Summary"
+    page: 5
+    template: executive_summary
+  - id: evaluation_summary
+    title: "Evaluation Summary"
+    page: 6
+    template: evaluation_summary
+  - id: risk_matrix
+    title: "Risk Matrix"
+    page: 7
+    template: risk_matrix
+  - id: summary_of_assessment
+    title: "Summary of Assessment"
+    page: 8
+    template: assessment_summary
+  - id: executive_dashboard
+    title: "Executive Dashboard"
+    page: 9
+    template: executive_dashboard
+  - id: key_observations
+    title: "Key Observations"
+    page: 10
+    template: key_observations
+  - id: user_information_analysis
+    title: "User Information Analysis"
+    page: 11
+    template: user_information
+  - id: usage_recommendations
+    title: "Usage and Recommendations"
+    page: 12
+    template: usage_recommendations
+  - id: detailed_assessment
+    title: "Detailed Assessment"
+    page: 13
+    template: detailed_assessment
+
+toc:
+  - title: "Executive Summary"
+    page: 5
+    level: 1
+  - title: "Purpose"
+    page: 5
+    level: 2
+  - title: "Evaluation Summary"
+    page: 6
+    level: 1
+  - title: "3 Pillars of Microsoft 365 Copilot Readiness Assessment"
+    page: 6
+    level: 2
+  - title: "M365 Services Assessed in CRA"
+    page: 6
+    level: 2
+  - title: "Risk Matrix"
+    page: 7
+    level: 1
+  - title: "Risk Category of Parameters Assessed"
+    page: 7
+    level: 2
+  - title: "Summary of Assessment"
+    page: 8
+    level: 1
+  - title: "Executive Dashboard"
+    page: 9
+    level: 1
+  - title: "Key Observations"
+    page: 10
+    level: 1
+  - title: "User Information Analysis"
+    page: 11
+    level: 1
+  - title: "Usage and Recommendations"
+    page: 12
+    level: 1
+  - title: "Detailed Assessment"
+    page: 13
+    level: 1
+  - title: "Entra ID"
+    page: 13
+    level: 2
+  - title: "Exchange Online"
+    page: 26
+    level: 2
+  - title: "Microsoft Purview"
+    page: 30
+    level: 2
+  - title: "Microsoft Teams"
+    page: 35
+    level: 2
+  - title: "OneDrive for Business"
+    page: 44
+    level: 2
+  - title: "SharePoint Online"
+    page: 47
+    level: 2
+  - title: "Conclusion"
+    page: 54
+    level: 1

@@ -4,13 +4,10 @@ Assessment Report Service - fetches real assessment data from database and gener
 
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
 from collections import defaultdict
 
 from app.db.models.assessment import Assessment
 from app.db.models.assessment_finding import AssessmentFinding
-from app.db.models.assessment_parameter import AssessmentParameter
-from app.services.reporting.professional_report_generator import ProfessionalReportGenerator
 
 
 class AssessmentReportService:
@@ -125,121 +122,6 @@ class AssessmentReportService:
         }
 
         return data
-
-    def generate_word_report(
-        self,
-        assessment_id: UUID,
-        tenant_info: Optional[dict] = None,
-        output_path: Optional[str] = None,
-    ) -> bytes:
-        """
-        Generate Word report for assessment.
-
-        Args:
-            assessment_id: UUID of assessment
-            tenant_info: Dict with tenant_name and partner_name
-            output_path: Optional file path to save report
-
-        Returns:
-            Bytes of Word document
-        """
-        # Prepare data
-        assessment_data = self.prepare_assessment_data(assessment_id, tenant_info)
-
-        # Generate report
-        generator = ProfessionalReportGenerator(assessment_data)
-        report_bytes = generator.generate_word_report()
-
-        # Save if path provided
-        if output_path:
-            with open(output_path, 'wb') as f:
-                f.write(report_bytes)
-
-        return report_bytes
-
-    def generate_pdf_report(
-        self,
-        assessment_id: UUID,
-        tenant_info: Optional[dict] = None,
-        output_path: Optional[str] = None,
-    ) -> bytes:
-        """
-        Generate PDF report for assessment.
-
-        Uses word-to-pdf conversion.
-
-        Args:
-            assessment_id: UUID of assessment
-            tenant_info: Dict with tenant_name and partner_name
-            output_path: Optional file path to save report
-
-        Returns:
-            Bytes of PDF document
-        """
-        try:
-            from docx2pdf import convert
-            import tempfile
-
-            # Generate Word report
-            word_bytes = self.generate_word_report(assessment_id, tenant_info)
-
-            # Save Word to temp file
-            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp:
-                tmp.write(word_bytes)
-                tmp_path = tmp.name
-
-            # Convert to PDF
-            pdf_path = tmp_path.replace('.docx', '.pdf')
-            convert(tmp_path, pdf_path)
-
-            # Read PDF
-            with open(pdf_path, 'rb') as f:
-                pdf_bytes = f.read()
-
-            # Save if path provided
-            if output_path:
-                with open(output_path, 'wb') as f:
-                    f.write(pdf_bytes)
-
-            return pdf_bytes
-
-        except ImportError:
-            raise ImportError("docx2pdf not installed. Install with: pip install docx2pdf")
-
-    def generate_both_reports(
-        self,
-        assessment_id: UUID,
-        tenant_info: Optional[dict] = None,
-        output_dir: Optional[str] = None,
-    ) -> dict:
-        """
-        Generate both Word and PDF reports.
-
-        Args:
-            assessment_id: UUID of assessment
-            tenant_info: Dict with tenant_name and partner_name
-            output_dir: Optional directory to save reports
-
-        Returns:
-            Dict with 'word' and 'pdf' bytes
-        """
-        word_path = None
-        pdf_path = None
-
-        if output_dir:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            word_path = f"{output_dir}/CRA_Report_{timestamp}.docx"
-            pdf_path = f"{output_dir}/CRA_Report_{timestamp}.pdf"
-
-        word_bytes = self.generate_word_report(assessment_id, tenant_info, word_path)
-        pdf_bytes = self.generate_pdf_report(assessment_id, tenant_info, pdf_path)
-
-        return {
-            'word': word_bytes,
-            'pdf': pdf_bytes,
-            'word_path': word_path,
-            'pdf_path': pdf_path,
-        }
 
     def close(self):
         """Close database session."""

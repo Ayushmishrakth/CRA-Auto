@@ -1,281 +1,153 @@
-import { useState, useRef } from "react";
-import { Upload, X, AlertCircle } from "lucide-react";
-import Button from "../ui/Button";
-import { useToast } from "../../context/ToastContext";
-import { injectBrandingIntoDocx } from "../../utils/reportBranding";
-import { saveAs } from "file-saver";
-import axios from "axios";
+import React, { useRef, useState } from "react";
+import { tokenStorage } from "../../utils/tokenStorage";
 
-const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/svg+xml"];
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") ||
+  "http://127.0.0.1:8000/api/v1";
 
-export default function CustomizeReportModal({ assessmentId, onClose, onGenerate, isLoading = false }) {
-  const toast = useToast();
-  const fileInputRef = useRef(null);
+function safeFileName(value) {
+  return String(value || "Report").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "");
+}
 
-  const [formState, setFormState] = useState({
-    logoFile: null,
-    logoPreview: null,
-    companyName: "",
-    companyAddress: "",
-    format: "pdf",
-  });
+export default function CustomizeReportModal({ assessmentId, tenantName, onClose }) {
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setPreview] = useState(null);
+  const [companyName, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [format, setFormat] = useState("docx");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const inputRef = useRef();
 
-  const [validation, setValidation] = useState({
-    logoSize: null,
-    logoType: null,
-  });
-
-  const handleLogoChange = (e) => {
-    const file = e.target.files?.[0];
+  const onFile = (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
-
-    const newValidation = { logoSize: null, logoType: null };
-
-    if (file.size > MAX_LOGO_SIZE) {
-      newValidation.logoSize = "Logo must be smaller than 5MB";
-      toast.error("Logo file too large (max 5MB)");
-    }
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      newValidation.logoType = "Only PNG, JPG, and SVG files are allowed";
-      toast.error("Invalid logo format. Allowed: PNG, JPG, SVG");
-    }
-
-    setValidation(newValidation);
-
-    if (!newValidation.logoSize && !newValidation.logoType) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        setFormState((prev) => ({
-          ...prev,
-          logoFile: file,
-          logoPreview: evt.target.result,
-        }));
-      };
-      reader.readAsDataURL(file);
-    } else {
-      e.target.value = "";
-    }
+    setLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => setPreview(loadEvent.target.result);
+    reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
-    setFormState((prev) => ({
-      ...prev,
-      logoFile: null,
-      logoPreview: null,
-    }));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormState((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleGenerate = async () => {
+  const generate = async () => {
+    setLoading(true);
+    setError("");
     try {
-      const companyName = formState.companyName.trim();
-      const companyAddress = formState.companyAddress.trim();
-      const logoFile = formState.logoFile;
+      const formData = new FormData();
+      if (logoFile) formData.append("logo_file", logoFile);
+      if (companyName.trim()) formData.append("company_name", companyName.trim());
+      if (address.trim()) formData.append("company_address", address.trim());
 
-      // Download plain DOCX from backend
-      const response = await axios.get(
-        `/api/v1/assessments/${assessmentId}/report/download?report_type=docx`,
-        { responseType: 'blob' }
+      const token =
+        tokenStorage.getAccessToken() ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token") ||
+        sessionStorage.getItem("token") ||
+        "";
+
+      const response = await fetch(
+        `${apiBaseUrl}/assessments/${assessmentId}/generate-report?report_type=${format}`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        }
       );
 
-      // Inject branding in browser
-      const brandedBlob = await injectBrandingIntoDocx(response.data, {
-        logoFile: logoFile,
-        companyName: companyName,
-        companyAddress: companyAddress,
-      });
+      if (!response.ok) throw new Error((await response.text()) || `Error ${response.status}`);
 
-      // Save to user's computer
-      const timestamp = new Date().toISOString().slice(0, 10);
-      const filename = `CRA_Report_${companyName || 'Report'}_${timestamp}.docx`;
-      saveAs(brandedBlob, filename);
-
-      toast.success("Report generated and downloaded successfully!");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `CRA_Report_${safeFileName(tenantName || assessmentId)}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       onClose();
-    } catch (error) {
-      console.error('Report generation failed:', error);
-      toast.error(error.message || "Failed to generate report");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const hasValidationErrors = validation.logoSize || validation.logoType;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Customize Report</h2>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",
+                 display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}>
+      <div style={{background:"#fff",borderRadius:12,padding:32,width:480,
+                   maxWidth:"90vw",maxHeight:"90vh",overflowY:"auto",
+                   boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+        <h2 style={{margin:"0 0 24px",fontSize:20,fontWeight:700}}>Customize Report</h2>
+
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontWeight:600,marginBottom:8}}>Company Logo</label>
+          <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.svg"
+                 onChange={onFile} style={{display:"none"}} />
+          {logoPreview
+            ? <div style={{display:"flex",alignItems:"center",gap:12,padding:12,
+                           border:"2px solid #e5e7eb",borderRadius:8}}>
+                <img src={logoPreview} alt="logo" style={{height:50,maxWidth:160,objectFit:"contain"}} />
+                <button onClick={() => inputRef.current.click()}
+                        style={{background:"none",border:"1px solid #2563eb",color:"#2563eb",
+                                padding:"4px 12px",borderRadius:6,cursor:"pointer"}}>Change</button>
+              </div>
+            : <button onClick={() => inputRef.current.click()}
+                      style={{background:"#2563eb",color:"#fff",padding:"10px 20px",
+                              borderRadius:8,border:"none",cursor:"pointer",
+                              fontSize:14,fontWeight:600,width:"100%"}}>
+                Upload Logo
+              </button>
+          }
+          <small style={{color:"#888"}}>PNG, JPG, or SVG (max 5MB)</small>
         </div>
 
-        {/* Content */}
-        <div className="px-6 py-6 space-y-6">
-          {/* Logo Upload */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-3">
-              Company Logo
-            </label>
-            <div className="space-y-3">
-              {formState.logoPreview ? (
-                <div className="relative bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4 flex items-center justify-center">
-                  <img
-                    src={formState.logoPreview}
-                    alt="Logo preview"
-                    className="max-h-24 max-w-full object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleRemoveLogo}
-                    disabled={isLoading}
-                    className="absolute top-2 right-2 bg-red-100 text-red-600 p-1 rounded-full hover:bg-red-200 disabled:opacity-50"
-                    aria-label="Remove logo"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading}
-                  className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Upload size={24} className="mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm font-medium text-gray-700">Click to upload</p>
-                  <p className="text-xs text-gray-500 mt-1">PNG, JPG or SVG • Max 5MB</p>
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/svg+xml"
-                onChange={handleLogoChange}
-                disabled={isLoading}
-                className="hidden"
-                aria-label="Logo file input"
-              />
-              {hasValidationErrors && (
-                <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 p-3 rounded">
-                  <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                  <div>
-                    {validation.logoSize && <p>{validation.logoSize}</p>}
-                    {validation.logoType && <p>{validation.logoType}</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Company Name */}
-          <div>
-            <label htmlFor="companyName" className="block text-sm font-semibold text-gray-900 mb-2">
-              Company Name
-            </label>
-            <input
-              id="companyName"
-              type="text"
-              name="companyName"
-              value={formState.companyName}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              placeholder="Enter your company name"
-              maxLength={200}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {formState.companyName.length}/200
-            </p>
-          </div>
-
-          {/* Company Address */}
-          <div>
-            <label htmlFor="companyAddress" className="block text-sm font-semibold text-gray-900 mb-2">
-              Company Address
-            </label>
-            <textarea
-              id="companyAddress"
-              name="companyAddress"
-              value={formState.companyAddress}
-              onChange={handleInputChange}
-              disabled={isLoading}
-              placeholder="Enter your company address"
-              maxLength={500}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {formState.companyAddress.length}/500
-            </p>
-          </div>
-
-          {/* Report Format */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-3">
-              Report Format
-            </label>
-            <div className="space-y-2">
-              {[
-                { value: "pdf", label: "PDF (.pdf)" },
-                { value: "docx", label: "Word (.docx)" },
-                { value: "both", label: "Both PDF & Word (.zip)" },
-              ].map((option) => (
-                <label
-                  key={option.value}
-                  className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <input
-                    type="radio"
-                    name="format"
-                    value={option.value}
-                    checked={formState.format === option.value}
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                    className="w-4 h-4 text-blue-600 cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  <span className="text-sm font-medium text-gray-700">{option.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontWeight:600,marginBottom:8}}>Company Name</label>
+          <input type="text" value={companyName} onChange={(event) => setName(event.target.value)}
+                 placeholder="e.g., Acme Corporation"
+                 style={{width:"100%",padding:"10px 12px",border:"1px solid #d1d5db",
+                         borderRadius:8,fontSize:14,boxSizing:"border-box"}} />
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Cancel
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontWeight:600,marginBottom:8}}>Company Address</label>
+          <textarea value={address} onChange={(event) => setAddress(event.target.value)}
+                    placeholder="e.g., 123 Business St, City"
+                    style={{width:"100%",padding:"10px 12px",border:"1px solid #d1d5db",
+                            borderRadius:8,fontSize:14,minHeight:80,
+                            boxSizing:"border-box",resize:"vertical"}} />
+        </div>
+
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontWeight:600,marginBottom:8}}>Report Format</label>
+          {[["docx","Word Document (.docx)"],["pdf","PDF Document (.pdf)"]].map(([value,label]) => (
+            <label key={value} style={{display:"flex",alignItems:"center",padding:"12px 16px",
+                                       border:"1px solid #e5e7eb",borderRadius:8,
+                                       marginBottom:8,cursor:"pointer"}}>
+              <input type="radio" name="fmt" value={value}
+                     checked={format===value} onChange={() => setFormat(value)} />
+              <span style={{marginLeft:8}}>{label}</span>
+              {value==="docx" && <span style={{marginLeft:"auto",background:"#f0f9ff",
+                                               color:"#0369a1",padding:"2px 8px",
+                                               borderRadius:12,fontSize:11}}>Recommended</span>}
+            </label>
+          ))}
+        </div>
+
+        {error && <div style={{background:"#fef2f2",color:"#dc2626",padding:12,
+                               borderRadius:8,marginBottom:16,fontSize:13}}>{error}</div>}
+
+        <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
+          <button onClick={onClose} disabled={loading}
+                  style={{padding:"10px 24px",border:"1px solid #d1d5db",
+                          borderRadius:8,background:"#fff",cursor:"pointer"}}>Cancel</button>
+          <button onClick={generate} disabled={loading}
+                  style={{padding:"10px 24px",background:"#2563eb",color:"#fff",
+                          border:"none",borderRadius:8,cursor:"pointer",
+                          fontWeight:600,opacity:loading?0.7:1}}>
+            {loading ? "Generating..." : "Apply & Generate"}
           </button>
-          <Button
-            variant="primary"
-            onClick={handleGenerate}
-            disabled={isLoading}
-          >
-            {isLoading ? "Generating..." : "Generate & Download"}
-          </Button>
         </div>
       </div>
     </div>

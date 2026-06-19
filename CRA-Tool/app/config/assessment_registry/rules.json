@@ -454,12 +454,12 @@
     "copilot_blocking": true,
     "expression": {
       "count_thresholds": [
-        70.0
+        80.0
       ],
-      "fail_criteria": "When it is less than 70%",
-      "pass_criteria": "When it is more than 70%",
+      "fail_criteria": "When it is less than 80%",
+      "pass_criteria": "When it is more than or equal to 80%",
       "percentage_thresholds": [
-        70.0
+        80.0
       ]
     },
     "parameter_key": "secure_score_percentage",

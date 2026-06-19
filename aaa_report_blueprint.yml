@@ -1,0 +1,730 @@
+document:
+  source_document: "C:\\Users\\Admin\\Downloads\\AAA Legal Process Copilot Readiness Assessment Report (1)(10).docx"
+  requested_source_name: "AAA Legal Process Copilot Readiness Assessment Report (1)(10)(6).docx"
+  extraction_basis: "direct_docx_package_xml"
+  page_count: 54
+  page_size:
+    name: "A4"
+    orientation: "portrait"
+    width: "8.2681in"
+    height: "11.6931in"
+    width_twips: 11906
+    height_twips: 16838
+  orientation: "portrait"
+  width: "8.2681in"
+  height: "11.6931in"
+  sections:
+    count: 1
+    section_type: "continuous"
+    title_page_enabled: true
+    columns_space_twips: 708
+    doc_grid_line_pitch_twips: 360
+
+page_setup:
+  page_size:
+    name: "A4"
+    orientation: "portrait"
+    width: "8.2681in"
+    height: "11.6931in"
+    width_twips: 11906
+    height_twips: 16838
+  margins:
+    top: "1.0000in"
+    bottom: "1.0000in"
+    left: "1.0000in"
+    right: "1.0000in"
+    header: "0.0000in"
+    footer: "0.0000in"
+    gutter: "0.0000in"
+
+margins:
+  top: "1.0000in"
+  bottom: "1.0000in"
+  left: "1.0000in"
+  right: "1.0000in"
+  top_twips: 1440
+  bottom_twips: 1440
+  left_twips: 1440
+  right_twips: 1440
+
+fonts:
+  title:
+    style_id: "CoverTitle"
+    family: "Segoe UI"
+    size: 22
+    bold: false
+    italic: false
+    color: "#FFFFFF"
+  heading_1:
+    style_id: "Heading1"
+    family: "majorHAnsi theme font"
+    size: 16
+    bold: false
+    italic: false
+    color: "#2F5496"
+    spacing_before_twips: 240
+    spacing_after_twips: 0
+  heading_2:
+    style_id: "Heading2"
+    family: "majorHAnsi theme font"
+    size: 13
+    bold: false
+    italic: false
+    color: "#2F5496"
+    spacing_before_twips: 40
+    spacing_after_twips: 0
+  heading_3:
+    style_id: "Heading3"
+    family: "majorHAnsi theme font"
+    size: 12
+    bold: false
+    italic: false
+    color: "#1F3763"
+    spacing_before_twips: 40
+    spacing_after_twips: 0
+  heading_4:
+    style_id: "Heading4"
+    family: "majorHAnsi theme font"
+    size: null
+    bold: false
+    italic: true
+    color: "#2F5496"
+    spacing_before_twips: 40
+    spacing_after_twips: 0
+  body_text:
+    style_id: "Default"
+    family: "Lato"
+    size: 12
+    bold: false
+    italic: false
+    color: "#000000"
+    spacing_after_twips: 0
+    line_twips: 240
+    line_rule: "auto"
+  toc_entry:
+    level_1_style_id: "TOC1"
+    level_2_style_id: "TOC2"
+    level_3_style_id: "TOC3"
+    family: "inherited from document default"
+    size: "inherited from document default"
+    bold: false
+    italic: false
+    color: "inherited from document default"
+    spacing_after_twips: 100
+  footer:
+    style_id: "Footer"
+    family: "inherited from document default"
+    size: "inherited from document default"
+    bold: false
+    italic: false
+    color: "inherited from document default"
+    spacing_after_twips: 0
+    line_twips: 240
+    line_rule: "auto"
+  table_header:
+    family: "inherited from document default"
+    size: "inherited from table cell paragraph"
+    bold: "not explicitly defined in table style"
+    italic: false
+    color: "#FFFFFF"
+  table_body:
+    family: "inherited from document default"
+    size: "inherited from table cell paragraph"
+    bold: false
+    italic: false
+    color: "#000000"
+  hyperlink:
+    style_id: "Hyperlink"
+    color: "#0563C1"
+    underline: true
+
+colors:
+  primary_blue: "#2F5496"
+  secondary_blue: "#2E74B5"
+  black_banner: "#000000"
+  table_header_blue: "#2E74B5"
+  alternate_table_header_blue: "#00759E"
+  critical_red: "#C00000"
+  high_red: "#EE0000"
+  medium_orange: "#FF0000"
+  low_yellow: "#FFC000"
+  informational_green: "#00B050"
+  pass_green: "#00B050"
+  chart_mint: "#B2EAD6"
+  hyperlink_blue: "#0563C1"
+  body_text: "#000000"
+  white_text: "#FFFFFF"
+  page_background: "#FFFFFF"
+
+header:
+  default_header_part: "word/header1.xml"
+  first_page_header_part: "word/header2.xml"
+  default_header_text: ""
+  first_page_header_text: ""
+  style_id: "Header"
+  tabs:
+    - alignment: "center"
+      position_twips: 4513
+    - alignment: "right"
+      position_twips: 9026
+  spacing_after_twips: 0
+  line_twips: 240
+
+footer:
+  default_footer_part: "word/footer1.xml"
+  left_text:
+    value: "Copilot Readiness Assessment"
+  right_text:
+    value: "{page} | Page"
+  actual_extracted_text_example: "Copilot Readiness Assessment 2 | Page"
+  font: "inherited from document default"
+  size: "inherited from document default"
+  style_id: "Footer"
+  tabs:
+    - alignment: "center"
+      position_twips: 4513
+    - alignment: "right"
+      position_twips: 9026
+  line_position:
+    present: false
+    source: "no footer border line found in footer XML"
+
+cover_page:
+  background_color: "#FFFFFF"
+  background_image:
+    file: "word/media/image1.png"
+    pixel_width: 2827
+    pixel_height: 1986
+    placement: "anchored_behind_text"
+    x:
+      relative_from: "column"
+      offset_emu: -7788275
+      offset: "-8.5174in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 490220
+      offset: "0.5361in"
+    width: "20.6833in"
+    height: "14.5146in"
+  title:
+    text: "Copilot Readiness Assessment"
+    x:
+      relative_from: "page"
+      offset_emu: 140335
+      offset: "0.1535in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 213360
+      offset: "0.2333in"
+    width: "8.0639in"
+    height: "1.5361in"
+    font: "Segoe UI"
+    size: 22
+    color: "#FFFFFF"
+    style_id: "CoverTitle"
+  date:
+    text: "DD-MM-YYYY"
+    x:
+      relative_from: "column"
+      offset_emu: -259080
+      offset: "-0.2833in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 8177530
+      offset: "8.9431in"
+  prepared_for:
+    text: "Prepared for:"
+    x:
+      relative_from: "column"
+      offset_emu: -259080
+      offset: "-0.2833in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 1441450
+      offset: "1.5764in"
+  customer_name:
+    text: "Customer Name"
+    x:
+      relative_from: "column"
+      offset_emu: -259080
+      offset: "-0.2833in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 1441450
+      offset: "1.5764in"
+  microsoft_logo:
+    file: "word/media/image4.png"
+    pixel_width: 540
+    pixel_height: 450
+    x:
+      relative_from: "margin"
+      offset_emu: 3060700
+      offset: "3.3472in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 1308100
+      offset: "1.4306in"
+    width: "4.9431in"
+    height: "4.1194in"
+  assessment_graphic:
+    file: "word/media/image2.png"
+    pixel_width: 2500
+    pixel_height: 2175
+    x:
+      relative_from: "column"
+      offset_emu: -772795
+      offset: "-0.8451in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 3623945
+      offset: "3.9632in"
+    width: "4.9375in"
+    height: "4.2958in"
+  score_box:
+    text: "46.15%"
+    width: "2.5819in"
+    height: "1.5361in"
+    x:
+      relative_from: "column"
+      offset_emu: -262890
+      offset: "-0.2875in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 978535
+      offset: "1.0701in"
+
+toc:
+  start_page: 2
+  end_page: 4
+  font: "inherited from document default"
+  size: "inherited from document default"
+  line_spacing: "default paragraph line spacing"
+  section_spacing:
+    after_twips: 100
+  page_number_alignment: "right tab stop at 9016 twips for TOC1"
+  dot_leader:
+    enabled: true
+    style: "dot"
+    tab_position_twips: 9016
+  toc_levels:
+    level_1:
+      style_id: "TOC1"
+      spacing_after_twips: 100
+      tabs:
+        - alignment: "left"
+          position_twips: 440
+        - alignment: "right"
+          leader: "dot"
+          position_twips: 9016
+    level_2:
+      style_id: "TOC2"
+      spacing_after_twips: 100
+      tabs: "inherited or field-generated"
+    level_3:
+      style_id: "TOC3"
+      spacing_after_twips: 100
+      tabs: "inherited or field-generated"
+
+section_pages:
+  title_style: "Heading1"
+  body_style: "Default"
+  section_heading_color: "#2F5496"
+  parameter_domain_headings:
+    - "ENTRA ID"
+    - "EXCHANGE ONLINE"
+    - "MICROSOFT PURVIEW"
+    - "MICROSOFT TEAMS"
+    - "ONEDRIVE FOR BUSINESS"
+    - "SHAREPOINT ONLINE"
+
+executive_summary:
+  title_style:
+    style_id: "Heading1"
+    font: "majorHAnsi theme font"
+    size: 16
+    color: "#2F5496"
+    spacing_before_twips: 240
+    spacing_after_twips: 0
+  paragraph_style:
+    style_id: "Default"
+    font: "Lato"
+    size: 12
+    color: "#000000"
+    spacing_after_twips: 0
+    line_twips: 240
+  bullet_style:
+    font: "Lato"
+    size: 12
+    color: "#000000"
+  before_title: "Heading1 spacing_before_twips 240"
+  after_title: "Heading1 spacing_after_twips 0"
+  before_paragraph: "paragraph default"
+  after_paragraph: "Default spacing_after_twips 0"
+
+evaluation_summary:
+  title_style:
+    style_id: "Heading1"
+    size: 16
+    color: "#2F5496"
+  pillar_chart:
+    chart_file: "word/charts/chart1.xml"
+    chart_type: "chart XML without c:barChart node; rendered as office chart object"
+    width: "6.3438in"
+    height: "2.5000in"
+    position: "inline"
+    title: ""
+    legend_position: "bottom"
+    series_name: "3 Pillars of CRA"
+    categories: ["Security", "Best Practices", "Governance"]
+    values: [27, 15, 23]
+  services_chart:
+    chart_file: "word/charts/chart2.xml"
+    chart_type: "chart XML without c:barChart node; rendered as office chart object"
+    width: "6.3438in"
+    height: "2.6866in"
+    position: "inline"
+    title: "M365 Services"
+    legend_position: "bottom"
+    series_name: "Services"
+    categories: ["Entra ID", "Exchange Online", "Microsoft Purview", "Microsoft Teams", "OneDrive for Business", "Sharepoint Online"]
+    values: [21, 6, 8, 16, 3, 11]
+
+risk_matrix:
+  title_style:
+    style_id: "Heading1"
+    size: 16
+    color: "#2F5496"
+  severity_graphic:
+    drawing_name: "Diagram 84"
+    width: "6.6632in"
+    height: "2.4000in"
+    position: "inline"
+  risk_chart:
+    chart_file: "word/charts/chart3.xml"
+    chart_type: "chart XML without c:barChart node; rendered as office chart object"
+    width: "6.0938in"
+    height: "2.9688in"
+    title: "Risk-wise Parameters"
+    legend_position: "bottom"
+    categories: ["Critical", "High", "Medium", "Low", "Informational"]
+    values: [21, 18, 18, 4, 4]
+    colors: ["#C00000", "#000000", "#FF0000"]
+
+assessment_summary:
+  readiness_score:
+    text: "46.15%"
+    position:
+      drawing_name: "Text Box 77"
+      width: "1.0167in"
+      height: "0.3875in"
+      x:
+        relative_from: "margin"
+        align: "center"
+      y:
+        relative_from: "paragraph"
+        offset_emu: 5715
+        offset: "0.0063in"
+    font: "inherited from text box"
+    size: "not explicitly defined in body style XML"
+  readiness_bar:
+    chart_file: "word/charts/chart4.xml"
+    chart_type: "barChart"
+    width: "6.7264in"
+    height: "0.9694in"
+    position: "anchor"
+    x:
+      relative_from: "column"
+      offset_emu: 0
+      offset: "0.0000in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 723265
+      offset: "0.7910in"
+    series:
+      - name: "Pass"
+        value: 30
+      - name: "Fail"
+        value: 35
+        color: "#EE0000"
+  readiness_label:
+    file: "word/media/image5.png"
+    width: "0.6264in"
+    height: "0.3729in"
+    pixel_width: 192
+    pixel_height: 192
+
+charts:
+  default:
+    font: "inherited Office chart default"
+    title_size: "stored in chart XML default text properties"
+    axis_size: "stored in chart XML default text properties"
+    legend_size: "stored in chart XML default text properties"
+    anti_aliasing: "native Office chart rendering"
+    dpi_rule: "preserve native chart object; do not rasterize"
+  pie_chart:
+    chart_type: "not present as c:pieChart in extracted chart XML"
+  bar_chart:
+    chart_files: ["word/charts/chart4.xml", "word/charts/chart5.xml", "word/charts/chart6.xml", "word/charts/chart8.xml"]
+    legend_positions:
+      bottom: ["word/charts/chart4.xml"]
+      top: ["word/charts/chart5.xml", "word/charts/chart8.xml"]
+      right: ["word/charts/chart6.xml"]
+  stacked_bar_chart:
+    chart_files: ["word/charts/chart5.xml", "word/charts/chart6.xml"]
+    fail_color: "#EE0000"
+    critical_color: "#C00000"
+    low_color: "#FFC000"
+  donut_chart:
+    chart_files: ["word/charts/chart9.xml", "word/charts/chart10.xml", "word/charts/chart11.xml", "word/charts/chart12.xml"]
+    width: "2.79in"
+    height: "2.82in"
+    active_color: "#00B050"
+    legend: false
+    hole_size: "stored in chart XML"
+    center_label_text_boxes:
+      - "100%"
+      - "100%"
+      - "0%"
+      - "100%"
+  dashboard:
+    m365_services_and_pillars:
+      chart_file: "word/charts/chart5.xml"
+      chart_type: "barChart"
+      width: "6.7273in"
+      height: "4.2597in"
+      title: "Executive Summary - M365 Services and 3 Pillars"
+      legend_position: "top"
+    severity_and_pillars:
+      chart_file: "word/charts/chart6.xml"
+      chart_type: "barChart"
+      width: "6.6076in"
+      height: "3.9610in"
+      title: "Executive Summary - Severity and 3 Pillars"
+      legend_position: "right"
+    licenses_assigned:
+      chart_file: "word/charts/chart7.xml"
+      width: "6.0000in"
+      height: "3.5455in"
+      title: "Licenses Assigned Data"
+      legend_position: "bottom"
+      color: "#B2EAD6"
+    user_information_details:
+      chart_file: "word/charts/chart8.xml"
+      chart_type: "barChart"
+      width: "6.0000in"
+      height: "3.5000in"
+      title: "User Information Details"
+      legend_position: "top"
+      not_added_color: "#C00000"
+
+tables:
+  assessment_summary:
+    columns:
+      - "sno"
+      - "parameter"
+      - "pillar"
+      - "finding"
+      - "severity"
+    widths:
+      default_entra_twips: [793, 4227, 1545, 986, 1465]
+      exchange_twips: [805, 4191, 1293, 1231, 1496]
+      purview_twips: [805, 4202, 1468, 1056, 1485]
+      teams_twips: [805, 4193, 1387, 1135, 1496]
+      onedrive_twips: [715, 4281, 1479, 1045, 1496]
+      sharepoint_twips: [715, 4283, 1387, 1135, 1496]
+    row_height:
+      header_twips: 537
+      common_body_twips: 537
+      compact_body_twips: 368
+    header_color: "#2E74B5"
+    sharepoint_header_color: "#00759E"
+    border_color: "auto"
+    border_width: "4 eighths of a point"
+    border_style: "single"
+    table_width:
+      type: "auto"
+      width_twips: 0
+    cell_vertical_alignment: "center"
+    font: "inherited from document/table cell styles"
+    severity_cell_colors:
+      Critical: "#C00000"
+      High: "#EE0000"
+      Medium: "#FF0000"
+      Low: "#FFC000"
+      Informational: "#00B050"
+
+parameter_pages:
+  parameters_per_page: 2
+  page_range: "15-54"
+  section_banner:
+    drawing_name: "Rectangle 6"
+    height: "0.4083in"
+    alternate_height: "0.4250in"
+    width: "6.2826in"
+    background: "#000000"
+    font: "inherited text box font"
+    font_size: "stored in drawing text body"
+    x:
+      relative_from: "column"
+      offset_emu: -15241
+      offset: "-0.0167in"
+    y:
+      relative_from: "paragraph"
+      offset_emu: 140970
+      offset: "0.1542in"
+  risk_rating:
+    font: "inherited text box font"
+    font_size: "stored in drawing text body"
+    risk_bar_images:
+      critical_or_common:
+        file: "word/media/image7.png"
+        width: "6.3986in"
+        height: "0.7799in"
+        pixel_width: 1112
+        pixel_height: 427
+      high:
+        file: "word/media/image8.jpeg"
+        width: "6.2826in"
+        height: "0.8250in"
+        pixel_width: 800
+        pixel_height: 307
+      medium:
+        file: "word/media/image9.png"
+        width: "6.2681in"
+        height: "0.8139in"
+        pixel_width: 1112
+        pixel_height: 427
+      low:
+        file: "word/media/image10.jpeg"
+        width: "6.2681in"
+        height: "0.7783in"
+        pixel_width: 800
+        pixel_height: 307
+      informational:
+        file: "word/media/image11.png"
+        width: "6.2681in"
+        height: "0.7771in"
+        pixel_width: 1112
+        pixel_height: 427
+  description:
+    heading_style: "Heading3"
+    body_style: "Default"
+  risk:
+    heading_style: "Heading3"
+    body_style: "Default"
+  documentation_link:
+    style_id: "Hyperlink"
+    color: "#0563C1"
+    underline: true
+
+risk_indicator:
+  width: "6.3986in"
+  height: "0.7799in"
+  alternate_widths: ["6.2826in", "6.2681in"]
+  alternate_heights: ["0.8250in", "0.8139in", "0.7783in", "0.7771in"]
+  critical_color: "#C00000"
+  high_color: "#EE0000"
+  medium_color: "#FF0000"
+  low_color: "#FFC000"
+  informational_color: "#00B050"
+  marker_style: "pre-rendered indicator image per severity"
+  marker_position_logic: "select corresponding extracted risk-bar image asset for severity; preserve native image dimensions"
+
+images:
+  alignment: "preserve original inline or anchor placement from DOCX"
+  max_width: "content width unless explicit drawing extent exceeds page"
+  spacing_before: "preserve paragraph/drawing anchor spacing"
+  spacing_after: "preserve paragraph/drawing anchor spacing"
+  media_assets:
+    - file: "word/media/image1.png"
+      pixels: [2827, 1986]
+      role: "cover background"
+    - file: "word/media/image2.png"
+      pixels: [2500, 2175]
+      role: "cover assessment graphic"
+    - file: "word/media/image4.png"
+      pixels: [540, 450]
+      role: "cover logo/graphic"
+    - file: "word/media/image5.png"
+      pixels: [192, 192]
+      role: "assessment summary icon"
+    - file: "word/media/image7.png"
+      pixels: [1112, 427]
+      role: "risk indicator"
+    - file: "word/media/image8.jpeg"
+      pixels: [800, 307]
+      role: "risk indicator"
+    - file: "word/media/image9.png"
+      pixels: [1112, 427]
+      role: "risk indicator"
+    - file: "word/media/image10.jpeg"
+      pixels: [800, 307]
+      role: "risk indicator"
+    - file: "word/media/image11.png"
+      pixels: [1112, 427]
+      role: "risk indicator"
+    - file: "word/media/image12.png"
+      pixels: [602, 75]
+      role: "parameter detail inline image"
+    - file: "word/media/image13.png"
+      pixels: [1521, 382]
+      role: "document image asset"
+
+spacing:
+  document_default:
+    body_spacing_after_twips: 0
+    body_line_twips: 240
+    body_line_rule: "auto"
+  headings:
+    heading_1_before_twips: 240
+    heading_1_after_twips: 0
+    heading_2_before_twips: 40
+    heading_2_after_twips: 0
+    heading_3_before_twips: 40
+    heading_3_after_twips: 0
+  toc:
+    entry_after_twips: 100
+  tables:
+    cell_vertical_alignment: "center"
+    header_row_height_twips: 537
+  charts:
+    preserve_inline_paragraph_spacing: true
+    preserve_anchor_offsets: true
+
+page_breaks:
+  cover_to_toc:
+    paragraph_index: 5
+    type: "w:br page"
+  toc_to_summary:
+    paragraph_index: 90
+    type: "w:br page"
+  section_to_section:
+    type: "explicit w:br page where present"
+    paragraph_indices: [105, 123, 133, 161, 169, 177, 270, 385, 418, 460, 480, 592, 614, 804, 851, 858, 992, 1003]
+  parameter_pages:
+    type: "explicit page breaks plus two-parameter layout"
+    preserve_existing_break_indices: true
+
+numbering:
+  footer_format: "{page} | Page"
+  starts_displaying_on_page: 2
+  cover_page_number_visible: false
+  toc_page_numbers_visible: true
+  toc_uses_field_page_numbers: true
+
+rendering_rules:
+  preserve_page_count: true
+  preserve_spacing: true
+  preserve_header_footer: true
+  preserve_table_widths: true
+  preserve_font_sizes: true
+  preserve_chart_dimensions: true
+  preserve_banner_dimensions: true
+  preserve_existing_page_sequence: true
+  preserve_existing_content_text: true
+  preserve_existing_chart_data: true
+  preserve_native_docx_charts: true
+  do_not_rasterize_charts: true
+  preserve_image_asset_dimensions: true
+  preserve_toc_dot_leaders: true
+  preserve_parameter_page_risk_images: true

@@ -3,6 +3,62 @@ report:
     title: "Copilot Readiness Assessment"
     subtitle: "Microsoft 365 readiness report"
     report_family: "Executive consulting report"
+  page_text:
+    risk_score_matrix:
+      heading: Risk Score Matrix
+      intro: "The findings presented in this report are graded according to the following levels of severity:"
+      category_heading: Risk Category of Parameters Assessed
+      category_intro: "The following chart provides consolidated parameters based on risk category assessed during the engagement:"
+    assessment_summary:
+      heading: Summary of Assessment
+      intro: "The Copilot Readiness Assessment uncovered several configuration gaps and policy deficiencies that could impact the secure and compliant adoption of Microsoft Copilot. Each finding has been categorized by severity and mapped to specific areas of risk within the Microsoft 365 environment."
+      overall_readiness_label: "Overall Readiness:"
+      readiness_intro: "Based on the findings, the Client's current readiness level for Copilot integration is assessed as:"
+      readiness_level_label: "Readiness Level:"
+      readiness_gaps_label: "Readiness Gaps:"
+      remediation_note: "Significant remediation is required prior to enabling Copilot in the production environment."
+    key_observations:
+      heading: "Key Observations:"
+      bullets:
+        - "A total of {failed_parameters} gaps out of {total_assessed} parameters were identified, distributed across Security, Governance, and Best Practice categories."
+        - "Medium to Critical severity issues make up {severity_percent}% of the findings, indicating substantial exposure to operational and compliance risks."
+        - "Gap findings reveal that the percentage of failed parameters is Security ({security_fail_pct}%), Governance ({governance_fail_pct}%), and Best Practices ({best_practice_fail_pct}%) pillars, indicating a critical need for immediate remediation in those areas."
+        - "There are {copilot_eligible_users} user accounts out of {total_users} that are eligible for a M365 Copilot license. Copilot requires a base Microsoft 365 subscription, such as Microsoft 365 E3, E5, Business Standard, or Business Premium."
+    user_license_information:
+      license_chart_title: "Licenses Assigned Data"
+      user_info_chart_title: "User Information Details"
+      added_label: "Added"
+      not_added_label: "Not Added"
+      complete_user_note: "There are {complete_users_text} users with full user information; assigning User information such as department or role, must be completed to establish an accurate organizational hierarchy and maintain proper records."
+    activity_signals:
+      observation: "In the past 60 days, {onedrive_pct}% of OneDrive users, {teams_pct}% of Microsoft Teams users, {outlook_pct}% of Outlook users and {sharepoint_pct}% of SharePoint users have been active, indicating strong engagement across Microsoft 365 core services."
+    risks_and_recommendations:
+      risks_heading: "Risks of Immediate Deployment:"
+      risks_intro: "Proceeding with Copilot activation in the current state may lead to:"
+      risk_items:
+        - "Unauthorized access to sensitive business data."
+        - "Inadequate auditing and monitoring of AI-driven activity."
+        - "Compliance violations with internal and external regulations."
+        - "Reduced user trust and operational inconsistencies due to misconfigured policies."
+      recommendations_heading: "Recommendations:"
+      recommendations:
+        - label: "Remediation of identified gaps:"
+          body: "Address all findings regardless of severity to meet cybersecurity baseline standards."
+        - label: "Postpone Deployment:"
+          body: "Due to the current maturity level of the environment, it is recommended to adopt Copilot deployment after all critical and high-priority gaps are resolved."
+        - label: "Futureproofing:"
+          body: "Implementing the recommendations provided will reduce security risks and ensure regulatory compliance during and after Copilot integration."
+    detailed_assessment:
+      heading: "Detailed Assessment"
+      intro: "The following tables provides a summary of all findings discovered during the course of this engagement:"
+      table_headers:
+        - "S. No"
+        - "Parameter"
+        - "CRA Pillar"
+        - "Finding"
+        - "Severity"
+      first_page_row_limit: 18
+      continuation_top_spacing_pt: 22
 
 sections:
   - id: cover

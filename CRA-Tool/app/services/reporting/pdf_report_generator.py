@@ -16,7 +16,8 @@ from reportlab.lib.units import inch, cm
 from reportlab.lib.colors import HexColor, black
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
-from reportlab.platypus import KeepTogether
+from reportlab.platypus import KeepTogether, PageTemplate, Frame
+from reportlab.pdfgen import canvas
 
 from app.services.reporting.chart_generator import (
     generate_severity_pie_chart,
@@ -50,6 +51,29 @@ SEVERITY_COLORS = {
     'pass': PASS_COLOR,
     'fail': FAIL_COLOR,
 }
+
+
+def _create_header_footer(canvas_obj, doc, logo_bytes_data):
+    """Draw logo header on each page."""
+    if logo_bytes_data:
+        try:
+            logo_bytes_data.seek(0)
+            logo_width = 1.8 * inch
+            logo_height = 1.8 * inch
+
+            canvas_obj.saveState()
+            canvas_obj.drawImage(
+                logo_bytes_data,
+                doc.leftMargin - 0.1 * inch,
+                doc.height + doc.topMargin + 0.2 * inch,
+                width=logo_width,
+                height=logo_height,
+                preserveAspectRatio=True,
+                kind='proportional'
+            )
+            canvas_obj.restoreState()
+        except Exception as e:
+            logger.warning(f"Could not draw logo header: {e}")
 
 
 def _get_styles():
@@ -153,18 +177,32 @@ def render_pdf_report(
 
     # Load logo if provided
     logo_bytes = None
+    logo_file_bytes = None
     if logo_path:
         try:
             with open(logo_path, 'rb') as f:
-                logo_bytes = io.BytesIO(f.read())
+                logo_file_bytes = f.read()
+                logo_bytes = io.BytesIO(logo_file_bytes)
         except Exception as e:
             logger.warning(f"Could not load logo from {logo_path}: {e}")
+
+    # Define a custom callback to draw logo on every page
+    def draw_page_header(canvas_obj, doc):
+        if logo_file_bytes:
+            _create_header_footer(canvas_obj, doc, io.BytesIO(logo_file_bytes))
+
+    # Update document to use custom header callback
+    doc.onFirstPage = draw_page_header
+    doc.onLaterPages = draw_page_header
+
+    # Increase top margin to accommodate logo header
+    doc.topMargin = 1.8 * inch
 
     # ── Cover Page ──────────────────────────────────────────────
     if logo_bytes:
         try:
             logo_bytes.seek(0)
-            logo_img = Image(logo_bytes, width=1.5*inch, height=1.5*inch)
+            logo_img = Image(logo_bytes, width=2.5*inch, height=2.5*inch, kind='proportional')
             story.append(logo_img)
         except Exception as e:
             logger.warning(f"Could not embed logo: {e}")

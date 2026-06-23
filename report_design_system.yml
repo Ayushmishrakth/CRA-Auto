@@ -15,6 +15,10 @@ fonts:
     family: Calibri
     size: 11
 
+typography:
+  body_font: Calibri
+  body_size: 11
+
   heading1:
     family: Calibri Light
     size: 16
@@ -55,6 +59,23 @@ colors:
     value: "#ED7D31"
   low:
     value: "#FFC000"
+
+severity_definitions:
+  Critical:
+    color: "C00000"
+    description: "The risks posed by this finding are of a critical nature and can lead to full system compromise. Specifics should be addressed immediately."
+  High:
+    color: "FF0000"
+    description: "The risks posed by this finding are of high impact and can lead to partial or full system compromise. Specifics should be addressed as soon as can be safely implemented."
+  Medium:
+    color: "ED7D31"
+    description: "The risks posed by this finding is of moderate impact, existing controls may be providing partial mitigation. Remediation efforts should be planned as part of regular maintenance."
+  Low:
+    color: "FFC000"
+    description: "The risk posed by this finding is low due to the potential impact or the difficulty of exploitation. Issues noted should be reviewed for remediation when convenient."
+  Informational:
+    color: "70AD47"
+    description: "A potential indirect risk that may contribute to or lead to an incident or deviation from industry best practices."
 
 tables:
   default:

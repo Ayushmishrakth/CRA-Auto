@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 import tempfile, os, logging, json
+import textwrap
 
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
@@ -81,20 +82,24 @@ FINDING_ORDER = {
 PARAMETER_ORDER = {
     'Custom Banned Password List': 1,
     'Restricted Access to Entra Admin Ctr': 2,
+    'Restricted Access to Microsoft Entra Admin Centre': 2,
     'Emergency Access Account': 3,
     'Device without Compliance Policies': 4,
     'Authentication Methods Enabled': 5,
     'Entra - Tenant Creation by Non-Admins': 6,
     'Global Administrator Accounts': 7,
     'Self-Service Password Reset Auth Meth': 8,
+    'Self-Service Password Reset Authentication Method': 8,
     'Tenant Collaboration Invitation': 9,
     'Administrator Consent Workflows': 10,
     'CAP Policies for Risky Sign-Ins': 11,
     'Conditional Access Policies Exclusion': 12,
+    'Conditional Access Policies (Exclusion)': 12,
     'User Consent for Applications': 13,
     'Entra - Third-Party App Integrations': 14,
     'Users without MFA': 15,
     'Auto-expiration policy M365 Groups': 16,
+    'Auto-expiration policy for inactive m365 groups': 16,
     'Customer Lockbox': 17,
     'Guest Invite Settings': 18,
     'Guest Users count': 19,
@@ -120,7 +125,7 @@ DEFAULT_REPORT_CONFIG = {
         "body_font": "Calibri",
         "h1_size": 18,
         "h2_size": 14,
-        "body_size": 10.5,
+        "body_size": 11,
         "caption_size": 8,
     },
     "layout": {
@@ -859,7 +864,7 @@ def _pie_chart(labels, values, colors, title):
     plt.close(fig)
     return path
 
-def _page6_pie_chart(labels, values, colors, title):
+def _page6_pie_chart(labels, values, colors, title, figure_size=(6.34, 2.5)):
     """Compact AAA-style Excel 3D pie chart for page 6."""
     filtered = [(l, v, c) for l, v, c in zip(labels, values, colors) if v > 0]
     if not filtered:
@@ -874,12 +879,12 @@ def _page6_pie_chart(labels, values, colors, title):
         b = int(int(h[4:6], 16) * factor)
         return f'#{r:02x}{g:02x}{b:02x}'
 
-    fig, ax = plt.subplots(figsize=(5.7, 3.15), dpi=REPORT_CHART_DPI)
+    fig, ax = plt.subplots(figsize=figure_size, dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('#BFBFBF')
+    fig.patch.set_edgecolor('#000000')
     fig.patch.set_linewidth(1.0)
 
-    radius = 0.62
+    radius = 0.58
     startangle = 112
 
     # Faux Excel 3D depth layer, then the visible pie on top.
@@ -888,7 +893,7 @@ def _page6_pie_chart(labels, values, colors, title):
         colors=[darken(c) for c in fc],
         startangle=startangle,
         radius=radius,
-        center=(0, -0.10),
+        center=(0, -0.12),
         wedgeprops={'linewidth': 0.5, 'edgecolor': '#777777'},
     )
     wedges, _texts = ax.pie(
@@ -902,26 +907,32 @@ def _page6_pie_chart(labels, values, colors, title):
         wedgeprops={'linewidth': 0.8, 'edgecolor': 'white'},
     )
 
-    # External percentage callouts with leader lines, matching the AAA chart style.
-    for wedge, value in zip(wedges, fv):
+    # External name + percentage callouts with leader lines, matching the AAA chart style.
+    for wedge, label, value in zip(wedges, fl, fv):
         angle = (wedge.theta1 + wedge.theta2) / 2
         x = np.cos(np.deg2rad(angle))
         y = np.sin(np.deg2rad(angle))
-        label_x = 1.10 * np.sign(x)
-        label_y = 0.78 * y
+        label_x = 1.18 * np.sign(x)
+        label_y = 0.80 * y
         ha = 'left' if x >= 0 else 'right'
         ax.annotate(
-            f'{value / total:.0%}',
-            xy=(0.66 * x, 0.66 * y),
+            f'{label} {value / total:.0%}',
+            xy=(0.61 * x, 0.61 * y),
             xytext=(label_x, label_y),
             ha=ha,
             va='center',
-            fontsize=8,
+            fontsize=7,
             fontfamily='Calibri',
             color='#1A1A1A',
+            bbox={
+                'boxstyle': 'square,pad=0.13',
+                'facecolor': 'white',
+                'edgecolor': '#000000',
+                'linewidth': 0.7,
+            },
             arrowprops={
                 'arrowstyle': '-',
-                'color': '#7F7F7F',
+                'color': '#000000',
                 'lw': 0.8,
                 'shrinkA': 0,
                 'shrinkB': 0,
@@ -929,32 +940,85 @@ def _page6_pie_chart(labels, values, colors, title):
             },
         )
 
-    ax.set_title(title, fontsize=15, fontweight='bold', fontfamily='Calibri', pad=8)
+    ax.set_title(title, fontsize=14, fontweight='bold', fontfamily='Calibri', pad=8)
     ax.legend(
         wedges,
         fl,
         loc='lower center',
-        bbox_to_anchor=(0.5, -0.14),
-        ncol=3 if len(fl) <= 3 else 2,
+        bbox_to_anchor=(0.5, -0.16),
+        ncol=min(3, len(fl)),
         frameon=False,
-        fontsize=8,
+        fontsize=6.8,
     )
     ax.set_aspect('equal')
-    ax.set_xlim(-1.52, 1.52)
-    ax.set_ylim(-1.08, 1.08)
+    ax.set_xlim(-1.62, 1.62)
+    ax.set_ylim(-1.12, 1.12)
     ax.set_axis_off()
-    plt.tight_layout(pad=0.45)
+    plt.tight_layout(pad=0.35)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches='tight', facecolor='white', edgecolor='#BFBFBF', pad_inches=0.06)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', edgecolor='#000000')
     plt.close(fig)
     return path
 
-def _page7_risk_pie_chart(labels, values, colors, title):
+def _page7_severity_matrix_graphic(severity_items, figure_size):
+    """AAA-style Page 7 severity matrix graphic with five overlapping circles."""
+    fig, ax = plt.subplots(figsize=figure_size, dpi=REPORT_CHART_DPI)
+    fig.patch.set_facecolor("white")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    def softened(hex_color):
+        h = str(hex_color or "#FFFFFF").strip().lstrip("#")
+        if len(h) != 6:
+            return "#FFFFFF"
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        r = int(r + (255 - r) * 0.88)
+        g = int(g + (255 - g) * 0.88)
+        b = int(b + (255 - b) * 0.88)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    centers = np.linspace(0.14, 0.90, max(len(severity_items), 1))
+    for idx, (item, x) in enumerate(zip(severity_items, centers)):
+        label = item.get("label", "")
+        color = item.get("color", "#6B7280")
+        desc = item.get("description", "")
+        circle = mpatches.Ellipse(
+            (x, 0.67),
+            width=0.18,
+            height=0.34,
+            facecolor=softened(color),
+            edgecolor=color,
+            linewidth=3.0,
+            zorder=3 + idx,
+        )
+        ax.add_patch(circle)
+        if idx < len(severity_items) - 1:
+            tri = mpatches.Polygon(
+                [(x + 0.087, 0.55), (x + 0.128, 0.67), (x + 0.087, 0.79)],
+                closed=True,
+                facecolor=color,
+                edgecolor=color,
+                linewidth=0,
+                zorder=8 + idx,
+            )
+            ax.add_patch(tri)
+        ax.text(x, 0.67, label, ha="center", va="center", fontsize=8, fontfamily="Calibri", color="#000000", zorder=20)
+        wrapped = textwrap.fill(desc, width=22)
+        ax.text(x - 0.085, 0.37, f"* {wrapped}", ha="left", va="top", fontsize=5.9, fontfamily="Calibri", color="#000000", zorder=20)
+
+    path = tempfile.mktemp(suffix=".png")
+    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches="tight", facecolor="white", pad_inches=0.02)
+    plt.close(fig)
+    return path
+
+def _page7_risk_pie_chart(labels, values, colors, title, figure_size):
     """Compact AAA-style Excel 3D pie chart for Page 7 risk categories."""
     filtered = [(l, v, c) for l, v, c in zip(labels, values, colors) if v > 0]
     if not filtered:
         return None
     fl, fv, fc = zip(*filtered)
+    total = sum(fv)
 
     def darken(hex_color, factor=0.55):
         h = hex_color.lstrip('#')
@@ -963,9 +1027,9 @@ def _page7_risk_pie_chart(labels, values, colors, title):
         b = int(int(h[4:6], 16) * factor)
         return f'#{r:02x}{g:02x}{b:02x}'
 
-    fig, ax = plt.subplots(figsize=(5.7, 3.15), dpi=REPORT_CHART_DPI)
+    fig, ax = plt.subplots(figsize=figure_size, dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('#BFBFBF')
+    fig.patch.set_edgecolor('#000000')
     fig.patch.set_linewidth(1.0)
 
     radius = 0.62
@@ -998,17 +1062,23 @@ def _page7_risk_pie_chart(labels, values, colors, title):
         label_y = 0.78 * y
         ha = 'left' if x >= 0 else 'right'
         ax.annotate(
-            f'{label} {value}%',
+            f'{label} {value / total:.0%}',
             xy=(0.66 * x, 0.66 * y),
             xytext=(label_x, label_y),
             ha=ha,
             va='center',
-            fontsize=8.5,
+            fontsize=7.2,
             fontfamily='Calibri',
             color='#1A1A1A',
+            bbox={
+                'boxstyle': 'square,pad=0.13',
+                'facecolor': 'white',
+                'edgecolor': '#000000',
+                'linewidth': 0.7,
+            },
             arrowprops={
                 'arrowstyle': '-',
-                'color': '#7F7F7F',
+                'color': '#000000',
                 'lw': 0.8,
                 'shrinkA': 0,
                 'shrinkB': 0,
@@ -1032,7 +1102,7 @@ def _page7_risk_pie_chart(labels, values, colors, title):
     ax.set_axis_off()
     plt.tight_layout(pad=0.45)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches='tight', facecolor='white', edgecolor='#BFBFBF', pad_inches=0.06)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', edgecolor='#000000')
     plt.close(fig)
     return path
 
@@ -1053,38 +1123,42 @@ def _bar_chart_h(labels, values, colors, title):
     plt.close(fig)
     return path
 
-def _add_readiness_gauge(doc, score):
+def _add_readiness_gauge(doc, score, config=None):
+    config = config or DEFAULT_REPORT_CONFIG
     score = max(0, min(100, float(score or 0)))
-    fig, ax = plt.subplots(figsize=(8, 1.45), dpi=150)
+    pass_color = f"#{_hex_text(_cfg(config, 'branding', 'success_color', '00B050'))}"
+    fail_color = f"#{_hex_text(_cfg(config, 'branding', 'fail_color', 'C00000'))}"
+    accent_color = f"#{_hex_text(_cfg(config, 'branding', 'primary_color', '0078D4'))}"
+    fig, ax = plt.subplots(figsize=(7.2, 1.18), dpi=150)
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 1.22)
-    ax.barh(0.45, 100, height=0.34, color='#CC0000', align='center')
-    ax.barh(0.45, score, height=0.34, color='#00B050', align='center')
+    ax.set_ylim(0, 1.05)
+    ax.barh(0.42, 100, height=0.24, color=fail_color, align='center')
+    ax.barh(0.42, score, height=0.24, color=pass_color, align='center')
     ax.annotate(
         '',
-        xy=(score, 0.63),
-        xytext=(score, 1.02),
+        xy=(score, 0.56),
+        xytext=(score, 0.90),
         arrowprops={
             'arrowstyle': '-|>',
-            'color': '#0070C0',
-            'lw': 2.4,
-            'mutation_scale': 16,
+            'color': accent_color,
+            'lw': 2.0,
+            'mutation_scale': 14,
         },
     )
     ax.text(
-        score, 1.08, f'{score:.2f}%',
+        score, 0.98, f'{score:.2f}%',
         ha='center', va='top',
-        fontsize=14, fontweight='bold', color='#0070C0'
+        fontsize=12, fontweight='bold', color=accent_color
     )
     ax.set_xticks(range(0, 101, 10))
-    ax.set_xticklabels([f'{x}%' for x in range(0, 101, 10)], fontsize=8)
+    ax.set_xticklabels([f'{x}%' for x in range(0, 101, 10)], fontsize=7)
     ax.set_yticks([])
     legend = [
-        mpatches.Patch(color='#00B050', label='Pass'),
-        mpatches.Patch(color='#CC0000', label='Fail'),
+        mpatches.Patch(color=pass_color, label='Pass'),
+        mpatches.Patch(color=fail_color, label='Fail'),
     ]
-    ax.legend(handles=legend, loc='lower right', fontsize=8, frameon=True)
-    fig.subplots_adjust(left=0.035, right=0.985, top=0.90, bottom=0.26)
+    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.58), ncol=2, fontsize=7, frameon=False)
+    fig.subplots_adjust(left=0.035, right=0.985, top=0.86, bottom=0.38)
     path = tempfile.mktemp(suffix='.png')
     plt.savefig(path, dpi=150, facecolor='white')
     plt.close(fig)
@@ -1215,35 +1289,75 @@ def _page8_exec_summary_chart(parameter_rows):
         else:
             counts[key]['Fail'] += 1
 
-    labels = [service for pillar, service in pillar_services]
+    def chart_service_label(service):
+        text = str(service or "")
+        replacements = {
+            "Exchange Online": "Exchange",
+            "SharePoint Online": "SharePoint",
+            "Microsoft Teams": "Teams",
+            "Microsoft Purview": "Purview",
+            "OneDrive for Business": "OneDrive",
+        }
+        return replacements.get(text, text)
+
+    labels = [chart_service_label(service) for pillar, service in pillar_services]
     pass_values = [counts[item]['Pass'] for item in pillar_services]
     fail_values = [counts[item]['Fail'] for item in pillar_services]
     x = np.arange(len(labels))
 
-    fig, ax = plt.subplots(figsize=(7.4, 3.8), dpi=REPORT_CHART_DPI)
-    ax.bar(x, pass_values, color='#00B050', label='Pass', width=0.58)
-    ax.bar(x, fail_values, bottom=pass_values, color='#C00000', label='Fail', width=0.58)
-    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=13, fontweight='bold', pad=10)
+    fig, ax = plt.subplots(figsize=(7.25, 3.85), dpi=REPORT_CHART_DPI)
+    fig.patch.set_facecolor('white')
+    fig.patch.set_edgecolor('#000000')
+    fig.patch.set_linewidth(1.0)
+    pass_bars = ax.bar(x, pass_values, color='#00B050', label='Pass', width=0.58)
+    fail_bars = ax.bar(x, fail_values, bottom=pass_values, color='#C00000', label='Fail', width=0.58)
+    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=12, fontweight='bold', pad=8)
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=90, fontsize=7.5)
-    ax.tick_params(axis='y', labelsize=8)
+    ax.set_xticklabels(labels, rotation=90, fontsize=6.4)
+    ax.tick_params(axis='x', pad=2)
+    ax.tick_params(axis='y', labelsize=7)
     ax.grid(axis='y', color='#D9D9D9', linewidth=0.6)
     ax.set_axisbelow(True)
-    ax.legend(loc='upper right', frameon=False, fontsize=8)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False, fontsize=7)
+
+    for bar, value in zip(pass_bars, pass_values):
+        if value > 0:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_y() + bar.get_height() / 2,
+                str(value),
+                ha='center',
+                va='center',
+                fontsize=6.6,
+                color='white',
+                fontweight='bold',
+            )
+    for bar, value, base in zip(fail_bars, fail_values, pass_values):
+        if value > 0:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                base + value / 2,
+                str(value),
+                ha='center',
+                va='center',
+                fontsize=6.6,
+                color='white',
+                fontweight='bold',
+            )
 
     group_spans = [(0, 3, 'Best Practice'), (4, 9, 'Governance'), (10, 15, 'Security')]
     for start, end, label in group_spans:
         center = (start + end) / 2
-        ax.text(center, -0.34, label, ha='center', va='top', fontsize=8, transform=ax.get_xaxis_transform())
+        ax.text(center, -0.42, label, ha='center', va='top', fontsize=7.2, transform=ax.get_xaxis_transform())
         ax.axvline(end + 0.5, color='#BFBFBF', linewidth=0.7)
 
     for spine in ax.spines.values():
         spine.set_color('#BFBFBF')
         spine.set_linewidth(0.8)
 
-    fig.subplots_adjust(bottom=0.34, top=0.88, left=0.07, right=0.985)
+    fig.subplots_adjust(bottom=0.39, top=0.86, left=0.07, right=0.985)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', bbox_inches='tight', pad_inches=0.06)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', edgecolor='#000000', bbox_inches=None)
     plt.close(fig)
     return path
 
@@ -1340,17 +1454,16 @@ def _page9_services_pillars_chart(parameter_rows):
     plt.close(fig)
     return path
 
-def _page9_severity_pillars_chart(parameter_rows):
+def _page9_severity_pillars_chart(parameter_rows, config=None):
     """AAA Page 9: grouped stacked severity columns by pillar and status."""
+    config = config or DEFAULT_REPORT_CONFIG
     pillar_order = ['Best Practice', 'Governance', 'Security']
     status_order = ['Fail', 'Pass']
     severity_stack = ['Informational', 'Low', 'Medium', 'High', 'Critical']
+    severity_definitions = config.get("severity_definitions", DEFAULT_REPORT_CONFIG["severity_definitions"])
     severity_colors = {
-        'Critical': '#C00000',
-        'High': '#FF0000',
-        'Medium': '#F79646',
-        'Low': '#FFD966',
-        'Informational': '#92D050',
+        severity: f"#{_hex_text((severity_definitions.get(severity, {}) or {}).get('color'))}"
+        for severity in severity_stack
     }
 
     def normalize_pillar(value):
@@ -1386,7 +1499,7 @@ def _page9_severity_pillars_chart(parameter_rows):
         group_ends.append(x - 0.5)
         x += 0.5
 
-    fig, ax = plt.subplots(figsize=(7.0, 3.65), dpi=REPORT_CHART_DPI)
+    fig, ax = plt.subplots(figsize=(7.15, 3.85), dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
     fig.patch.set_edgecolor('black')
     fig.patch.set_linewidth(0.5)
@@ -1490,6 +1603,15 @@ def _page9_observation_metrics(assessment_data):
         or assessment_data.get('summary', {}).get('eligible_users')
         or 0
     )
+    total_users = (
+        assessment_data.get('total_users')
+        or assessment_data.get('eligible_total_users')
+        or assessment_data.get('user_info_total')
+        or assessment_data.get('summary', {}).get('total_users')
+        or assessment_data.get('summary', {}).get('eligible_total_users')
+        or assessment_data.get('summary', {}).get('user_info_total')
+        or 0
+    )
 
     return {
         'failed_parameters': int(failed_parameters or 0),
@@ -1499,7 +1621,178 @@ def _page9_observation_metrics(assessment_data):
         'governance_fail_pct': int(fail_pct['Governance']),
         'best_practice_fail_pct': int(fail_pct['Best Practice']),
         'copilot_eligible_users': int(eligible_users or 0),
+        'total_users': int(total_users or 0),
     }
+
+def _page10_license_pie_chart(license_counts, title, config=None):
+    config = config or DEFAULT_REPORT_CONFIG
+    cleaned = {
+        str(label): int(value)
+        for label, value in (license_counts or {}).items()
+        if int(value or 0) > 0
+    }
+    if not cleaned:
+        return None
+    labels = list(cleaned.keys())
+    values = list(cleaned.values())
+    palette = [
+        "#F9D976",
+        "#A9C2E8",
+        "#AEE8D2",
+        "#F4B183",
+        "#B4C7E7",
+        "#C6E0B4",
+    ]
+    colors = palette[:len(labels)]
+    total = sum(values)
+
+    def darken(hex_color, factor=0.62):
+        h = hex_color.lstrip("#")
+        r = int(int(h[0:2], 16) * factor)
+        g = int(int(h[2:4], 16) * factor)
+        b = int(int(h[4:6], 16) * factor)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    fig, ax = plt.subplots(figsize=(6.35, 3.05), dpi=REPORT_CHART_DPI)
+    fig.patch.set_facecolor("white")
+    fig.patch.set_edgecolor("#000000")
+    fig.patch.set_linewidth(1.0)
+    radius = 0.82
+    startangle = 112
+    ax.pie(
+        values,
+        colors=[darken(color) for color in colors],
+        startangle=startangle,
+        radius=radius,
+        center=(0, -0.14),
+        wedgeprops={"linewidth": 0.5, "edgecolor": "#777777"},
+    )
+    wedges, _texts = ax.pie(
+        values,
+        colors=colors,
+        startangle=startangle,
+        shadow=True,
+        radius=radius,
+        center=(0, 0),
+        labels=None,
+        wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
+    )
+    for wedge, label, value in zip(wedges, labels, values):
+        angle = (wedge.theta1 + wedge.theta2) / 2
+        x = np.cos(np.deg2rad(angle))
+        y = np.sin(np.deg2rad(angle))
+        label_x = 1.36 * np.sign(x)
+        label_y = 0.86 * y
+        ax.annotate(
+            f"{label}; {value}",
+            xy=(0.72 * x, 0.72 * y),
+            xytext=(label_x, label_y),
+            ha="left" if x >= 0 else "right",
+            va="center",
+            fontsize=6.6,
+            fontfamily="Calibri",
+            bbox={"boxstyle": "square,pad=0.12", "facecolor": "white", "edgecolor": "#000000", "linewidth": 0.6},
+            arrowprops={"arrowstyle": "-", "color": "#000000", "lw": 0.8, "shrinkA": 0, "shrinkB": 0},
+        )
+    ax.set_title(title, fontsize=12, fontweight="bold", fontfamily="Calibri", pad=5)
+    ax.legend(
+        wedges,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.12),
+        ncol=min(len(labels), 4),
+        frameon=False,
+        fontsize=6.6,
+    )
+    ax.set_aspect("equal")
+    ax.set_xlim(-1.55, 1.55)
+    ax.set_ylim(-1.08, 1.08)
+    ax.set_axis_off()
+    fig.subplots_adjust(left=0.03, right=0.97, top=0.90, bottom=0.14)
+    path = tempfile.mktemp(suffix=".png")
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", edgecolor="#000000", bbox_inches=None)
+    plt.close(fig)
+    return path
+
+def _page10_user_info_chart(fields_dict, total_users, title, added_label, not_added_label, config=None):
+    config = config or DEFAULT_REPORT_CONFIG
+    total_users = int(total_users or 0)
+    if not fields_dict or total_users <= 0:
+        return None
+    fields = list(fields_dict.keys())
+    added = [max(min(int(value or 0), total_users), 0) for value in fields_dict.values()]
+    missing = [max(total_users - value, 0) for value in added]
+    x = np.arange(len(fields))
+    width = 0.42
+    pass_color = f"#{_hex_text(_cfg(config, 'branding', 'success_color', '00B050'))}"
+    fail_color = f"#{_hex_text(_cfg(config, 'branding', 'fail_color', 'C00000'))}"
+
+    fig, ax = plt.subplots(figsize=(6.35, 2.95), dpi=REPORT_CHART_DPI)
+    fig.patch.set_facecolor("white")
+    fig.patch.set_edgecolor("#000000")
+    fig.patch.set_linewidth(1.0)
+    bars_added = ax.bar(x, added, width, color=pass_color, label=added_label)
+    bars_missing = ax.bar(x, missing, width, bottom=added, color=fail_color, label=not_added_label)
+    for bar, value in zip(bars_added, added):
+        if value > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2, value / 2, str(value), ha="center", va="center", fontsize=7, color="white", fontweight="bold")
+    for bar, value, base in zip(bars_missing, missing, added):
+        if value > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2, base + value / 2, str(value), ha="center", va="center", fontsize=7, color="white", fontweight="bold")
+
+    ax.set_title(title, pad=8, fontsize=12, fontweight="bold", fontfamily="Calibri")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.98), ncol=2, frameon=False, fontsize=7)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(field).replace(" ", "\n") for field in fields], fontsize=6.6)
+    ax.set_ylim(0, max(total_users * 1.18, 1))
+    ax.tick_params(axis="y", labelleft=False, length=0)
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_color("#000000")
+        spine.set_linewidth(0.8)
+    fig.subplots_adjust(left=0.04, right=0.985, top=0.84, bottom=0.20)
+    path = tempfile.mktemp(suffix=".png")
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", edgecolor="#000000", bbox_inches=None)
+    plt.close(fig)
+    return path
+
+def _page12_risk_strips(risk_items, config=None):
+    config = config or DEFAULT_REPORT_CONFIG
+    items = [str(item) for item in (risk_items or []) if str(item).strip()]
+    if not items:
+        return None
+    items = items[:4]
+    primary = np.array([0x00, 0xB0, 0xF0]) / 255.0
+    dark = np.array([0x00, 0x00, 0x00]) / 255.0
+    fig, ax = plt.subplots(figsize=(6.35, 3.05), dpi=REPORT_CHART_DPI)
+    fig.patch.set_facecolor("white")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    x0, x1 = 0.12, 0.93
+    bar_h = 0.13
+    y_positions = np.linspace(0.78, 0.18, len(items))
+    line_x = x0 - 0.035
+    ax.plot([line_x, line_x], [y_positions[-1] - 0.10, y_positions[0] + 0.11], color="#315A9C", linewidth=2.0, zorder=1)
+
+    grad = np.linspace(0, 1, 600)
+    colors = np.zeros((1, len(grad), 3))
+    for idx, t in enumerate(grad):
+        mix = min(t * 1.18, 1.0)
+        colors[0, idx, :] = primary * (1 - mix) + dark * mix
+
+    for y, text in zip(y_positions, items):
+        ax.imshow(colors, extent=(x0, x1, y - bar_h / 2, y + bar_h / 2), aspect="auto", zorder=2)
+        ax.add_patch(mpatches.Rectangle((x0, y - bar_h / 2), x1 - x0, bar_h, fill=False, edgecolor="#000000", linewidth=0.6, zorder=4))
+        ax.add_patch(mpatches.Circle((x0 - 0.055, y), 0.055, facecolor="#00A4EF", edgecolor="#0070C0", linewidth=1.3, zorder=5))
+        ax.add_patch(mpatches.Circle((x0 - 0.07, y + 0.018), 0.035, facecolor="#4CC5F4", edgecolor="none", alpha=0.70, zorder=6))
+        ax.text(x0 + 0.035, y, textwrap.fill(text, width=58), ha="left", va="center", fontsize=9.5, color="white", fontfamily="Calibri", fontweight="bold", zorder=6)
+
+    path = tempfile.mktemp(suffix=".png")
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", bbox_inches="tight", pad_inches=0.03)
+    plt.close(fig)
+    return path
 
 def _make_donut_chart_img(active, total, title, size=(2.5, 2.5)):
     try:
@@ -1508,16 +1801,18 @@ def _make_donut_chart_img(active, total, title, size=(2.5, 2.5)):
         active = max(float(active or 0), 0.0)
         total = max(float(total or 0), 0.0)
         pct = (active / total * 100) if total > 0 else 0
-        fill_color = '#27AE60' if pct > 0 else '#CCCCCC'
-        empty_color = '#E8E8E8'
+        fill_color = '#00B050' if pct > 0 else '#D9D9D9'
+        empty_color = '#D9D9D9'
 
         fig, ax = plt.subplots(figsize=size, dpi=REPORT_CHART_DPI, facecolor='white')
+        fig.patch.set_edgecolor('#000000')
+        fig.patch.set_linewidth(1.0)
         ax.set_facecolor('white')
         ax.pie(
             [pct, max(0, 100 - pct)],
             colors=[fill_color, empty_color],
             startangle=90,
-            wedgeprops={'width': 0.32, 'edgecolor': 'white', 'linewidth': 2.4},
+            wedgeprops={'width': 0.30, 'edgecolor': 'white', 'linewidth': 2.4},
         )
         ax.text(
             0, 0, f'{pct:.0f}%',
@@ -1526,12 +1821,12 @@ def _make_donut_chart_img(active, total, title, size=(2.5, 2.5)):
             fontfamily='Calibri',
             color='#1A1A1A',
         )
-        ax.set_title(title, pad=10, fontsize=11, fontweight='bold', fontfamily='Calibri', color='#333333')
+        ax.set_title(title, pad=8, fontsize=10.5, fontweight='bold', fontfamily='Calibri', color='#333333')
         ax.set_aspect('equal')
         ax.set_axis_off()
 
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=REPORT_CHART_DPI, bbox_inches='tight', facecolor='white', pad_inches=0.05)
+        plt.savefig(buf, format='png', dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', edgecolor='#000000')
         plt.close(fig)
         buf.seek(0)
         return buf.read()
@@ -1681,7 +1976,7 @@ def _insert_activity_donut_grid(doc, activity_counts):
     donut_imgs = {}
     for key, title in chart_pairs:
         active, total = (activity_counts or {}).get(key, (0, 0))
-        donut_imgs[key] = _make_donut_chart_img(active, total, title, size=(2.55, 2.25))
+        donut_imgs[key] = _make_donut_chart_img(active, total, title, size=(2.55, 2.58))
 
     if not any(donut_imgs.values()):
         return
@@ -1698,8 +1993,8 @@ def _insert_activity_donut_grid(doc, activity_counts):
     ]
     for key, row_idx, col_idx in positions:
         cell = table.rows[row_idx].cells[col_idx]
-        _set_cell_width(cell, Inches(3.15))
-        set_cell_padding(cell, top=90, right=90, bottom=90, left=90)
+        _set_cell_width(cell, Inches(3.05))
+        set_cell_padding(cell, top=80, right=70, bottom=80, left=70)
         for paragraph in list(cell.paragraphs):
             paragraph._element.getparent().remove(paragraph._element)
         img_bytes = donut_imgs.get(key)
@@ -1707,9 +2002,9 @@ def _insert_activity_donut_grid(doc, activity_counts):
             continue
         p = cell.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.paragraph_format.space_after = Pt(6)
-        p.paragraph_format.space_before = Pt(6)
-        p.add_run().add_picture(io.BytesIO(img_bytes), width=Inches(2.45))
+        p.paragraph_format.space_after = Pt(10)
+        p.paragraph_format.space_before = Pt(4)
+        p.add_run().add_picture(io.BytesIO(img_bytes), width=Inches(2.55), height=Inches(2.58))
 
     spacer = doc.add_paragraph()
     spacer.paragraph_format.space_after = Pt(10)
@@ -1909,10 +2204,10 @@ def _severity_meter(severity: str) -> str:
 
     levels = [
         ('Critical', '#CC0000'),
-        ('High', '#FF6600'),
-        ('Medium', '#FFA500'),
-        ('Low', '#FFD700'),
-        ('Informational', '#00B050'),
+        ('High', '#FF0000'),
+        ('Medium', '#ED7D31'),
+        ('Low', '#FFC000'),
+        ('Informational', '#2FB62F'),
     ]
 
     pos_map = {
@@ -1921,7 +2216,7 @@ def _severity_meter(severity: str) -> str:
     }
     active_pos = pos_map.get(severity, 4)
 
-    fig, ax = plt.subplots(figsize=(7, 1.1))
+    fig, ax = plt.subplots(figsize=(7.1, 1.08), dpi=180)
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 2)
     ax.axis('off')
@@ -1937,23 +2232,23 @@ def _severity_meter(severity: str) -> str:
             (x, 0.8), box_width, box_height,
             boxstyle='round,pad=0.05',
             facecolor=color,
-            edgecolor='white',
-            linewidth=1.5,
+            edgecolor='#111111',
+            linewidth=1.2,
             zorder=2
         )
         ax.add_patch(fancy)
         ax.text(
             x + box_width/2, 0.55, label,
             ha='center', va='top',
-            fontsize=7.5, color='#333333',
-            fontfamily='Arial'
+            fontsize=7.8, color='#333333',
+            fontfamily='Calibri'
         )
         if i == active_pos:
             triangle_x = x + box_width/2
             triangle = plt.Polygon(
-                [[triangle_x-0.18, 0.85],
-                 [triangle_x+0.18, 0.85],
-                 [triangle_x, 0.65]],
+                [[triangle_x-0.16, 0.65],
+                 [triangle_x+0.16, 0.65],
+                 [triangle_x, 1.05]],
                 closed=True,
                 facecolor='black',
                 edgecolor='black',
@@ -1967,9 +2262,34 @@ def _severity_meter(severity: str) -> str:
 
     plt.tight_layout(pad=0)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=150, bbox_inches='tight',
+    plt.savefig(path, dpi=180, bbox_inches='tight',
                 facecolor='white', edgecolor='none')
     plt.close()
+    return path
+
+def _detail_title_bar(title):
+    fig, ax = plt.subplots(figsize=(6.35, 0.43), dpi=220)
+    gradient = np.linspace(0, 1, 512)
+    gradient = np.vstack([gradient, gradient])
+    from matplotlib.colors import LinearSegmentedColormap
+    cmap = LinearSegmentedColormap.from_list("cra_detail_bar", ["#000000", "#003946", "#00B5E8"])
+    ax.imshow(gradient, aspect="auto", cmap=cmap, extent=[0, 1, 0, 1])
+    ax.add_patch(mpatches.Rectangle((0, 0), 1, 1, fill=False, edgecolor="#000000", linewidth=1.1))
+    ax.text(
+        0.022,
+        0.50,
+        str(title or DATA_NOT_AVAILABLE),
+        ha="left",
+        va="center",
+        color="white",
+        fontsize=8.4,
+        fontweight="bold",
+        fontfamily="Calibri",
+    )
+    ax.axis("off")
+    path = tempfile.mktemp(suffix=".png")
+    plt.savefig(path, dpi=220, bbox_inches="tight", pad_inches=0, facecolor="white")
+    plt.close(fig)
     return path
 
 def _set_cell_bg(cell, hex_color):
@@ -2141,52 +2461,68 @@ def _format_date(date_value):
         return dt.strftime('%d-%m-%Y')
     except: return str(date_value)[:10]
 
+def _apply_body_font_defaults(doc, config=None):
+    config = config or DEFAULT_REPORT_CONFIG
+    body_font = _font_name(config, "body")
+    body_size = _pt(config, "body_size", 11)
+    for style_name in ("Normal", "Body Text"):
+        try:
+            style = doc.styles[style_name]
+        except KeyError:
+            continue
+        style.font.name = body_font
+        style.font.size = body_size
+        r_pr = style.element.get_or_add_rPr()
+        r_fonts = r_pr.find(qn("w:rFonts"))
+        if r_fonts is None:
+            r_fonts = OxmlElement("w:rFonts")
+            r_pr.append(r_fonts)
+        r_fonts.set(qn("w:ascii"), body_font)
+        r_fonts.set(qn("w:hAnsi"), body_font)
+        r_fonts.set(qn("w:cs"), body_font)
+
 def _add_header_logo(doc, logo_path=None, display_name=None):
-    """Apply the AAA blueprint header contract to content pages."""
+    """Apply the TPT logo to the top-left header on every page section."""
     blueprint = _load_aaa_report_blueprint()
     header_config = blueprint.get("header", {}) if isinstance(blueprint, dict) else {}
     style_id = header_config.get("style_id", "Header")
     spacing_after = _twips_value(header_config.get("spacing_after_twips"), 0)
     line_twips = header_config.get("line_twips")
+    logo_file = Path(str(logo_path)) if logo_path else None
+    if not logo_file or not logo_file.exists():
+        configured_logo = _cfg(DEFAULT_REPORT_CONFIG, "branding", "partner_logo")
+        logo_file = _repo_file_path(configured_logo) if configured_logo else None
 
-    cover_section = doc.sections[0]
-    cover_section.different_first_page_header_footer = True
-    for header in [cover_section.header, cover_section.first_page_header]:
+    def apply_to_header(header):
         header.is_linked_to_previous = False
         for para in list(header.paragraphs):
             try:
                 para._element.getparent().remove(para._element)
             except Exception:
                 pass
-
-    if len(doc.sections) < 2:
-        section = doc.sections[0]
-        section.different_first_page_header_footer = True
-    else:
-        section = doc.sections[1]
-        section.different_first_page_header_footer = False
-
-    section.header.is_linked_to_previous = False
-    header = section.header
-    for para in list(header.paragraphs):
+        header_para = header.add_paragraph()
         try:
-            para._element.getparent().remove(para._element)
+            header_para.style = style_id
         except Exception:
             pass
+        header_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        header_para.paragraph_format.space_before = Pt(0)
+        header_para.paragraph_format.space_after = Pt(spacing_after / 20)
+        if line_twips is not None:
+            header_para.paragraph_format.line_spacing = Pt(_twips_value(line_twips) / 20)
+        if logo_file and logo_file.exists():
+            header_para.add_run().add_picture(str(logo_file), width=Inches(0.92))
+        else:
+            header_text = header_config.get("default_header_text")
+            if header_text:
+                header_para.add_run(str(header_text))
 
-    header_para = header.add_paragraph()
-    try:
-        header_para.style = style_id
-    except Exception:
-        pass
-    header_para.paragraph_format.space_before = Pt(0)
-    header_para.paragraph_format.space_after = Pt(spacing_after / 20)
-    if line_twips is not None:
-        header_para.paragraph_format.line_spacing = Pt(_twips_value(line_twips) / 20)
-    _apply_blueprint_paragraph_tabs(header_para, header_config.get("tabs"))
-    header_text = header_config.get("default_header_text")
-    if header_text:
-        header_para.add_run(str(header_text))
+    for section in doc.sections:
+        section.header.is_linked_to_previous = False
+        apply_to_header(section.header)
+        if section.different_first_page_header_footer:
+            section.first_page_header.is_linked_to_previous = False
+            apply_to_header(section.first_page_header)
 
 def _add_page_number_field(paragraph):
     run = paragraph.add_run()
@@ -3831,15 +4167,194 @@ def _get_risk_text(severity):
     severity_key = str(severity or '').lower().strip()
     return RISK_TEMPLATES.get(severity_key, 'This finding should be reviewed as part of Copilot readiness.')
 
-def _add_detailed_pages(doc, assessment_data, meter_cache=None):
-    h = doc.add_heading('Detailed Assessment', level=1)
-    for r in h.runs: r.font.color.rgb = RGBColor(0, 51, 102)
+def _detailed_status_text(status):
+    status_key = str(status or '').lower().strip()
+    return 'Pass' if status_key == 'pass' else 'Fail'
 
-    # FIX 7: Add intro text before detailed findings
-    doc.add_paragraph(
-        'The following tables provide a summary of all findings '
-        'discovered during the course of this engagement:'
+def _detailed_severity_color(severity, config):
+    severity_defs = config.get("severity_definitions", {}) if isinstance(config, dict) else {}
+    severity_info = severity_defs.get(severity, {}) if isinstance(severity_defs, dict) else {}
+    return _hex_text(severity_info.get("color"), {
+        "Critical": "C00000",
+        "High": "FF0000",
+        "Medium": "ED7D31",
+        "Low": "FFC000",
+        "Informational": "70AD47",
+    }.get(severity, "70AD47"))
+
+def _add_detailed_summary_table(doc, rows, config, headers, start_index=1, include_header=True):
+    table_rows = len(rows) + (1 if include_header else 0)
+    table = doc.add_table(rows=table_rows, cols=5)
+    table.style = 'Table Grid'
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    widths = [0.55, 3.05, 1.08, 0.72, 1.00]
+    for idx, width in enumerate(widths):
+        for table_row in table.rows:
+            _set_cell_width(table_row.cells[idx], width)
+
+    body_start = 0
+    if include_header:
+        hrow = table.rows[0]
+        for i, header in enumerate(headers):
+            cell = hrow.cells[i]
+            _set_cell_bg(cell, '2E74B5')
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            p = cell.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            r = p.add_run(header)
+            r.bold = True
+            r.font.color.rgb = RGBColor(255, 255, 255)
+            r.font.size = Pt(8)
+            r.font.name = _font_name(config)
+        _set_row_height(hrow, 0.30)
+        body_start = 1
+
+    for offset, row in enumerate(rows):
+        trow = table.rows[body_start + offset]
+        _set_row_height(trow, 0.30)
+        for cell in trow.cells:
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            _set_cell_bg(cell, 'FFFFFF')
+
+        display_index = start_index + offset
+        _set_cell_text(trow.cells[0], str(display_index).zfill(2), config, size_key="caption_size", align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell_text(trow.cells[1], row.get('title', ''), config, size_key="caption_size")
+
+        pillar_raw = str(row.get('pillar', '')).lower().strip()
+        pillar = PILLAR_MAP.get(pillar_raw, row.get('pillar', 'Best Practice'))
+        _set_cell_text(trow.cells[2], pillar, config, size_key="caption_size", align=WD_ALIGN_PARAGRAPH.CENTER)
+
+        status = str(row.get('display_status', row.get('status', ''))).lower().strip()
+        finding_text = _detailed_status_text(status)
+        finding_color = _cfg(config, "branding", "success_color", "00B050") if finding_text == 'Pass' else _cfg(config, "branding", "fail_color", "C00000")
+        _set_cell_text(
+            trow.cells[3],
+            finding_text,
+            config,
+            size_key="caption_size",
+            bold=True,
+            color=finding_color,
+            align=WD_ALIGN_PARAGRAPH.CENTER,
+        )
+
+        severity_raw = str(
+            row.get('display_severity')
+            or row.get('registry_severity')
+            or row.get('severity', '')
+        ).lower().strip()
+        severity = SEVERITY_MAP.get(severity_raw, 'Informational')
+        _set_cell_bg(trow.cells[4], _detailed_severity_color(severity, config))
+        _set_cell_text(
+            trow.cells[4],
+            severity,
+            config,
+            size_key="caption_size",
+            bold=True,
+            color="FFFFFF",
+            align=WD_ALIGN_PARAGRAPH.CENTER,
+        )
+    return table
+
+def _detail_paragraph(doc, text="", config=None, before=0, after=5, bold=False, color=None, size_key="caption_size"):
+    config = config or DEFAULT_REPORT_CONFIG
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(before)
+    p.paragraph_format.space_after = Pt(after)
+    p.paragraph_format.line_spacing = 1.03
+    run = p.add_run(str(text or ""))
+    _apply_run_style(run, config, size_key, bold=bold, color=color)
+    return p
+
+def _add_detail_finding_block(doc, row, idx, config, meter_cache=None, compact_top=False):
+    title = row.get('title') or row.get('parameter') or DATA_NOT_AVAILABLE
+    bar_path = _detail_title_bar(f"{str(idx).zfill(2)}: {title}")
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(0 if compact_top else 5)
+    p.paragraph_format.space_after = Pt(12)
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.add_run().add_picture(bar_path, width=Inches(6.35), height=Inches(0.43))
+    try:
+        os.remove(bar_path)
+    except OSError:
+        pass
+
+    severity_raw = str(
+        row.get('display_severity')
+        or row.get('registry_severity')
+        or row.get('severity', 'informational')
+    ).lower().strip()
+    severity = SEVERITY_MAP.get(severity_raw, 'Informational')
+    status = str(row.get('display_status', row.get('status', ''))).lower().strip()
+    finding_text = _detailed_status_text(status)
+
+    risk_line = doc.add_paragraph()
+    risk_line.paragraph_format.space_before = Pt(0)
+    risk_line.paragraph_format.space_after = Pt(5)
+    _apply_run_style(risk_line.add_run("Risk Rating: "), config, "caption_size", bold=True)
+    _apply_run_style(risk_line.add_run(severity), config, "caption_size", bold=True)
+    _apply_run_style(risk_line.add_run(" - "), config, "caption_size", bold=True)
+    status_color = _cfg(config, "branding", "success_color", "00B050") if finding_text == "Pass" else _cfg(config, "branding", "fail_color", "C00000")
+    _apply_run_style(risk_line.add_run(finding_text), config, "caption_size", bold=True, color=status_color)
+
+    severity_key = severity.lower().strip()
+    if severity_key == 'info':
+        severity_key = 'informational'
+    meter_path = meter_cache.get(severity_key) if meter_cache else None
+    generated_meter = False
+    if not meter_path or not os.path.exists(meter_path):
+        meter_path = _severity_meter(severity_key)
+        generated_meter = True
+    if meter_path and os.path.exists(meter_path):
+        mp = doc.add_paragraph()
+        mp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        mp.paragraph_format.space_before = Pt(0)
+        mp.paragraph_format.space_after = Pt(13)
+        mp.add_run().add_picture(meter_path, width=Inches(6.35), height=Inches(0.86))
+        if generated_meter:
+            try:
+                os.remove(meter_path)
+            except OSError:
+                pass
+
+    _detail_paragraph(doc, "Description:", config, after=7, bold=True)
+    description = (
+        resolve_description(row.get('parameter_key'), row.get('evidence'), status)
+        or row.get('description', '')
+        or DATA_NOT_AVAILABLE
     )
+    _detail_paragraph(doc, description, config, after=9)
+
+    _detail_paragraph(doc, "Risk:", config, after=7, bold=True)
+    risk_text = row.get('risk') or _get_risk_text(severity)
+    _detail_paragraph(doc, risk_text, config, after=6)
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(20)
+
+def _add_detailed_pages(doc, assessment_data, meter_cache=None):
+    config = _report_config(assessment_data)
+    page_text = (config.get("page_text", {}) or {}).get("detailed_assessment", {})
+    heading = page_text.get("heading", "Detailed Assessment")
+    intro = page_text.get(
+        "intro",
+        "The following tables provides a summary of all findings discovered during the course of this engagement:",
+    )
+    headers = page_text.get("table_headers") or ['S. No', 'Parameter', 'CRA Pillar', 'Finding', 'Severity']
+    first_page_row_limit = int(page_text.get("first_page_row_limit", 18) or 18)
+    continuation_top_spacing = float(page_text.get("continuation_top_spacing_pt", 22) or 22)
+
+    _styled_heading(
+        doc,
+        heading,
+        config,
+        level=1,
+        color=_cfg(config, "branding", "secondary_color", "2F5496"),
+        before=0,
+        after=18,
+    )
+    _body_paragraph(doc, intro, config, after=26)
 
     parameter_rows = assessment_data.get('parameter_rows', [])
     if not parameter_rows:
@@ -3848,11 +4363,11 @@ def _add_detailed_pages(doc, assessment_data, meter_cache=None):
 
     grouped = defaultdict(list)
     for row in parameter_rows:
-        service = row.get('service', 'General')
+        service = _service_name_key(row.get('service', row.get('category', 'General')))
         grouped[service].append(row)
 
-    for service in SERVICE_ORDER:
-        if service not in grouped: continue
+    ordered_services = [service for service in SERVICE_ORDER if service in grouped]
+    for service_index, service in enumerate(ordered_services):
 
         rows = grouped[service]
         # FIX 1-2: SORT FINDINGS BY SEVERITY THEN STATUS
@@ -3860,160 +4375,120 @@ def _add_detailed_pages(doc, assessment_data, meter_cache=None):
 
         # FIX 3: SERVICE HEADINGS WITH PROPER NAMES
         display_svc = SERVICE_DISPLAY_NAMES.get(service.lower().strip(), service.upper())
-        h2 = doc.add_heading(display_svc, level=2)
-        for run in h2.runs:
-            run.font.color.rgb = RGBColor(0x00, 0x33, 0x66)
-            run.bold = True
+        _styled_heading(
+            doc,
+            display_svc,
+            config,
+            level=2,
+            color=_cfg(config, "branding", "secondary_color", "2F5496"),
+            before=0,
+            after=14,
+        )
 
-        table = doc.add_table(rows=len(sorted_findings) + 1, cols=5)
-        table.style = 'Table Grid'
+        first_chunk = sorted_findings[:first_page_row_limit]
+        remaining_chunk = sorted_findings[first_page_row_limit:]
+        _add_detailed_summary_table(doc, first_chunk, config, headers, start_index=1, include_header=True)
 
-        headers = ['S. No', 'Parameter', 'CRA Pillar', 'Finding', 'Severity']
-        hrow = table.rows[0]
-        for i, header in enumerate(headers):
-            cell = hrow.cells[i]
-            _set_cell_bg(cell, '003366')
-            p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            r = p.add_run(header)
-            r.bold = True
-            r.font.color.rgb = RGBColor(255, 255, 255)
-            r.font.size = Pt(10)
+        if remaining_chunk:
+            doc.add_page_break()
+            top_spacer = doc.add_paragraph()
+            top_spacer.paragraph_format.space_before = Pt(continuation_top_spacing)
+            top_spacer.paragraph_format.space_after = Pt(0)
+            _add_detailed_summary_table(
+                doc,
+                remaining_chunk,
+                config,
+                headers,
+                start_index=first_page_row_limit + 1,
+                include_header=False,
+            )
 
-        for row_idx, row in enumerate(sorted_findings, 1):
-            trow = table.rows[row_idx]
-            trow.cells[0].text = str(row_idx).zfill(2)
-            trow.cells[1].text = row.get('title', '')
-
-            pillar_raw = str(row.get('pillar', '')).lower().strip()
-            pillar = PILLAR_MAP.get(pillar_raw, row.get('pillar', 'Best Practice'))
-            trow.cells[2].text = pillar
-
-            status = str(row.get('display_status', row.get('status', ''))).lower().strip()
-            finding_text = 'Pass' if status == 'pass' else 'Fail'
-            trow.cells[3].text = finding_text
-            if status == 'pass': _set_cell_bg(trow.cells[3], '90EE90')
-            else: _set_cell_bg(trow.cells[3], 'FFB6C6')
-
-            severity_raw = str(
-                row.get('display_severity')
-                or row.get('registry_severity')
-                or row.get('severity', '')
-            ).lower().strip()
-            severity = SEVERITY_MAP.get(severity_raw, 'Informational')
-            trow.cells[4].text = severity
-            if severity.lower() == 'critical':
-                trow.cells[4].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 0, 0)
-
-        doc.add_paragraph()
+        spacer = doc.add_paragraph()
+        spacer.paragraph_format.space_after = Pt(2)
+        doc.add_page_break()
 
         for idx, row in enumerate(sorted_findings, 1):
-            param_name = row.get('title', '')
-            h3 = doc.add_heading(f'{str(idx).zfill(2)}: {param_name}', level=3)
-
-            severity_raw = str(
-                row.get('display_severity')
-                or row.get('registry_severity')
-                or row.get('severity', 'informational')
-            ).lower().strip()
-            severity = SEVERITY_MAP.get(severity_raw, 'Informational')
-            status = str(row.get('display_status', row.get('status', ''))).lower().strip()
-            finding_text = 'Pass' if status == 'pass' else 'Fail'
-
-            p = doc.add_paragraph()
-            r = p.add_run(f"Risk Rating: {severity} - {finding_text}")
-            r.bold = True
-            if severity.lower() == 'critical' or finding_text == 'Fail':
-                r.font.color.rgb = RGBColor(255, 0, 0)
-            elif severity.lower() == 'high':
-                r.font.color.rgb = RGBColor(255, 102, 0)
-            elif finding_text == 'Pass':
-                r.font.color.rgb = RGBColor(0, 176, 80)
-
-            # SEVERITY METER IMAGE
-            severity_key = severity.lower().strip()
-            if severity_key == 'informational' or severity_key == 'info':
-                severity_key = 'informational'
-            meter_path = meter_cache.get(severity_key) if meter_cache else None
-            if meter_path and os.path.exists(meter_path):
-                try:
-                    mp = doc.add_paragraph()
-                    mp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                    tmp = tempfile.mktemp(suffix='.png')
-                    shutil.copy(meter_path, tmp)
-                    mp.add_run().add_picture(tmp, width=Inches(5.0))
-                    os.remove(tmp)
-                except Exception as e:
-                    print(f'[METER INSERT] Failed: {e}')
-
-            description = (
-                resolve_description(row.get('parameter_key'), row.get('evidence'), status)
-                or row.get('description', '')
+            if idx > 1 and idx % 2 == 1:
+                doc.add_page_break()
+            _add_detail_finding_block(
+                doc,
+                row,
+                idx,
+                config,
+                meter_cache=meter_cache,
+                compact_top=(idx % 2 == 1),
             )
-            if description:
-                p = doc.add_paragraph()
-                p.add_run("Description: ").bold = True
-                p.add_run(description)
 
-            risk_text = row.get('risk') or _get_risk_text(severity)
-            p = doc.add_paragraph()
-            p.add_run("Risk: ").bold = True
-            p.add_run(risk_text)
-
-            doc_url = _documentation_url(row)
-            if doc_url:
-                p = doc.add_paragraph()
-                p.paragraph_format.space_after = Pt(8)
-                _add_hyperlink(p, doc_url, 'Microsoft Documentation')
-
-            doc.add_paragraph()
+        if service_index < len(ordered_services) - 1:
+            doc.add_page_break()
 
 def _add_conclusion_page(doc, company_name, partner_name, assessment_data):
     """Conclusion with real report_data values."""
-    h = doc.add_heading('Conclusion', level=1)
-    h.paragraph_format.space_after = Pt(10)
-    for r in h.runs:
-        r.font.color.rgb = RGBColor(0, 51, 102)
+    config = _report_config(assessment_data)
+    heading = doc.add_paragraph()
+    heading.paragraph_format.space_before = Pt(56)
+    heading.paragraph_format.space_after = Pt(26)
+    run = heading.add_run('Conclusion')
+    _apply_run_style(run, config, "h1_size", bold=True, color=_cfg(config, "branding", "secondary_color", "2F5496"), font_kind="heading")
 
-    company = assessment_data.get('company_name') or company_name or 'the organisation'
-    fail_count = assessment_data.get('gaps_count', 0)
-    total = assessment_data.get('total_params', 0)
+    company = (
+        assessment_data.get('company_name')
+        or assessment_data.get('organization_name')
+        or assessment_data.get('customer_name')
+        or company_name
+        or 'the organisation'
+    )
+    fail_count = (
+        assessment_data.get('gaps_count')
+        or assessment_data.get('failed_parameters')
+        or assessment_data.get('summary', {}).get('gaps_count')
+        or 0
+    )
+    total = (
+        assessment_data.get('total_params')
+        or assessment_data.get('total_assessed')
+        or assessment_data.get('summary', {}).get('total_params')
+        or 0
+    )
 
-    def para(text, sa=8):
+    def para(text, sa=13):
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(sa)
         p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.line_spacing = 1.12
         r = p.add_run(text)
-        r.font.size = Pt(11)
-        r.font.name = 'Calibri'
+        _apply_run_style(r, config, "body_size")
         return p
 
     para(
-        f'The Copilot Readiness Assessment for {company} reveals that the current Microsoft '
-        f'365 environment is not yet prepared for the secure and compliant deployment of '
-        f'Microsoft 365 Copilot. With {fail_count} out of {total} parameters failing to meet '
-        f'readiness standards, many of which fall under critical and high-risk categories, '
-        f'there is a clear need for immediate and comprehensive remediation.'
+        f'The Copilot Readiness Assessment for {company} reveals that the current Microsoft 365 '
+        f'environment is not yet prepared for the secure and compliant deployment of Microsoft '
+        f'365 Copilot. With {fail_count} out of {total} parameters failing to meet readiness '
+        f'standards, many of which fall under critical and high-risk categories, there is a '
+        f'clear need for immediate and comprehensive remediation.'
     )
 
     para(
-        'Key gaps were identified across all three foundational pillars: '
-        'Security, Governance, and Best Practices. Notably, critical '
-        'vulnerabilities such as the absence of sensitivity labels, '
-        'permissive external sharing configurations, and insufficient '
-        'audit logging significantly elevate the risk of data exposure '
-        'and non-compliance. Furthermore, the lack of complete user '
-        'profile information and inconsistent policy enforcement could '
-        'impair Copilot\'s ability to deliver accurate, context-aware '
-        'insights.'
+        'Key gaps were identified across all three foundational pillars: Security, Governance, '
+        'and Best Practices. Notably, critical vulnerabilities such as the absence of sensitivity '
+        'labels, permissive external sharing configurations, and insufficient audit logging '
+        'significantly elevate the risk of data exposure and non-compliance. Furthermore, the '
+        'lack of complete user profile information and inconsistent policy enforcement could '
+        'impair Copilot\'s ability to deliver accurate, context-aware insights.'
     )
 
     para(
-        f'It is strongly recommended that {company} addresses all identified gaps before enabling '
-        f'Microsoft 365 Copilot in the production environment. Implementing the recommended '
-        f'remediation steps will not only enhance the security and compliance posture but also '
-        f'ensure that Copilot operates within a governed, trustworthy, and optimised Microsoft '
-        f'365 ecosystem.'
+        'To mitigate these risks and ensure a successful Copilot rollout, we strongly recommend '
+        'a phased remediation strategy. This should prioritise the resolution of critical and '
+        'high-severity issues, followed by medium and low-risk items. Only after these gaps are '
+        'addressed should the organisation consider enabling Copilot in the production environment.'
+    )
+
+    para(
+        f'By aligning with the recommendations outlined in this report, {company} can enhance '
+        'its security posture, ensure regulatory compliance, and fully leverage the transformative '
+        'potential of Microsoft 365 Copilot.',
+        sa=0,
     )
 
 def _toc_key(text):
@@ -4330,6 +4805,7 @@ def _add_toc_page(doc, config=None):
     blueprint = _load_aaa_report_blueprint()
     _apply_blueprint_page_setup(doc, blueprint)
     _apply_blueprint_document_defaults(doc, blueprint)
+    _apply_body_font_defaults(doc, config)
     page_lookup = _toc_page_lookup(config)
     toc_config = blueprint.get("toc", {}) if isinstance(blueprint, dict) else {}
     toc_levels = toc_config.get("toc_levels", {}) if isinstance(toc_config, dict) else {}
@@ -4580,60 +5056,145 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     doc.add_page_break()
 
 def _add_evaluation_page(doc, findings, config=None):
-    """PAGE 6: Evaluation Summary with centered high-resolution charts."""
+    """PAGE 6: Evaluation Summary matching the AAA reference layout."""
     config = config or DEFAULT_REPORT_CONFIG
-    _styled_heading(doc, "Evaluation Summary", config, level=1, after=8)
-    _body_paragraph(doc, "Assessment coverage is organized by Copilot readiness pillar and Microsoft 365 service.", config, after=10)
+    _styled_heading(doc, "Evaluation Summary", config, level=1, after=16)
 
-    pillar_order = ["Security", "Governance", "Best Practice"]
+    _styled_heading(doc, "3 Pillars of Microsoft 365 Copilot Readiness Assessment", config, level=2, after=10)
+    for pillar in ["Governance", "Security", "Best Practices"]:
+        p = doc.add_paragraph(style="List Bullet")
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        _apply_run_style(p.add_run(pillar), config, "body_size")
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(8)
+
+    pillar_order = ["Security", "Best Practice", "Governance"]
     pillar_counts = _distribution(findings, _pillar_value, pillar_order)
-    pillar_colors = [_hex_text(c) for c in _cfg(config, "chart_palette", "pillars", ["4472C4", "A5A5A5", "ED7D31"])]
-    _styled_heading(doc, "3 Pillars of CRA", config, level=2, after=4)
-    chart = _page6_pie_chart(list(pillar_counts.keys()), list(pillar_counts.values()), [f"#{c}" for c in pillar_colors], "3 Pillars of CRA") if pillar_counts else None
-    _chart_or_data_not_available(doc, chart, width=Inches(5.8), height=Inches(2.9), config=config)
+    pillar_counts = {
+        ("Best Practices" if name == "Best Practice" else name): value
+        for name, value in pillar_counts.items()
+    }
+    configured_pillar_colors = [_hex_text(c) for c in _cfg(config, "chart_palette", "pillars", ["4472C4", "A5A5A5", "ED7D31"])]
+    pillar_color_by_name = {
+        "Security": configured_pillar_colors[0] if len(configured_pillar_colors) > 0 else "4472C4",
+        "Governance": configured_pillar_colors[1] if len(configured_pillar_colors) > 1 else "A5A5A5",
+        "Best Practices": configured_pillar_colors[2] if len(configured_pillar_colors) > 2 else "ED7D31",
+    }
+    pillar_colors = [pillar_color_by_name[name] for name in pillar_counts.keys()]
+    chart = _page6_pie_chart(
+        list(pillar_counts.keys()),
+        list(pillar_counts.values()),
+        [f"#{c}" for c in pillar_colors],
+        "3 Pillars of CRA",
+        figure_size=(6.34, 2.50),
+    ) if pillar_counts else None
+    _chart_or_data_not_available(doc, chart, width=Inches(6.34), height=Inches(2.50), config=config)
 
     service_counts = _distribution(findings, _service_value, SERVICE_ORDER)
     service_colors = [_hex_text(c) for c in _cfg(config, "chart_palette", "services", ["4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47"])]
-    _styled_heading(doc, "M365 Services Assessed", config, level=2, before=6, after=4)
-    chart = _page6_pie_chart(list(service_counts.keys()), list(service_counts.values()), [f"#{c}" for c in service_colors], "M365 Services") if service_counts else None
-    _chart_or_data_not_available(doc, chart, width=Inches(5.8), height=Inches(2.9), config=config)
+    _styled_heading(doc, "M365 Services assessed in CRA", config, level=2, before=10, after=2)
+    for service in SERVICE_ORDER:
+        p = doc.add_paragraph(style="List Bullet")
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        _apply_run_style(p.add_run(service), config, "body_size")
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(6)
+
+    chart = _page6_pie_chart(
+        list(service_counts.keys()),
+        list(service_counts.values()),
+        [f"#{c}" for c in service_colors],
+        "M365 Services",
+        figure_size=(6.34, 2.69),
+    ) if service_counts else None
+    _chart_or_data_not_available(doc, chart, width=Inches(6.34), height=Inches(2.69), config=config)
 
 def _add_summary_page(doc, findings, assessment_data):
-    """PAGE 7: Risk Matrix infographic."""
+    """PAGE 7: Risk Score Matrix matching the AAA reference layout."""
     config = _report_config(assessment_data)
     severity_config = config.get("severity_definitions", DEFAULT_REPORT_CONFIG["severity_definitions"])
-    _styled_heading(doc, "Risk Matrix", config, level=1, after=8)
-    _body_paragraph(doc, "Severity levels below show the progression of deployment exposure and remediation urgency.", config, after=10)
-    counts = _distribution(findings, _severity_value, ["Critical", "High", "Medium", "Low", "Informational"])
+    blueprint = _load_aaa_report_blueprint()
+    risk_matrix_config = blueprint.get("risk_matrix", {}) if isinstance(blueprint, dict) else {}
+    risk_chart_config = risk_matrix_config.get("risk_chart", {}) if isinstance(risk_matrix_config, dict) else {}
+    severity_graphic_config = risk_matrix_config.get("severity_graphic", {}) if isinstance(risk_matrix_config, dict) else {}
+    severity_order = risk_chart_config.get("categories") if isinstance(risk_chart_config, dict) else None
+    if not severity_order:
+        severity_order = list(severity_config.keys())
+    blueprint_values = risk_chart_config.get("values") if isinstance(risk_chart_config, dict) else None
+    if (
+        isinstance(blueprint_values, list)
+        and len(blueprint_values) == len(severity_order)
+        and sum(int(value or 0) for value in blueprint_values) > 0
+    ):
+        counts = {
+            severity: int(value or 0)
+            for severity, value in zip(severity_order, blueprint_values)
+            if int(value or 0) > 0
+        }
+    else:
+        counts = _distribution(findings, _severity_value, severity_order)
+    design_colors = _load_yaml_config(REPORT_DESIGN_SYSTEM).get("colors", {})
 
-    table = doc.add_table(rows=2, cols=5)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = False
-    _remove_table_borders(table)
-    for col_idx, severity in enumerate(["Critical", "High", "Medium", "Low", "Informational"]):
-        color = _hex_text(severity_config.get(severity, {}).get("color"), "6B7280")
-        desc = severity_config.get(severity, {}).get("description", "")
-        header_cell = table.rows[0].cells[col_idx]
-        body_cell = table.rows[1].cells[col_idx]
-        for cell in (header_cell, body_cell):
-            _set_cell_width(cell, Inches(1.27))
-            set_cell_padding(cell, top=70, right=55, bottom=70, left=55)
-            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-        _set_cell_bg(header_cell, color)
-        _set_cell_bg(body_cell, "FFF2F2" if severity in {"Critical", "High"} else "F7FAFC")
-        header_p = _set_cell_text(header_cell, severity, config, "body_size", True, "FFFFFF", WD_ALIGN_PARAGRAPH.CENTER)
-        header_p.add_run("\n")
-        count_run = header_p.add_run(str(counts.get(severity, 0)))
-        _apply_run_style(count_run, config, "h2_size", bold=True, color="FFFFFF")
-        body_p = _set_cell_text(body_cell, desc, config, "caption_size", False, _cfg(config, "branding", "dark_color", "1F2937"), WD_ALIGN_PARAGRAPH.CENTER)
-        body_p.paragraph_format.line_spacing = 1.02
-    spacer = doc.add_paragraph()
-    spacer.paragraph_format.space_after = Pt(4)
-    chart = _page7_risk_pie_chart(list(counts.keys()), list(counts.values()), [f"#{_hex_text(severity_config.get(s, {}).get('color'))}" for s in counts.keys()], "Risk-wise Parameters") if counts else None
-    _chart_or_data_not_available(doc, chart, width=Inches(5.6), height=Inches(2.8), config=config)
+    def design_color(name, fallback):
+        color_entry = design_colors.get(str(name).lower()) if isinstance(design_colors, dict) else None
+        if isinstance(color_entry, dict):
+            return color_entry.get("value") or fallback
+        return color_entry or fallback
+
+    severity_items = []
+    for severity in severity_order:
+        definition = severity_config.get(severity, {}) if isinstance(severity_config, dict) else {}
+        configured_color = definition.get("color") if isinstance(definition, dict) else None
+        color = design_color(severity, configured_color or _cfg(config, "branding", "muted_color", "6B7280"))
+        severity_items.append({
+            "label": severity,
+            "color": f"#{_hex_text(color)}",
+            "description": definition.get("description", "") if isinstance(definition, dict) else "",
+        })
+    page_text = _cfg(config, "page_text", "risk_score_matrix", {})
+
+    _styled_heading(doc, page_text.get("heading") or DATA_NOT_AVAILABLE, config, level=1, after=8)
+    _body_paragraph(
+        doc,
+        page_text.get("intro") or DATA_NOT_AVAILABLE,
+        config,
+        after=18,
+    )
+
+    severity_width = _inch_value(severity_graphic_config.get("width"), 6.66)
+    severity_height = _inch_value(severity_graphic_config.get("height"), 2.40)
+    severity_graphic = _page7_severity_matrix_graphic(severity_items, (severity_width, severity_height))
+    _chart_or_data_not_available(doc, severity_graphic, width=Inches(severity_width), height=Inches(severity_height), config=config)
+
+    _styled_heading(doc, page_text.get("category_heading") or DATA_NOT_AVAILABLE, config, level=2, before=18, after=2)
+    _body_paragraph(
+        doc,
+        page_text.get("category_intro") or DATA_NOT_AVAILABLE,
+        config,
+        after=14,
+    )
+
+    risk_colors = {item["label"]: item["color"] for item in severity_items}
+    risk_title = risk_chart_config.get("title") if isinstance(risk_chart_config, dict) else None
+    risk_width = _inch_value(risk_chart_config.get("width"), 6.09)
+    risk_height = _inch_value(risk_chart_config.get("height"), 2.97)
+    chart = _page7_risk_pie_chart(
+        list(counts.keys()),
+        list(counts.values()),
+        [risk_colors.get(s, f"#{_hex_text(severity_config.get(s, {}).get('color'))}") for s in counts.keys()],
+        risk_title or DATA_NOT_AVAILABLE,
+        (risk_width, risk_height),
+    ) if counts else None
+    _chart_or_data_not_available(doc, chart, width=Inches(risk_width), height=Inches(risk_height), config=config)
+
+    doc.add_page_break()
 
 def _add_assessment_summary_page(doc, assessment_data):
-    """PAGE 8: Summary score cards."""
+    """PAGE 8: Summary of Assessment with real readiness data and service/pillar chart."""
     config = _report_config(assessment_data)
     rows = assessment_data.get("parameter_rows", [])
     total = int(assessment_data.get("total_params") or len(rows) or 0)
@@ -4646,66 +5207,80 @@ def _add_assessment_summary_page(doc, assessment_data):
     summary = assessment_data.get("summary", {}) if isinstance(assessment_data.get("summary"), dict) else {}
     score = assessment_data.get("readiness_score") or assessment_data.get("overall_score") or summary.get("readiness_score") or summary.get("overall_score") or 0
     status, status_color = _readiness_badge(score, assessment_data.get("readiness_level") or summary.get("readiness_status"), config)
+    status_display = str(status).replace("_", " ").title()
+    page_text = _cfg(config, "page_text", "assessment_summary", {})
 
-    _styled_heading(doc, "Summary of Assessment", config, level=1, after=8)
-    table = _card_table(doc, 4, widths=[1.58, 1.58, 1.58, 1.58], row_height=0.92)
-    table.autofit = False
-    cards = [
-        ("READINESS SCORE", f"{float(score or 0):.1f}%", _cfg(config, "branding", "primary_color", "0078D4")),
-        ("PASS", str(int(passed or 0)), _cfg(config, "branding", "success_color", "00B050")),
-        ("GAPS", str(int(failed or 0)), _cfg(config, "branding", "fail_color", "C00000")),
-        ("STATUS", status, status_color),
-    ]
-    for idx, (label, value, color) in enumerate(cards):
-        cell = table.rows[0].cells[idx]
-        _set_cell_bg(cell, "F5F9FD")
-        set_cell_padding(cell, top=105, right=70, bottom=95, left=70)
-        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-        _set_cell_text(cell, label, config, "caption_size", True, _cfg(config, "branding", "muted_color", "6B7280"), WD_ALIGN_PARAGRAPH.CENTER)
-        _set_cell_text(cell, value, config, "h2_size", True, color, WD_ALIGN_PARAGRAPH.CENTER)
-    _body_paragraph(doc, "The readiness score combines persisted assessment results and highlights the remediation effort required before Copilot rollout.", config, before=10, after=7)
-    chart = _pass_fail_horizontal_chart(int(passed or 0), int(failed or 0))
-    _chart_or_data_not_available(doc, chart, width=Inches(6.3), height=Inches(1.05), config=config)
-    meter = _add_readiness_gauge(doc, score)
-    _chart_or_data_not_available(doc, meter, width=Inches(6.3), height=Inches(1.05), config=config)
+    _styled_heading(doc, page_text.get("heading") or DATA_NOT_AVAILABLE, config, level=1, after=8)
+    _body_paragraph(doc, page_text.get("intro") or DATA_NOT_AVAILABLE, config, after=6)
+    _body_paragraph(doc, page_text.get("overall_readiness_label") or DATA_NOT_AVAILABLE, config, after=4, bold=True)
+    _body_paragraph(doc, page_text.get("readiness_intro") or DATA_NOT_AVAILABLE, config, after=4)
+
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(4)
+    _apply_run_style(p.add_run(page_text.get("readiness_level_label") or DATA_NOT_AVAILABLE), config, "body_size", bold=True)
+    status_run = p.add_run(f" {status_display}")
+    _apply_run_style(status_run, config, "body_size", bold=True, color=status_color)
+
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(5)
+    _apply_run_style(p.add_run(page_text.get("readiness_gaps_label") or DATA_NOT_AVAILABLE), config, "body_size", bold=True)
+    gaps_run = p.add_run(f" {int(failed or 0)} out of {int(total or 0)}")
+    _apply_run_style(gaps_run, config, "body_size", bold=True, color=_cfg(config, "branding", "fail_color", "C00000"))
+
+    note = _body_paragraph(doc, page_text.get("remediation_note") or DATA_NOT_AVAILABLE, config, after=8, italic=True, color=_cfg(config, "branding", "fail_color", "C00000"))
+    note.paragraph_format.line_spacing = 1.0
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_before = Pt(0)
+    spacer.paragraph_format.space_after = Pt(8)
+
+    meter = _add_readiness_gauge(doc, score, config)
+    _chart_or_data_not_available(doc, meter, width=Inches(6.35), height=Inches(0.95), config=config)
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_before = Pt(0)
+    spacer.paragraph_format.space_after = Pt(12)
+
+    chart = _page8_exec_summary_chart(rows)
+    _chart_or_data_not_available(doc, chart, width=Inches(6.55), height=Inches(3.55), config=config)
+
+    doc.add_page_break()
 
 def _add_page9_executive_dashboard(doc, assessment_data):
-    """PAGE 9: Executive Dashboard."""
+    """PAGE 9: Severity and pillars chart with live key observations."""
     config = _report_config(assessment_data)
     rows = assessment_data.get("parameter_rows", [])
-    _styled_heading(doc, "Executive Dashboard", config, level=1, after=6)
-    chart = _page8_exec_summary_chart(rows)
-    _chart_or_data_not_available(doc, chart, width=Inches(6.55), height=Inches(2.95), config=config)
+    page_text = _cfg(config, "page_text", "key_observations", {})
+    metrics = _page9_observation_metrics(assessment_data)
 
-    lower_charts = [
-        (_page9_severity_pillars_chart(rows), Inches(3.18), Inches(2.18)),
-        (_service_pass_fail_chart(rows), Inches(3.18), Inches(2.18)),
-    ]
-    if any(item[0] for item in lower_charts):
-        table = doc.add_table(rows=1, cols=2)
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.autofit = False
-        _remove_table_borders(table)
-        for idx, (chart_path, width, height) in enumerate(lower_charts):
-            cell = table.rows[0].cells[idx]
-            _set_cell_width(cell, Inches(3.25))
-            set_cell_padding(cell, top=60, right=40, bottom=40, left=40)
-            for paragraph in list(cell.paragraphs):
-                paragraph._element.getparent().remove(paragraph._element)
-            if chart_path:
-                p = cell.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p.paragraph_format.space_before = Pt(0)
-                p.paragraph_format.space_after = Pt(0)
-                p.add_run().add_picture(chart_path, width=width, height=height)
-                try:
-                    os.remove(chart_path)
-                except:
-                    pass
-            else:
-                cell.add_paragraph()
-    else:
-        _empty_state_card(doc, "No activity data available", config)
+    chart = _page9_severity_pillars_chart(rows, config)
+    _chart_or_data_not_available(doc, chart, width=Inches(6.20), height=Inches(2.45), config=config)
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_before = Pt(0)
+    spacer.paragraph_format.space_after = Pt(22)
+
+    heading = doc.add_paragraph()
+    heading.paragraph_format.space_before = Pt(0)
+    heading.paragraph_format.space_after = Pt(12)
+    marker = heading.add_run(chr(0x25E2) + " ")
+    _apply_run_style(marker, config, "h2_size", bold=True, color="000000")
+    title = heading.add_run(page_text.get("heading") or DATA_NOT_AVAILABLE)
+    _apply_run_style(title, config, "h2_size", bold=True, color=_cfg(config, "branding", "secondary_color", "2F5496"))
+
+    values = defaultdict(lambda: DATA_NOT_AVAILABLE)
+    values.update(metrics)
+    for template in page_text.get("bullets", []):
+        text = str(template).format_map(values)
+        p = doc.add_paragraph(style="List Bullet")
+        p.paragraph_format.left_indent = Inches(0.45)
+        p.paragraph_format.first_line_indent = Inches(-0.20)
+        p.paragraph_format.space_after = Pt(4)
+        p.paragraph_format.line_spacing = 1.0
+        run = p.add_run(text)
+        _apply_run_style(run, config, "caption_size")
+
+    doc.add_page_break()
 
 def _dynamic_observations(assessment_data, limit=5):
     rows = assessment_data.get("parameter_rows", [])
@@ -4720,19 +5295,42 @@ def _dynamic_observations(assessment_data, limit=5):
     return observations[:limit]
 
 def _add_page10_key_observations(doc, assessment_data):
-    """PAGE 10: Dynamic key observations."""
+    """PAGE 10: Licenses and user information details."""
     config = _report_config(assessment_data)
-    _styled_heading(doc, "Key Observations", config, level=1, after=8)
-    for text in _dynamic_observations(assessment_data):
-        p = doc.add_paragraph(style='List Bullet')
-        p.paragraph_format.left_indent = Inches(0.25)
-        p.paragraph_format.space_after = Pt(5)
-        p.paragraph_format.line_spacing = 1.05
-        _apply_run_style(p.add_run(text), config)
-    rows = assessment_data.get("parameter_rows", [])
-    counts = _distribution(rows, _service_value, SERVICE_ORDER)
-    chart = _bar_chart_h(list(counts.keys()), list(counts.values()), ["#0078D4"] * len(counts), "Parameters by Service") if counts else None
-    _chart_or_data_not_available(doc, chart, width=Inches(6.35), height=Inches(2.55), config=config)
+    page_text = _cfg(config, "page_text", "user_license_information", {})
+    license_counts = assessment_data.get("license_counts") or {}
+    ui_fields = assessment_data.get("user_info_fields", {}) or {}
+    ui_total = int(assessment_data.get("user_info_total", 0) or 0)
+
+    license_chart = _page10_license_pie_chart(
+        license_counts,
+        page_text.get("license_chart_title") or DATA_NOT_AVAILABLE,
+        config,
+    )
+    _chart_or_data_not_available(doc, license_chart, width=Inches(6.35), height=Inches(3.05), config=config)
+
+    complete_users = min([int(value or 0) for value in ui_fields.values()], default=0) if ui_fields else 0
+    complete_users_text = "no" if complete_users == 0 else str(complete_users)
+    note_template = page_text.get("complete_user_note") or DATA_NOT_AVAILABLE
+    note = note_template.format_map(defaultdict(lambda: DATA_NOT_AVAILABLE, complete_users=complete_users, complete_users_text=complete_users_text))
+    p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.left_indent = Inches(0.35)
+    p.paragraph_format.first_line_indent = Inches(-0.18)
+    p.paragraph_format.space_after = Pt(10)
+    p.paragraph_format.line_spacing = 1.03
+    _apply_run_style(p.add_run(note), config, "caption_size")
+
+    user_chart = _page10_user_info_chart(
+        ui_fields,
+        ui_total,
+        page_text.get("user_info_chart_title") or DATA_NOT_AVAILABLE,
+        page_text.get("added_label") or DATA_NOT_AVAILABLE,
+        page_text.get("not_added_label") or DATA_NOT_AVAILABLE,
+        config,
+    )
+    _chart_or_data_not_available(doc, user_chart, width=Inches(6.35), height=Inches(2.95), config=config)
+
+    doc.add_page_break()
 
 def _activity_counts_for_render(assessment_data):
     activity_counts = assessment_data.get("activity_counts") or {}
@@ -4766,57 +5364,61 @@ def _activity_counts_for_render(assessment_data):
     return normalized
 
 def _add_page11_user_information(doc, assessment_data):
-    """PAGES 11-12: User Information Analysis."""
+    """PAGE 11: Microsoft 365 activity signals."""
     config = _report_config(assessment_data)
-    _styled_heading(doc, "User Information Analysis", config, level=1, after=8)
-    ui_fields = assessment_data.get("user_info_fields", {})
-    ui_total = int(assessment_data.get("user_info_total", 0) or 0)
-    if ui_fields and ui_total > 0:
-        bar_bytes = _make_bar_chart_img(ui_fields, ui_total, "User Information Completeness", size=(6.0, 3.15))
-        _insert_chart(doc, bar_bytes, width_inches=6.1, sa=8)
-    else:
-        _empty_state_card(doc, "User information data could not be collected.", config)
-
+    page_text = _cfg(config, "page_text", "activity_signals", {})
     activity_counts = _activity_counts_for_render(assessment_data)
     if not activity_counts:
+        _empty_state_card(doc, "Activity data could not be collected.", config)
         return
 
-    _styled_heading(doc, "User Information Analysis", config, level=1, after=6)
-    _styled_heading(doc, "Activity Signals", config, level=2, before=8, after=4)
+    pct_values = {}
+    for key, token in [
+        ("SharePoint", "sharepoint_pct"),
+        ("OneDrive", "onedrive_pct"),
+        ("Teams", "teams_pct"),
+        ("Outlook", "outlook_pct"),
+    ]:
+        active, total = activity_counts.get(key, (0, 0))
+        pct_values[token] = int(round((active / total * 100) if total else 0))
+
+    p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.left_indent = Inches(0.35)
+    p.paragraph_format.first_line_indent = Inches(-0.18)
+    p.paragraph_format.space_before = Pt(4)
+    p.paragraph_format.space_after = Pt(12)
+    p.paragraph_format.line_spacing = 1.05
+    observation = (page_text.get("observation") or DATA_NOT_AVAILABLE).format_map(defaultdict(lambda: DATA_NOT_AVAILABLE, pct_values))
+    _apply_run_style(p.add_run(observation), config, "caption_size")
+
     _insert_activity_donut_grid(doc, activity_counts)
+    doc.add_page_break()
 
 def _add_page12_usage_recommendations(doc, assessment_data):
-    """PAGE 13: Usage and recommendations."""
+    """PAGE 12: Risks of immediate deployment and recommendations."""
     config = _report_config(assessment_data)
-    _styled_heading(doc, "Usage and Recommendations", config, level=1, after=8)
-    activity_counts = _activity_counts_for_render(assessment_data)
-    activity = []
-    for label in ("SharePoint", "OneDrive", "Teams", "Outlook"):
-        active, total = activity_counts.get(label, (0, 0))
-        pct = (active / total * 100) if total else 0
-        activity.append((label, pct))
-    table = _card_table(doc, 4, widths=[1.62, 1.62, 1.62, 1.62], row_height=0.85)
-    for idx, (label, pct) in enumerate(activity):
-        cell = table.rows[0].cells[idx]
-        _set_cell_bg(cell, "EBF4FD")
-        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-        _set_cell_text(cell, f"{float(pct or 0):.0f}%", config, "h2_size", True, _cfg(config, "branding", "primary_color", "0078D4"), WD_ALIGN_PARAGRAPH.CENTER)
-        _set_cell_text(cell, label, config, "caption_size", True, _cfg(config, "branding", "dark_color", "1F2937"), WD_ALIGN_PARAGRAPH.CENTER)
+    page_text = _cfg(config, "page_text", "risks_and_recommendations", {})
+    _styled_heading(doc, page_text.get("risks_heading") or DATA_NOT_AVAILABLE, config, level=1, after=16)
+    _body_paragraph(doc, page_text.get("risks_intro") or DATA_NOT_AVAILABLE, config, after=6)
 
-    _styled_heading(doc, "Priority Recommendations", config, level=2, before=12, after=6)
-    rows = (
-        _top_findings_by_severity(assessment_data.get("parameter_rows", []), ["Critical"], limit=2)
-        + _top_findings_by_severity(assessment_data.get("parameter_rows", []), ["High"], limit=2)
-        + _top_findings_by_severity(assessment_data.get("parameter_rows", []), ["Medium"], limit=1)
-    )
-    if not rows:
-        _empty_state_card(doc, "No priority recommendation data available.", config)
-    for idx, row in enumerate(rows[:5], 1):
-        rec = _recommendation_text(row) or f"Review and remediate {_finding_title(row)}."
-        p = doc.add_paragraph()
+    risk_chart = _page12_risk_strips(page_text.get("risk_items", []), config)
+    _chart_or_data_not_available(doc, risk_chart, width=Inches(6.35), height=Inches(2.75), config=config)
+
+    _styled_heading(doc, page_text.get("recommendations_heading") or DATA_NOT_AVAILABLE, config, level=1, before=12, after=8)
+    for recommendation in page_text.get("recommendations", []):
+        if not isinstance(recommendation, dict):
+            continue
+        label = recommendation.get("label") or DATA_NOT_AVAILABLE
+        body = recommendation.get("body") or DATA_NOT_AVAILABLE
+        p = doc.add_paragraph(style="List Bullet")
+        p.paragraph_format.left_indent = Inches(0.35)
+        p.paragraph_format.first_line_indent = Inches(-0.18)
         p.paragraph_format.space_after = Pt(5)
-        _apply_run_style(p.add_run(f"Priority {idx}: "), config, bold=True, color=_cfg(config, "branding", "secondary_color", "2F5496"))
-        _apply_run_style(p.add_run(rec), config)
+        p.paragraph_format.line_spacing = 1.02
+        _apply_run_style(p.add_run(f"{label} "), config, "caption_size", bold=True)
+        _apply_run_style(p.add_run(body), config, "caption_size")
+
+    doc.add_page_break()
 
 def _inject_legacy_chart3_xml(docx_path, assessment_data):
     """Keep existing DOCX package inspections working while visible charts are rendered PNGs."""
@@ -5051,6 +5653,7 @@ def build_docx_report(assessment_data: dict, output_path: str, company_name: str
 
         doc = Document()
         _apply_design_system(doc, design_system)
+        _apply_body_font_defaults(doc, report_config)
 
         report_data = {
             'company_name': display_name,
@@ -5074,12 +5677,14 @@ def build_docx_report(assessment_data: dict, output_path: str, company_name: str
             _add_page11_user_information(doc, assessment_data)
             _add_page12_usage_recommendations(doc, assessment_data)
             _add_detailed_pages(doc, assessment_data)
+            doc.add_page_break()
             _add_conclusion_page(doc, display_name, partner, assessment_data)
         except Exception:
             logger.exception("[REPORT_BUILDER] Failed while adding pages 9-12")
             raise
 
         _add_header_logo(doc, report_data.get('logo_path'))
+        _apply_body_font_defaults(doc, report_config)
         _add_document_footer_page_numbers(doc)
         _remove_page_number_restarts(doc)
 

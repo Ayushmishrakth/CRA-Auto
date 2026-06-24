@@ -598,7 +598,8 @@ async def generate_report_bundle(
 
         if normalized_report_type in {"pdf", "both"}:
             pdf_path = target_dir / f"{report_stem}.pdf"
-            generated_pdf = await _generate_pdf_from_docx(docx_path, pdf_path)
+            report_data["logo_path"] = logo_path
+            generated_pdf = await _convert_docx_to_pdf_async(docx_path, pdf_path)
             pdf_artifact = AssessmentReport(
                 assessment_id=assessment.id,
                 report_type="pdf",
@@ -739,32 +740,8 @@ async def build_report_data(
     findings = await _load_findings(db, assessment.id)
     recommendations = await _load_recommendations(db, assessment.id, assessment.tenant_id)
     artifacts = await _load_artifacts(db, assessment.id, assessment.tenant_id)
-    analytics_raw = aggregate_findings(findings)
     summary = build_summary(assessment=assessment, findings=findings, recommendations=recommendations)
-    narrative = build_narrative(summary=summary, analytics=analytics_raw)
     parameter_rows = _build_parameter_rows(findings, recommendations, artifacts)
-    summary = {
-        **summary,
-        "tenant_id": assessment.tenant_id,
-        "tenant_name": tenant.tenant_name if tenant and tenant.tenant_name else assessment.tenant_id,
-        "customer_name": tenant.tenant_name if tenant and tenant.tenant_name else summary.get("customer_name"),
-        "parameter_total": len(parameter_rows),
-        "collected_total": len([row for row in parameter_rows if row["status"] in {"pass", "warning", "fail"}]),
-        "failed_total": len([row for row in parameter_rows if row["status"] == "failed"]),
-        "licensing_required_total": len([row for row in parameter_rows if row["status"] in {"licensing_required", "licensing_limitation"}]),
-        "manual_validation_total": len([row for row in parameter_rows if row["status"] == "manual_validation_required"]),
-        "not_collected_total": len([row for row in parameter_rows if row["status"] == "not_collected"]),
-    }
-    analytics = _build_report_analytics(summary=summary, parameter_rows=parameter_rows, assessment=assessment)
-    sections = _build_sections_from_rows(parameter_rows)
-    report_model = _build_report_model(
-        assessment=assessment,
-        summary=summary,
-        analytics=analytics,
-        parameter_rows=parameter_rows,
-        recommendations=recommendations,
-    )
-    sections_generated = [section["title"] for section in report_model["sections"] if section["items"] or section.get("metrics")]
 
     # FIX 1: READINESS SCORE - Build complete findings list from parameter_rows
     findings_list = [
@@ -819,10 +796,42 @@ async def build_report_data(
 
     eligible_users, eligible_total_users = _copilot_license_counts(parameter_rows)
     total_users = eligible_total_users or _tenant_user_count(parameter_rows) or assessment.total_findings or total
+    tenant_name = tenant.tenant_name if tenant and tenant.tenant_name else assessment.tenant_id
+
+    # Keep every report output path on the same live score calculated from the
+    # current parameter rows, instead of any stale score persisted earlier.
+    assessment.overall_score = readiness_score
+    summary = {
+        **summary,
+        "tenant_id": assessment.tenant_id,
+        "tenant_name": tenant_name,
+        "customer_name": tenant_name,
+        "parameter_total": len(parameter_rows),
+        "collected_total": len([row for row in parameter_rows if row["status"] in {"pass", "warning", "fail"}]),
+        "failed_total": fail_count,
+        "licensing_required_total": len([row for row in parameter_rows if row["status"] in {"licensing_required", "licensing_limitation"}]),
+        "manual_validation_total": len([row for row in parameter_rows if row["status"] == "manual_validation_required"]),
+        "not_collected_total": len([row for row in parameter_rows if row["status"] == "not_collected"]),
+        "overall_readiness": readiness_score,
+        "overall_score": readiness_score,
+        "readiness_score": readiness_score,
+        "readiness_status": level,
+        "readiness_level": level,
+        "pass_total": pass_count,
+        "fail_total": fail_count,
+        "total_findings": total,
+        "deployment_recommendation": (
+            "Proceed with Copilot rollout while continuing standard governance monitoring."
+            if readiness_score >= 80
+            else "Moderate remediation is recommended before enabling Copilot."
+            if readiness_score >= 50
+            else "Significant remediation is required prior to enabling Copilot in the production environment."
+        ),
+    }
 
     # Build complete assessment_data
     assessment_data = {
-        'tenant_name': summary.get('tenant_name', 'Unknown'),
+        'tenant_name': tenant_name,
         'assessment_date': assessment.created_at.strftime('%d %B %Y').lstrip('0') if assessment.created_at else '',
         'overall_score': readiness_score,
         'readiness_score': readiness_score,
@@ -856,6 +865,21 @@ async def build_report_data(
         'activity_counts': _activity_chart_counts(rv_lookup),
     })
 
+    summary = {**summary, **assessment_data}
+    analytics_raw = aggregate_findings(findings)
+    analytics = _build_report_analytics(summary=summary, parameter_rows=parameter_rows, assessment=assessment)
+    analytics["assessment_scores"]["overall"] = readiness_score
+    narrative = build_narrative(summary=summary, analytics=analytics_raw)
+    sections = _build_sections_from_rows(parameter_rows)
+    report_model = _build_report_model(
+        assessment=assessment,
+        summary=summary,
+        analytics=analytics,
+        parameter_rows=parameter_rows,
+        recommendations=recommendations,
+    )
+    sections_generated = [section["title"] for section in report_model["sections"] if section["items"] or section.get("metrics")]
+
     import logging
     logging.getLogger('cra').info(
         f'[REPORT] Activity pcts: '
@@ -871,7 +895,7 @@ async def build_report_data(
 
     return {
         "assessment": assessment,
-        "summary": {**summary, **assessment_data},
+        "summary": summary,
         "analytics": analytics,
         "narrative": narrative,
         "sections": sections,
@@ -1609,13 +1633,24 @@ async def _generate_pdf_from_docx(docx_path: str | Path, pdf_path: str | Path) -
         ps_docx = str(docx_path).replace("'", "''")
         ps_pdf = str(pdf_path).replace("'", "''")
         ps_script = f"""
+$ErrorActionPreference = 'Stop'
 $word = New-Object -ComObject Word.Application
 $word.Visible = $false
-$doc = $word.Documents.Open('{ps_docx}')
-$doc.SaveAs('{ps_pdf}', 17)
-$doc.Close()
-$word.Quit()
-[System.Runtime.Interopservices.Marshal]::ReleaseComObject($word) | Out-Null
+$word.DisplayAlerts = 0
+$doc = $null
+try {{
+    $doc = $word.Documents.Open('{ps_docx}', $false, $true, $false)
+    $doc.ExportAsFixedFormat('{ps_pdf}', 17)
+}} finally {{
+    if ($doc -ne $null) {{
+        $doc.Close($false)
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($doc) | Out-Null
+    }}
+    $word.Quit()
+    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($word) | Out-Null
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+}}
 """
         result = await asyncio.get_event_loop().run_in_executor(
             None,

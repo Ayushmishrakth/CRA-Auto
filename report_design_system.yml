@@ -18,6 +18,7 @@ fonts:
 typography:
   body_font: Calibri
   body_size: 11
+  caption_size: 11
 
   heading1:
     family: Calibri Light

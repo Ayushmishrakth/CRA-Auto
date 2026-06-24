@@ -437,8 +437,8 @@ function ActionButton({ children, onClick, disabled, variant = "primary" }) {
 function TopBar({ model, onCustomize, onQuickGenerate, quickGenerating, onRerun, rerunning, isRunning }) {
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const quickOptions = [
-    { type: "pdf", label: "PDF Document (.pdf)", icon: "ti-file-type-pdf" },
     { type: "docx", label: "Word Document (.docx)", icon: "ti-file-type-doc" },
+    { type: "pdf", label: "PDF Document (.pdf)", icon: "ti-file-type-pdf" },
   ];
 
   const selectQuickFormat = (reportType) => {
@@ -964,7 +964,7 @@ export default function ResultsPage() {
     }
   };
 
-  const handleQuickGenerate = async (reportType = "pdf") => {
+  const handleQuickGenerate = async (reportType = "docx") => {
     setQuickGenerating(true);
     try {
       const blob = await generateAssessmentReport(assessmentId, reportType);

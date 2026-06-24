@@ -16,7 +16,7 @@ typography:
   h1_size: 18
   h2_size: 14
   body_size: 11
-  caption_size: 8
+  caption_size: 11
 
 layout:
   top_margin: 0.68

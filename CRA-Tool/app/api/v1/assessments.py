@@ -337,6 +337,13 @@ async def generate_assessment_report(
         company_address=(company_address or '').strip() or None,
     )
 
+    if report_type == "both":
+        return success_response(
+            message="Assessment report generated",
+            data=payload,
+            request_id=request.state.request_id,
+        )
+
     if isinstance(payload, dict):
         artifacts = payload.get("artifacts", [])
         selected_artifact = next(
@@ -421,33 +428,23 @@ async def download_assessment_report(
     from app.core.exceptions import AppException
 
     try:
-        try:
-            artifact = await cra_report_service.get_report_artifact(
-                db,
-                current_user=current_user,
-                assessment_id=assessment_id,
-                report_type=report_type,
-            )
-        except FileNotFoundError:
-            payload = await cra_report_service.generate_report_bundle(
-                assessment_id=str(assessment_id),
-                db=db,
-                current_user=current_user,
-                report_type=report_type,
-                partner_name=(company_name or '').strip() or None,
-                logo_path=logo_path,
-                company_address=(company_address or '').strip() or None,
-            )
-            artifacts = payload.get("artifacts", []) if isinstance(payload, dict) else []
-            artifact_payload = next(
-                (item for item in artifacts if item.get("report_type") == report_type),
-                artifacts[0] if artifacts else None,
-            )
-            if not artifact_payload:
-                raise HTTPException(status_code=500, detail="Report generation did not return a file path")
-            path = artifact_payload.get("storage_path") or artifact_payload.get("file_path")
-        else:
-            path = artifact.storage_path
+        payload = await cra_report_service.generate_report_bundle(
+            assessment_id=str(assessment_id),
+            db=db,
+            current_user=current_user,
+            report_type=report_type,
+            partner_name=(company_name or '').strip() or None,
+            logo_path=logo_path,
+            company_address=(company_address or '').strip() or None,
+        )
+        artifacts = payload.get("artifacts", []) if isinstance(payload, dict) else []
+        artifact_payload = next(
+            (item for item in artifacts if item.get("report_type") == report_type),
+            artifacts[0] if artifacts else None,
+        )
+        if not artifact_payload:
+            raise HTTPException(status_code=500, detail="Report generation did not return a file path")
+        path = artifact_payload.get("storage_path") or artifact_payload.get("file_path")
 
         media_type = (
             "application/pdf"

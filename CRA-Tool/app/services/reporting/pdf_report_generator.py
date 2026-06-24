@@ -18,6 +18,7 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
 from reportlab.platypus import KeepTogether, PageTemplate, Frame
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 
 from app.services.reporting.chart_generator import (
     generate_severity_pie_chart,
@@ -58,18 +59,20 @@ def _create_header_footer(canvas_obj, doc, logo_bytes_data):
     if logo_bytes_data:
         try:
             logo_bytes_data.seek(0)
-            logo_width = 1.8 * inch
-            logo_height = 1.8 * inch
+            logo_reader = ImageReader(logo_bytes_data)
+            image_width, image_height = logo_reader.getSize()
+            logo_width = 1.35 * inch
+            logo_height = logo_width * (image_height / image_width)
+            page_width, page_height = canvas_obj._pagesize
 
             canvas_obj.saveState()
             canvas_obj.drawImage(
-                logo_bytes_data,
-                doc.leftMargin - 0.1 * inch,
-                doc.height + doc.topMargin + 0.2 * inch,
+                logo_reader,
+                doc.leftMargin,
+                page_height - 0.55 * inch,
                 width=logo_width,
                 height=logo_height,
                 preserveAspectRatio=True,
-                kind='proportional'
             )
             canvas_obj.restoreState()
         except Exception as e:
@@ -196,7 +199,7 @@ def render_pdf_report(
     doc.onLaterPages = draw_page_header
 
     # Increase top margin to accommodate logo header
-    doc.topMargin = 1.8 * inch
+    doc.topMargin = 1.25 * inch
 
     # ── Cover Page ──────────────────────────────────────────────
     if logo_bytes:

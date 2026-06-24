@@ -96,10 +96,15 @@ async def generate_assessment_report(
 
         if isinstance(payload, dict):
             arts = payload.get("artifacts", [])
+            desired_type = "docx" if report_format == "both" else report_format
+            selected = next(
+                (item for item in arts if item.get("report_type") == desired_type),
+                arts[0] if arts else None,
+            )
             fp = (
                 payload.get("file_path")
                 or payload.get("docx_path")
-                or (arts[0].get("file_path") or arts[0].get("storage_path") if arts else None)
+                or (selected.get("file_path") or selected.get("storage_path") if selected else None)
             )
         else:
             fp = str(payload)
@@ -107,10 +112,16 @@ async def generate_assessment_report(
         if not fp:
             raise HTTPException(status_code=500, detail="Report generation did not return a file path")
 
+        response_format = "docx" if report_format == "both" else report_format
+        media_type = (
+            "application/pdf"
+            if response_format == "pdf"
+            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
         return FileResponse(
             path=fp,
-            filename=f'CRA_Report_{assessment_id}.docx',
-            media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            filename=f'CRA_Report_{assessment_id}.{response_format}',
+            media_type=media_type,
         )
 
     except ValueError as ve:

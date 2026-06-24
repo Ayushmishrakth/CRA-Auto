@@ -126,7 +126,7 @@ DEFAULT_REPORT_CONFIG = {
         "h1_size": 18,
         "h2_size": 14,
         "body_size": 11,
-        "caption_size": 8,
+        "caption_size": 11,
     },
     "layout": {
         "top_margin": 0.68,
@@ -283,6 +283,48 @@ def _body_paragraph(doc, text="", config=None, before=0, after=6, bold=False, it
     run = p.add_run(str(text))
     _apply_run_style(run, config, "body_size", bold=bold, color=color)
     run.font.italic = italic
+    return p
+
+def _add_emphasized_text(paragraph, text, config, emphasize_terms, *, size_key="body_size", underline_terms=None):
+    """Add text with selected terms emphasized while preserving live text values."""
+    underline_terms = set(underline_terms or [])
+    terms = [str(term) for term in emphasize_terms if str(term or "").strip()]
+    if not terms:
+        return _apply_run_style(paragraph.add_run(str(text)), config, size_key)
+
+    lowered_terms = [(term.lower(), term) for term in sorted(terms, key=len, reverse=True)]
+    source = str(text)
+    idx = 0
+    while idx < len(source):
+        match = None
+        source_lower = source.lower()
+        for lowered, original in lowered_terms:
+            if source_lower.startswith(lowered, idx):
+                match = original
+                break
+        if match:
+            run = paragraph.add_run(source[idx:idx + len(match)])
+            _apply_run_style(run, config, size_key, bold=True)
+            if match in underline_terms:
+                run.font.underline = True
+            idx += len(match)
+            continue
+
+        next_idx = len(source)
+        for lowered, _original in lowered_terms:
+            found = source_lower.find(lowered, idx + 1)
+            if found != -1:
+                next_idx = min(next_idx, found)
+        run = paragraph.add_run(source[idx:next_idx])
+        _apply_run_style(run, config, size_key)
+        idx = next_idx
+
+def _body_paragraph_emphasis(doc, text, config, emphasize_terms, before=0, after=6, underline_terms=None):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(before)
+    p.paragraph_format.space_after = Pt(after)
+    p.paragraph_format.line_spacing = 1.08
+    _add_emphasized_text(p, text, config, emphasize_terms, underline_terms=underline_terms)
     return p
 
 def _set_cell_text(cell, text, config, size_key="body_size", bold=False, color=None, align=WD_ALIGN_PARAGRAPH.LEFT):
@@ -864,6 +906,29 @@ def _pie_chart(labels, values, colors, title):
     plt.close(fig)
     return path
 
+def _add_chart_panel_shadow(fig):
+    shadow = mpatches.Rectangle(
+        (0.018, -0.018),
+        0.968,
+        0.968,
+        transform=fig.transFigure,
+        facecolor="#9E9E9E",
+        alpha=0.28,
+        linewidth=0,
+        zorder=-20,
+    )
+    panel = mpatches.Rectangle(
+        (0.0, 0.0),
+        0.985,
+        0.985,
+        transform=fig.transFigure,
+        facecolor="white",
+        edgecolor="#000000",
+        linewidth=1.0,
+        zorder=-19,
+    )
+    fig.patches.extend([shadow, panel])
+
 def _page6_pie_chart(labels, values, colors, title, figure_size=(6.34, 2.5)):
     """Compact AAA-style Excel 3D pie chart for page 6."""
     filtered = [(l, v, c) for l, v, c in zip(labels, values, colors) if v > 0]
@@ -883,6 +948,7 @@ def _page6_pie_chart(labels, values, colors, title, figure_size=(6.34, 2.5)):
     fig.patch.set_facecolor('white')
     fig.patch.set_edgecolor('#000000')
     fig.patch.set_linewidth(1.0)
+    _add_chart_panel_shadow(fig)
 
     radius = 0.58
     startangle = 112
@@ -1031,6 +1097,7 @@ def _page7_risk_pie_chart(labels, values, colors, title, figure_size):
     fig.patch.set_facecolor('white')
     fig.patch.set_edgecolor('#000000')
     fig.patch.set_linewidth(1.0)
+    _add_chart_panel_shadow(fig)
 
     radius = 0.62
     startangle = 112
@@ -1129,15 +1196,16 @@ def _add_readiness_gauge(doc, score, config=None):
     pass_color = f"#{_hex_text(_cfg(config, 'branding', 'success_color', '00B050'))}"
     fail_color = f"#{_hex_text(_cfg(config, 'branding', 'fail_color', 'C00000'))}"
     accent_color = f"#{_hex_text(_cfg(config, 'branding', 'primary_color', '0078D4'))}"
-    fig, ax = plt.subplots(figsize=(7.2, 1.18), dpi=150)
+    fig, ax = plt.subplots(figsize=(7.2, 1.72), dpi=150)
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 1.05)
-    ax.barh(0.42, 100, height=0.24, color=fail_color, align='center')
-    ax.barh(0.42, score, height=0.24, color=pass_color, align='center')
+    ax.set_ylim(0, 1.46)
+    bar_y = 0.55
+    ax.barh(bar_y, 100, height=0.22, color=fail_color, align='center')
+    ax.barh(bar_y, score, height=0.22, color=pass_color, align='center')
     ax.annotate(
         '',
-        xy=(score, 0.56),
-        xytext=(score, 0.90),
+        xy=(score, bar_y + 0.15),
+        xytext=(score, 1.07),
         arrowprops={
             'arrowstyle': '-|>',
             'color': accent_color,
@@ -1146,9 +1214,11 @@ def _add_readiness_gauge(doc, score, config=None):
         },
     )
     ax.text(
-        score, 0.98, f'{score:.2f}%',
+        score, 1.28, f'{score:.2f}%',
         ha='center', va='top',
-        fontsize=12, fontweight='bold', color=accent_color
+        fontsize=12, fontweight='bold', color=accent_color,
+        bbox={'boxstyle': 'round,pad=0.18', 'facecolor': 'white', 'edgecolor': 'white', 'linewidth': 0},
+        clip_on=False,
     )
     ax.set_xticks(range(0, 101, 10))
     ax.set_xticklabels([f'{x}%' for x in range(0, 101, 10)], fontsize=7)
@@ -1157,8 +1227,8 @@ def _add_readiness_gauge(doc, score, config=None):
         mpatches.Patch(color=pass_color, label='Pass'),
         mpatches.Patch(color=fail_color, label='Fail'),
     ]
-    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.58), ncol=2, fontsize=7, frameon=False)
-    fig.subplots_adjust(left=0.035, right=0.985, top=0.86, bottom=0.38)
+    ax.legend(handles=legend, loc='lower center', bbox_to_anchor=(0.5, -0.66), ncol=2, fontsize=7, frameon=False)
+    fig.subplots_adjust(left=0.035, right=0.985, top=0.82, bottom=0.42)
     path = tempfile.mktemp(suffix='.png')
     plt.savefig(path, dpi=150, facecolor='white')
     plt.close(fig)
@@ -1171,7 +1241,7 @@ def _pass_fail_horizontal_chart(pass_count, fail_count):
     pass_pct = int(round(int(pass_count or 0) / total * 100))
     fail_pct = max(0, 100 - pass_pct)
 
-    fig, ax = plt.subplots(figsize=(6.4, 1.0))
+    fig, ax = plt.subplots(figsize=(6.4, 1.1))
     ax.barh([0], [pass_pct], color='#00B050', label='Pass')
     ax.barh([0], [fail_pct], left=[pass_pct], color='#FF0000', label='Fail')
     ax.text(pass_pct / 2, 0, f'Pass {pass_pct}%', ha='center', va='center', color='white', fontsize=10, fontweight='bold')
@@ -1179,11 +1249,11 @@ def _pass_fail_horizontal_chart(pass_count, fail_count):
     ax.set_xlim(0, 100)
     ax.set_yticks([])
     ax.set_xticks([])
-    ax.set_title('Pass vs Fail', fontsize=11, fontweight='bold', pad=8)
+    ax.set_title('Pass vs Fail', fontsize=11, fontweight='bold', pad=16)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.45), ncol=2, frameon=False, fontsize=8)
-    plt.tight_layout()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.20), ncol=2, frameon=False, fontsize=8)
+    plt.tight_layout(pad=0.55)
     path = tempfile.mktemp(suffix='.png')
     plt.savefig(path, dpi=150, bbox_inches='tight', facecolor='white')
     plt.close(fig)
@@ -1311,14 +1381,14 @@ def _page8_exec_summary_chart(parameter_rows):
     fig.patch.set_linewidth(1.0)
     pass_bars = ax.bar(x, pass_values, color='#00B050', label='Pass', width=0.58)
     fail_bars = ax.bar(x, fail_values, bottom=pass_values, color='#C00000', label='Fail', width=0.58)
-    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=12, fontweight='bold', pad=8)
+    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=12, fontweight='bold', pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=90, fontsize=6.4)
     ax.tick_params(axis='x', pad=2)
     ax.tick_params(axis='y', labelsize=7)
     ax.grid(axis='y', color='#D9D9D9', linewidth=0.6)
     ax.set_axisbelow(True)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False, fontsize=7)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.08), ncol=2, frameon=False, fontsize=7)
 
     for bar, value in zip(pass_bars, pass_values):
         if value > 0:
@@ -1355,7 +1425,7 @@ def _page8_exec_summary_chart(parameter_rows):
         spine.set_color('#BFBFBF')
         spine.set_linewidth(0.8)
 
-    fig.subplots_adjust(bottom=0.39, top=0.86, left=0.07, right=0.985)
+    fig.subplots_adjust(bottom=0.39, top=0.80, left=0.07, right=0.985)
     path = tempfile.mktemp(suffix='.png')
     plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', edgecolor='#000000', bbox_inches=None)
     plt.close(fig)
@@ -1499,7 +1569,7 @@ def _page9_severity_pillars_chart(parameter_rows, config=None):
         group_ends.append(x - 0.5)
         x += 0.5
 
-    fig, ax = plt.subplots(figsize=(7.15, 3.85), dpi=REPORT_CHART_DPI)
+    fig, ax = plt.subplots(figsize=(8.05, 3.85), dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
     fig.patch.set_edgecolor('black')
     fig.patch.set_linewidth(0.5)
@@ -1544,8 +1614,8 @@ def _page9_severity_pillars_chart(parameter_rows, config=None):
     ax.legend(
         [handle_map[label] for label in legend_order],
         legend_order,
-        loc='center right',
-        bbox_to_anchor=(0.99, 0.55),
+        loc='center left',
+        bbox_to_anchor=(1.01, 0.55),
         frameon=False,
         fontsize=9.5,
     )
@@ -1553,7 +1623,7 @@ def _page9_severity_pillars_chart(parameter_rows, config=None):
     for spine in ax.spines.values():
         spine.set_color('black')
         spine.set_linewidth(0.5)
-    fig.subplots_adjust(left=0.065, right=0.965, top=0.88, bottom=0.18)
+    fig.subplots_adjust(left=0.065, right=0.79, top=0.88, bottom=0.18)
     path = tempfile.mktemp(suffix='.png')
     plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', bbox_inches='tight', pad_inches=0.06)
     plt.close(fig)
@@ -1635,16 +1705,23 @@ def _page10_license_pie_chart(license_counts, title, config=None):
         return None
     labels = list(cleaned.keys())
     values = list(cleaned.values())
-    palette = [
-        "#F9D976",
-        "#A9C2E8",
-        "#AEE8D2",
-        "#F4B183",
-        "#B4C7E7",
-        "#C6E0B4",
-    ]
-    colors = palette[:len(labels)]
-    total = sum(values)
+    palette = ["#F4B183", "#B4C7E7", "#C6E0B4", "#FFD966", "#A9D18E", "#9DC3E6"]
+
+    def license_color(label, index):
+        text = str(label or "").lower()
+        if "unlicensed" in text:
+            return "#AEE8D2"
+        if "no license" in text or "none" == text.strip():
+            return "#D9D9D9"
+        if "business basic" in text:
+            return "#F9D976"
+        if "business premium" in text:
+            return "#A9C2E8"
+        if "exchange online" in text:
+            return "#F4B183"
+        return palette[index % len(palette)]
+
+    colors = [license_color(label, idx) for idx, label in enumerate(labels)]
 
     def darken(hex_color, factor=0.62):
         h = hex_color.lstrip("#")
@@ -1657,6 +1734,7 @@ def _page10_license_pie_chart(license_counts, title, config=None):
     fig.patch.set_facecolor("white")
     fig.patch.set_edgecolor("#000000")
     fig.patch.set_linewidth(1.0)
+    _add_chart_panel_shadow(fig)
     radius = 0.82
     startangle = 112
     ax.pie(
@@ -2440,7 +2518,7 @@ def _add_risk_score_matrix(doc):
     for i, desc in enumerate(descs):
         cell = table.cell(1, i)
         p = cell.paragraphs[0]
-        p.add_run(desc).font.size = Pt(9)
+        p.add_run(desc).font.size = Pt(11)
 
 def _add_risks_section(doc):
     risks = [
@@ -2485,13 +2563,13 @@ def _add_header_logo(doc, logo_path=None, display_name=None):
     """Apply the TPT logo to the top-left header on every page section."""
     blueprint = _load_aaa_report_blueprint()
     header_config = blueprint.get("header", {}) if isinstance(blueprint, dict) else {}
-    style_id = header_config.get("style_id", "Header")
     spacing_after = _twips_value(header_config.get("spacing_after_twips"), 0)
-    line_twips = header_config.get("line_twips")
     logo_file = Path(str(logo_path)) if logo_path else None
     if not logo_file or not logo_file.exists():
         configured_logo = _cfg(DEFAULT_REPORT_CONFIG, "branding", "partner_logo")
         logo_file = _repo_file_path(configured_logo) if configured_logo else None
+
+    logo_width = Inches(1.30)
 
     def apply_to_header(header):
         header.is_linked_to_previous = False
@@ -2501,23 +2579,20 @@ def _add_header_logo(doc, logo_path=None, display_name=None):
             except Exception:
                 pass
         header_para = header.add_paragraph()
-        try:
-            header_para.style = style_id
-        except Exception:
-            pass
         header_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
         header_para.paragraph_format.space_before = Pt(0)
-        header_para.paragraph_format.space_after = Pt(spacing_after / 20)
-        if line_twips is not None:
-            header_para.paragraph_format.line_spacing = Pt(_twips_value(line_twips) / 20)
+        header_para.paragraph_format.space_after = Pt(0)
+        header_para.paragraph_format.left_indent = Inches(0)
+        header_para.paragraph_format.line_spacing = None
         if logo_file and logo_file.exists():
-            header_para.add_run().add_picture(str(logo_file), width=Inches(0.92))
+            header_para.add_run().add_picture(str(logo_file), width=logo_width)
         else:
             header_text = header_config.get("default_header_text")
             if header_text:
                 header_para.add_run(str(header_text))
 
     for section in doc.sections:
+        section.header_distance = Inches(0.38)
         section.header.is_linked_to_previous = False
         apply_to_header(section.header)
         if section.different_first_page_header_footer:
@@ -2944,7 +3019,7 @@ def _build_cover_page(doc, report_data):
     p.paragraph_format.space_after = Pt(3)
     p.paragraph_format.alignment = C
     r3 = p.add_run('Readiness Score')
-    r3.font.size = Pt(7)
+    r3.font.size = Pt(11)
     r3.font.name = 'Calibri'
     r3.font.color.rgb = R('888888')
 
@@ -2953,7 +3028,7 @@ def _build_cover_page(doc, report_data):
     p.paragraph_format.space_after = Pt(2)
     p.paragraph_format.alignment = C
     r4 = p.add_run(f'●  {level_short}')
-    r4.font.size = Pt(9)
+    r4.font.size = Pt(11)
     r4.font.bold = True
     r4.font.name = 'Calibri'
     r4.font.color.rgb = R('A32D2D')
@@ -2965,7 +3040,7 @@ def _build_cover_page(doc, report_data):
     r5 = p.add_run(
         f'{fail_total} fail  ·  {pass_total} pass\n'
         f'out of {fail_total + pass_total} parameters' if (fail_total + pass_total) else DATA_NOT_AVAILABLE)
-    r5.font.size = Pt(7.5)
+    r5.font.size = Pt(11)
     r5.font.name = 'Calibri'
     r5.font.color.rgb = R('666666')
 
@@ -2979,18 +3054,18 @@ def _build_cover_page(doc, report_data):
         p.paragraph_format.space_after = Pt(2)
 
         rd = p.add_run('●  ')
-        rd.font.size = Pt(7)
+        rd.font.size = Pt(11)
         rd.font.name = 'Calibri'
         rd.font.color.rgb = R(dot_c)
 
         rn = p.add_run(f'{svc_short:<12}')
-        rn.font.size = Pt(9)
+        rn.font.size = Pt(11)
         rn.font.bold = True
         rn.font.name = 'Calibri'
         rn.font.color.rgb = R('0C447C')
 
         rc2 = p.add_run(f'   {fc}F / {pc}P')
-        rc2.font.size = Pt(9)
+        rc2.font.size = Pt(11)
         rc2.font.name = 'Calibri'
         rc2.font.color.rgb = R('444444')
 
@@ -3025,7 +3100,7 @@ def _build_cover_page(doc, report_data):
         p1.paragraph_format.space_before = Pt(7)
         p1.paragraph_format.space_after = Pt(2)
         r1 = p1.add_run(lbl)
-        r1.font.size = Pt(7)
+        r1.font.size = Pt(11)
         r1.font.name = 'Calibri'
         r1.font.color.rgb = R('999999')
 
@@ -4037,7 +4112,7 @@ def _add_page9_user_activity_and_risks(doc, assessment_data):
         p.paragraph_format.space_after = Pt(0)
         r = p.add_run(label)
         r.font.name = 'Calibri'
-        r.font.size = Pt(8)
+        r.font.size = Pt(11)
 
     heading('Risks of Immediate Deployment', space_after=4)
 
@@ -4056,7 +4131,7 @@ def _add_page9_user_activity_and_risks(doc, assessment_data):
         p.paragraph_format.space_after = Pt(1)
         r = p.add_run(f'{idx + 1}. {risk}')
         r.font.name = 'Calibri'
-        r.font.size = Pt(10)
+        r.font.size = Pt(11)
         r.font.bold = True
         r.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
 
@@ -4206,7 +4281,7 @@ def _add_detailed_summary_table(doc, rows, config, headers, start_index=1, inclu
             r = p.add_run(header)
             r.bold = True
             r.font.color.rgb = RGBColor(255, 255, 255)
-            r.font.size = Pt(8)
+            r.font.size = Pt(11)
             r.font.name = _font_name(config)
         _set_row_height(hrow, 0.30)
         body_start = 1
@@ -4870,11 +4945,17 @@ def _add_toc_page(doc, config=None):
         # TOC uses Calibri, NOT the blueprint body font (Lato)
         run.font.name = "Calibri"
         run.font.size = Pt(11)
+        run.font.bold = True
+        if level <= 2:
+            run.font.underline = True
         page = page_lookup.get(_toc_key(text), "")
         if page:
             page_run = p.add_run(f"\t{page}")
             page_run.font.name = "Calibri"
             page_run.font.size = Pt(11)
+            page_run.font.bold = True
+            if level <= 2:
+                page_run.font.underline = True
         return p
 
     def insert_manual_page_break():
@@ -5029,11 +5110,19 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
     }
 
     # Render all Executive Summary paragraphs with EXACT YAML text and placeholder replacement only
+    emphasis_terms = [
+        company_name,
+        partner_name,
+        "Copilot Readiness Assessment",
+        "CRA",
+        "CRA parameters",
+        "parameters",
+    ]
     for para_text in exec_paragraphs:
         resolved_text = para_text
         for placeholder, value in placeholder_values.items():
             resolved_text = resolved_text.replace(placeholder, value)
-        _body_paragraph(doc, resolved_text, config, after=8)
+        _body_paragraph_emphasis(doc, resolved_text, config, emphasis_terms, after=8)
 
     # NOTE: Readiness card (READINESS/STATUS/GAPS) is NOT part of Executive Summary page
     # per YAML blueprint. Readiness metrics appear only in "Summary of Assessment" page.
@@ -5051,7 +5140,7 @@ def _add_executive_page(doc, company_name, partner_name, assessment_data=None):
             resolved_bullet = resolved_bullet.replace(placeholder, value)
         p = doc.add_paragraph(style='List Bullet')
         p.paragraph_format.space_after = Pt(4)
-        _apply_run_style(p.add_run(resolved_bullet), config)
+        _add_emphasized_text(p, resolved_bullet, config, emphasis_terms)
 
     doc.add_page_break()
 
@@ -5235,7 +5324,7 @@ def _add_assessment_summary_page(doc, assessment_data):
     spacer.paragraph_format.space_after = Pt(8)
 
     meter = _add_readiness_gauge(doc, score, config)
-    _chart_or_data_not_available(doc, meter, width=Inches(6.35), height=Inches(0.95), config=config)
+    _chart_or_data_not_available(doc, meter, width=Inches(6.35), height=Inches(1.34), config=config)
 
     spacer = doc.add_paragraph()
     spacer.paragraph_format.space_before = Pt(0)
@@ -5272,13 +5361,23 @@ def _add_page9_executive_dashboard(doc, assessment_data):
     values.update(metrics)
     for template in page_text.get("bullets", []):
         text = str(template).format_map(values)
+        bold_terms = [
+            f"{metrics.get('failed_parameters', 0)} gaps out of {metrics.get('total_assessed', 0)} parameters",
+            "Security",
+            "Governance",
+            "Best Practice",
+            "Best Practices",
+            "Medium to Critical",
+            f"Security ({metrics.get('security_fail_pct', 0)}%)",
+            f"Governance ({metrics.get('governance_fail_pct', 0)}%)",
+            f"Best Practices ({metrics.get('best_practice_fail_pct', 0)}%)",
+        ]
         p = doc.add_paragraph(style="List Bullet")
         p.paragraph_format.left_indent = Inches(0.45)
         p.paragraph_format.first_line_indent = Inches(-0.20)
         p.paragraph_format.space_after = Pt(4)
         p.paragraph_format.line_spacing = 1.0
-        run = p.add_run(text)
-        _apply_run_style(run, config, "caption_size")
+        _add_emphasized_text(p, text, config, bold_terms, size_key="caption_size")
 
     doc.add_page_break()
 

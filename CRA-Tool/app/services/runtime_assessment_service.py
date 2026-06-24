@@ -395,11 +395,13 @@ def _classified_dependency_status(message: str | None) -> str:
 def _canonical_finding_status(status: str | None) -> str:
     normalized = str(status or "fail").lower().replace(" ", "_")
     if normalized == "not_collected":
-        return "not_collected"
+        return "fail"
     if normalized in {"manual_validation_required", "manual_validation", "evidence_collected"}:
         return "fail"
     if normalized in {"failed", "error", "execution_failed", "collector_failed", "failed_collector"}:
-        return "collection_error"
+        return "fail"
+    if normalized == "collection_error":
+        return "fail"
     if normalized in {"licensing_required", "licensing_limitation", "licensing_gap"}:
         return "fail"
     if normalized in {"service_unavailable", "skipped"}:

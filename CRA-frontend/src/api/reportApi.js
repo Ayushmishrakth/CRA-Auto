@@ -8,7 +8,7 @@ export async function generateCustomizedReport(assessmentId, {
   logoFile,
   companyName = "",
   companyAddress = "",
-  format = "pdf",
+  format = "docx",
 }) {
   const formData = new FormData();
 

@@ -836,7 +836,7 @@ async def build_report_data(
         'overall_score': readiness_score,
         'readiness_score': readiness_score,
         'readiness_level': level,
-        'partner_name': 'CRA Assessment Team',
+        'partner_name': DEFAULT_REPORT_COMPANY_NAME,
         'findings': findings_list,
         'findings_list': findings_list,
         'pass_count': pass_count,

@@ -5,6 +5,7 @@ from datetime import datetime
 from collections import defaultdict
 import tempfile, os, logging, json
 import textwrap
+import math
 
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
@@ -1030,6 +1031,7 @@ def _page7_severity_matrix_graphic(severity_items, figure_size):
     """AAA-style Page 7 severity matrix graphic with five overlapping circles."""
     fig, ax = plt.subplots(figsize=figure_size, dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor("white")
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
@@ -1044,15 +1046,21 @@ def _page7_severity_matrix_graphic(severity_items, figure_size):
         b = int(b + (255 - b) * 0.88)
         return f"#{r:02x}{g:02x}{b:02x}"
 
-    centers = np.linspace(0.14, 0.90, max(len(severity_items), 1))
+    circle_width = 0.18
+    circle_height = circle_width * (figure_size[0] / figure_size[1])
+    circle_radius_x = circle_width / 2
+    circle_radius_y = circle_height / 2
+    center_y = 0.66
+
+    centers = np.linspace(0.13, 0.87, max(len(severity_items), 1))
     for idx, (item, x) in enumerate(zip(severity_items, centers)):
         label = item.get("label", "")
         color = item.get("color", "#6B7280")
         desc = item.get("description", "")
         circle = mpatches.Ellipse(
-            (x, 0.67),
-            width=0.18,
-            height=0.34,
+            (x, center_y),
+            width=circle_width,
+            height=circle_height,
             facecolor=softened(color),
             edgecolor=color,
             linewidth=3.0,
@@ -1061,7 +1069,11 @@ def _page7_severity_matrix_graphic(severity_items, figure_size):
         ax.add_patch(circle)
         if idx < len(severity_items) - 1:
             tri = mpatches.Polygon(
-                [(x + 0.087, 0.55), (x + 0.128, 0.67), (x + 0.087, 0.79)],
+                [
+                    (x + circle_radius_x * 0.80, center_y - circle_radius_y * 0.68),
+                    (x + circle_radius_x * 1.40, center_y),
+                    (x + circle_radius_x * 0.80, center_y + circle_radius_y * 0.68),
+                ],
                 closed=True,
                 facecolor=color,
                 edgecolor=color,
@@ -1069,12 +1081,24 @@ def _page7_severity_matrix_graphic(severity_items, figure_size):
                 zorder=8 + idx,
             )
             ax.add_patch(tri)
-        ax.text(x, 0.67, label, ha="center", va="center", fontsize=8, fontfamily="Calibri", color="#000000", zorder=20)
-        wrapped = textwrap.fill(desc, width=22)
-        ax.text(x - 0.085, 0.37, f"* {wrapped}", ha="left", va="top", fontsize=5.9, fontfamily="Calibri", color="#000000", zorder=20)
+        ax.text(x, center_y, label, ha="center", va="center", fontsize=7.5, fontfamily="Calibri", color="#000000", zorder=20)
+        wrapped = textwrap.fill(desc, width=16)
+        ax.text(
+            x,
+            0.34,
+            f"* {wrapped}",
+            ha="center",
+            va="top",
+            fontsize=5.75,
+            fontfamily="Calibri",
+            color="#000000",
+            linespacing=0.90,
+            multialignment="left",
+            zorder=20,
+        )
 
     path = tempfile.mktemp(suffix=".png")
-    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches="tight", facecolor="white", pad_inches=0.02)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor="white", pad_inches=0)
     plt.close(fig)
     return path
 
@@ -1312,6 +1336,32 @@ def _recommendation_text(row):
         recommendation = recommendation.get('text') or recommendation.get('recommendation')
     return str(recommendation or '').strip()
 
+def _service_pillar_pass_fail_counts(parameter_rows, pillar_services):
+    """Count chart values from the same service/pillar/status fields shown in report tables."""
+    def normalize_pillar(value):
+        text = str(value or '').lower().strip()
+        return PILLAR_MAP.get(text, str(value or '').replace('_', ' ').title())
+
+    def normalize_service(value):
+        service = _service_name_key(value)
+        aliases = {
+            'OneDrive': 'OneDrive for Business',
+            'SharePoint': 'SharePoint Online',
+            'Teams': 'Microsoft Teams',
+            'Purview': 'Microsoft Purview',
+            'Exchange': 'Exchange Online',
+        }
+        return aliases.get(service, service)
+
+    counts = {(pillar, service): {'Pass': 0, 'Fail': 0} for pillar, service in pillar_services}
+    for row in parameter_rows or []:
+        key = (normalize_pillar(row.get('pillar')), normalize_service(row.get('service')))
+        if key not in counts:
+            continue
+        status = _detailed_status_text(row.get('display_status', row.get('status', '')))
+        counts[key][status] += 1
+    return counts
+
 def _page8_exec_summary_chart(parameter_rows):
     """AAA-style stacked pass/fail summary chart for Page 8."""
     pillar_services = [
@@ -1333,31 +1383,7 @@ def _page8_exec_summary_chart(parameter_rows):
         ('Security', 'SharePoint Online'),
     ]
 
-    def normalize_pillar(value):
-        text = str(value or '').lower().strip()
-        return PILLAR_MAP.get(text, str(value or '').replace('_', ' ').title())
-
-    def normalize_service(value):
-        text = str(value or '').strip()
-        lookup = text.lower()
-        if lookup == 'onedrive':
-            return 'OneDrive for Business'
-        if lookup == 'sharepoint':
-            return 'SharePoint Online'
-        return text
-
-    counts = {(pillar, service): {'Pass': 0, 'Fail': 0} for pillar, service in pillar_services}
-    for row in parameter_rows:
-        pillar = normalize_pillar(row.get('pillar'))
-        service = normalize_service(row.get('service'))
-        key = (pillar, service)
-        if key not in counts:
-            continue
-        status = str(row.get('display_status', row.get('status', ''))).lower().strip()
-        if status == 'pass':
-            counts[key]['Pass'] += 1
-        else:
-            counts[key]['Fail'] += 1
+    counts = _service_pillar_pass_fail_counts(parameter_rows, pillar_services)
 
     def chart_service_label(service):
         text = str(service or "")
@@ -1374,27 +1400,53 @@ def _page8_exec_summary_chart(parameter_rows):
     pass_values = [counts[item]['Pass'] for item in pillar_services]
     fail_values = [counts[item]['Fail'] for item in pillar_services]
     x = np.arange(len(labels))
+    totals = [p + f for p, f in zip(pass_values, fail_values)]
+    max_total = max(totals, default=0)
+    y_max = max(2, int(math.ceil((max_total + 1) / 2.0) * 2))
 
     fig, ax = plt.subplots(figsize=(7.25, 3.85), dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('#000000')
-    fig.patch.set_linewidth(1.0)
-    pass_bars = ax.bar(x, pass_values, color='#00B050', label='Pass', width=0.58)
-    fail_bars = ax.bar(x, fail_values, bottom=pass_values, color='#C00000', label='Fail', width=0.58)
-    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=12, fontweight='bold', pad=20)
+    fig.patches.append(
+        mpatches.Rectangle(
+            (0, 0),
+            1,
+            1,
+            transform=fig.transFigure,
+            fill=False,
+            edgecolor='#000000',
+            linewidth=1.0,
+            zorder=1000,
+        )
+    )
+    fail_bars = ax.bar(x, fail_values, color='#C00000', label='Fail', width=0.58)
+    pass_bars = ax.bar(x, pass_values, bottom=fail_values, color='#00B050', label='Pass', width=0.58)
+    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=12, fontweight='normal', pad=44)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=90, fontsize=6.4)
     ax.tick_params(axis='x', pad=2)
     ax.tick_params(axis='y', labelsize=7)
+    ax.set_ylim(0, y_max)
+    ax.set_yticks(np.arange(0, y_max + 1, 2))
     ax.grid(axis='y', color='#D9D9D9', linewidth=0.6)
     ax.set_axisbelow(True)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.08), ncol=2, frameon=False, fontsize=7)
+    ax.legend(
+        [fail_bars, pass_bars],
+        ['Fail', 'Pass'],
+        loc='upper center',
+        bbox_to_anchor=(0.5, 1.30),
+        ncol=2,
+        frameon=False,
+        fontsize=7,
+        handlelength=0.9,
+        handletextpad=0.3,
+        columnspacing=0.8,
+    )
 
-    for bar, value in zip(pass_bars, pass_values):
+    for bar, value, base in zip(fail_bars, fail_values, [0] * len(fail_values)):
         if value > 0:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
-                bar.get_y() + bar.get_height() / 2,
+                base + value / 2,
                 str(value),
                 ha='center',
                 va='center',
@@ -1402,7 +1454,7 @@ def _page8_exec_summary_chart(parameter_rows):
                 color='white',
                 fontweight='bold',
             )
-    for bar, value, base in zip(fail_bars, fail_values, pass_values):
+    for bar, value, base in zip(pass_bars, pass_values, fail_values):
         if value > 0:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
@@ -1418,118 +1470,31 @@ def _page8_exec_summary_chart(parameter_rows):
     group_spans = [(0, 3, 'Best Practice'), (4, 9, 'Governance'), (10, 15, 'Security')]
     for start, end, label in group_spans:
         center = (start + end) / 2
-        ax.text(center, -0.42, label, ha='center', va='top', fontsize=7.2, transform=ax.get_xaxis_transform())
-        ax.axvline(end + 0.5, color='#BFBFBF', linewidth=0.7)
+        ax.text(center, -0.50, label, ha='center', va='top', fontsize=7.2, transform=ax.get_xaxis_transform())
+    for separator in (3.5, 9.5):
+        ax.axvline(separator, color='#BFBFBF', linewidth=0.7)
 
     for spine in ax.spines.values():
         spine.set_color('#BFBFBF')
         spine.set_linewidth(0.8)
 
-    fig.subplots_adjust(bottom=0.39, top=0.80, left=0.07, right=0.985)
+    ax.set_xlim(-0.8, len(labels) - 0.2)
+    fig.subplots_adjust(bottom=0.35, top=0.76, left=0.07, right=0.985)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', edgecolor='#000000', bbox_inches=None)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', bbox_inches=None, pad_inches=0)
     plt.close(fig)
     return path
 
 def _page9_services_pillars_chart(parameter_rows):
     """AAA Page 9 chart 1: grouped stacked columns by M365 service and pillar."""
-    pillar_order = ['Best Practice', 'Governance', 'Security']
-    service_order = [
-        'Entra ID',
-        'Exchange Online',
-        'SharePoint Online',
-        'Microsoft Teams',
-        'Microsoft Purview',
-        'OneDrive for Business',
-    ]
-
-    def normalize_pillar(value):
-        text = str(value or '').lower().strip()
-        return PILLAR_MAP.get(text, str(value or '').replace('_', ' ').title())
-
-    counts = {}
-    for row in parameter_rows:
-        pillar = normalize_pillar(row.get('pillar'))
-        service = _service_name_key(row.get('service'))
-        if pillar not in pillar_order or service not in service_order:
-            continue
-        key = (pillar, service)
-        counts.setdefault(key, {'Fail': 0, 'Pass': 0})
-        status = str(row.get('display_status', row.get('status', ''))).lower().strip()
-        if status == 'pass':
-            counts[key]['Pass'] += 1
-        else:
-            counts[key]['Fail'] += 1
-
-    positions, labels, fail_values, pass_values = [], [], [], []
-    group_centers, group_ends = [], []
-    x = 0
-    for pillar in pillar_order:
-        start = x
-        for service in service_order:
-            key = (pillar, service)
-            if key not in counts:
-                continue
-            positions.append(x)
-            labels.append(service)
-            fail_values.append(counts[key]['Fail'])
-            pass_values.append(counts[key]['Pass'])
-            x += 1
-        if x > start:
-            group_centers.append(((start + x - 1) / 2, pillar))
-            group_ends.append(x - 0.5)
-            x += 0.75
-
-    fig, ax = plt.subplots(figsize=(7.5, 3.9), dpi=REPORT_CHART_DPI)
-    fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('black')
-    fig.patch.set_linewidth(1.0)
-    if positions:
-        bars_fail = ax.bar(positions, fail_values, color='#C00000', label='Fail', width=0.72)
-        bars_pass = ax.bar(positions, pass_values, bottom=fail_values, color='#00B050', label='Pass', width=0.72)
-        for bars, values, bottoms in [(bars_fail, fail_values, [0] * len(fail_values)), (bars_pass, pass_values, fail_values)]:
-            for bar, value, bottom in zip(bars, values, bottoms):
-                if value <= 0:
-                    continue
-                ax.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    bottom + value / 2,
-                    str(value),
-                    ha='center',
-                    va='center',
-                    fontsize=8,
-                    fontweight='bold',
-                    color='white',
-                )
-
-    ax.set_title('Executive Summary - M365 Services and 3 Pillars', fontsize=14, fontweight='bold', pad=18)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.04), ncol=2, frameon=False, fontsize=9)
-    ax.set_xticks(positions)
-    ax.set_xticklabels(labels, rotation=90, fontsize=7.5)
-    ax.tick_params(axis='y', labelsize=8)
-    ax.grid(axis='y', color='#D9D9D9', linewidth=0.6)
-    ax.set_axisbelow(True)
-
-    for end in group_ends[:-1]:
-        ax.axvline(end + 0.375, color='black', linewidth=0.8)
-    for center, label in group_centers:
-        ax.text(center, -0.38, label, ha='center', va='top', fontsize=8.5, transform=ax.get_xaxis_transform())
-
-    for spine in ax.spines.values():
-        spine.set_color('black')
-        spine.set_linewidth(0.8)
-    fig.subplots_adjust(left=0.055, right=0.985, top=0.82, bottom=0.35)
-    path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', bbox_inches='tight', pad_inches=0.06)
-    plt.close(fig)
-    return path
+    return _page8_exec_summary_chart(parameter_rows)
 
 def _page9_severity_pillars_chart(parameter_rows, config=None):
     """AAA Page 9: grouped stacked severity columns by pillar and status."""
     config = config or DEFAULT_REPORT_CONFIG
     pillar_order = ['Best Practice', 'Governance', 'Security']
     status_order = ['Fail', 'Pass']
-    severity_stack = ['Informational', 'Low', 'Medium', 'High', 'Critical']
+    severity_stack = ['Critical', 'High', 'Medium', 'Low', 'Informational']
     severity_definitions = config.get("severity_definitions", DEFAULT_REPORT_CONFIG["severity_definitions"])
     severity_colors = {
         severity: f"#{_hex_text((severity_definitions.get(severity, {}) or {}).get('color'))}"
@@ -1549,34 +1514,50 @@ def _page9_severity_pillars_chart(parameter_rows, config=None):
         pillar = normalize_pillar(row.get('pillar'))
         if pillar not in pillar_order:
             continue
-        status = 'Pass' if str(row.get('display_status', row.get('status', ''))).lower().strip() == 'pass' else 'Fail'
-        severity = SEVERITY_MAP.get(str(row.get('severity', '')).lower().strip(), 'Informational')
+        status = _detailed_status_text(row.get('display_status', row.get('status', '')))
+        severity_raw = str(
+            row.get('display_severity')
+            or row.get('registry_severity')
+            or row.get('severity')
+            or 'informational'
+        ).lower().strip()
+        severity = SEVERITY_MAP.get(severity_raw, 'Informational')
         if severity not in severity_stack:
             severity = 'Informational'
         counts[(pillar, status)][severity] += 1
 
     positions, labels, keys = [], [], []
-    group_centers, group_ends = [], []
-    x = 0
+    group_centers, group_bounds = [], []
+    x = 0.0
     for pillar in pillar_order:
         start = x
         for status in status_order:
             positions.append(x)
             labels.append(status)
             keys.append((pillar, status))
-            x += 1
+            x += 1.0
         group_centers.append(((start + x - 1) / 2, pillar))
-        group_ends.append(x - 0.5)
-        x += 0.5
+        group_bounds.append((start - 0.5, x - 0.5))
+        x += 0.95
 
-    fig, ax = plt.subplots(figsize=(8.05, 3.85), dpi=REPORT_CHART_DPI)
+    fig, ax = plt.subplots(figsize=(6.6, 3.95), dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('black')
-    fig.patch.set_linewidth(0.5)
+    fig.patches.append(
+        mpatches.Rectangle(
+            (0, 0),
+            1,
+            1,
+            transform=fig.transFigure,
+            fill=False,
+            edgecolor='#000000',
+            linewidth=1.0,
+            zorder=1000,
+        )
+    )
     bottoms = np.zeros(len(positions))
     for severity in severity_stack:
         values = [counts[key][severity] for key in keys]
-        bars = ax.bar(positions, values, bottom=bottoms, color=severity_colors[severity], label=severity, width=0.62, edgecolor='none')
+        bars = ax.bar(positions, values, bottom=bottoms, color=severity_colors[severity], label=severity, width=0.42, edgecolor='none')
         for bar, value, bottom in zip(bars, values, bottoms):
             if value <= 0:
                 continue
@@ -1586,46 +1567,56 @@ def _page9_severity_pillars_chart(parameter_rows, config=None):
                 str(value),
                     ha='center',
                     va='center',
-                    fontsize=8.5,
+                    fontsize=7.6,
                     fontweight='bold',
                     color='white',
                 )
         bottoms += np.array(values)
 
     max_stack = max(bottoms) if len(bottoms) else 0
-    y_max = max(6, int(np.ceil(max_stack * 1.2)))
-    ax.set_title('Executive Summary - Severity and 3 Pillars', fontsize=15, fontweight='bold', pad=12, fontfamily='Calibri')
+    y_max = max(20, int(np.ceil(max_stack / 2.0) * 2))
+    ax.set_title('Executive Summary - Severity and 3 Pillars', fontsize=13, fontweight='bold', pad=10, fontfamily='Calibri')
     ax.set_xticks(positions)
-    ax.set_xticklabels(labels, fontsize=10.5)
+    ax.set_xticklabels(labels, fontsize=7.5)
     ax.set_ylim(0, y_max)
-    ax.set_yticks(np.linspace(0, y_max, min(y_max, 10) + 1, dtype=int))
-    ax.tick_params(axis='y', labelsize=9.5)
-    ax.grid(axis='y', color='#E0E0E0', linewidth=0.8)
-    ax.set_axisbelow(True)
+    ax.set_yticks(np.arange(0, y_max + 1, 2))
+    ax.tick_params(axis='y', labelsize=7.5, length=0)
+    ax.tick_params(axis='x', length=0, pad=0)
+    ax.grid(False)
 
-    for end in group_ends[:-1]:
-        ax.axvline(end + 0.25, color='black', linewidth=0.5)
+    bracket_top = -0.055
+    bracket_bottom = -0.18
+    for start, end in group_bounds:
+        ax.plot([start, end], [bracket_top, bracket_top], color='black', linewidth=0.6, transform=ax.get_xaxis_transform(), clip_on=False)
+        ax.plot([start, start], [bracket_top, bracket_bottom], color='black', linewidth=0.6, transform=ax.get_xaxis_transform(), clip_on=False)
+        ax.plot([end, end], [bracket_top, bracket_bottom], color='black', linewidth=0.6, transform=ax.get_xaxis_transform(), clip_on=False)
     for center, label in group_centers:
-        ax.text(center, -0.17, label, ha='center', va='top', fontsize=10.5, transform=ax.get_xaxis_transform())
+        ax.text(center, -0.14, label, ha='center', va='top', fontsize=7.0, transform=ax.get_xaxis_transform())
 
-    handles, labels_ = ax.get_legend_handles_labels()
-    legend_order = ['Critical', 'High', 'Medium', 'Low', 'Informational']
-    handle_map = dict(zip(labels_, handles))
     ax.legend(
-        [handle_map[label] for label in legend_order],
-        legend_order,
+        [ax.containers[severity_stack.index(label)] for label in severity_stack],
+        severity_stack,
         loc='center left',
-        bbox_to_anchor=(1.01, 0.55),
+        bbox_to_anchor=(1.02, 0.54),
         frameon=False,
-        fontsize=9.5,
+        fontsize=7.0,
+        handlelength=0.8,
+        handletextpad=0.35,
+        borderaxespad=0,
     )
 
     for spine in ax.spines.values():
-        spine.set_color('black')
-        spine.set_linewidth(0.5)
-    fig.subplots_adjust(left=0.065, right=0.79, top=0.88, bottom=0.18)
+        spine.set_visible(False)
+    ax.spines['left'].set_visible(True)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_color('black')
+    ax.spines['bottom'].set_color('black')
+    ax.spines['left'].set_linewidth(0.6)
+    ax.spines['bottom'].set_linewidth(0.6)
+    ax.set_xlim(group_bounds[0][0], group_bounds[-1][1])
+    fig.subplots_adjust(left=0.05, right=0.825, top=0.84, bottom=0.19)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', bbox_inches='tight', pad_inches=0.06)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor='white', bbox_inches=None, pad_inches=0)
     plt.close(fig)
     return path
 
@@ -2560,7 +2551,7 @@ def _apply_body_font_defaults(doc, config=None):
         r_fonts.set(qn("w:cs"), body_font)
 
 def _add_header_logo(doc, logo_path=None, display_name=None):
-    """Apply the TPT logo to the top-left header on every page section."""
+    """Apply the TPT logo to the top-left header after the cover page."""
     blueprint = _load_aaa_report_blueprint()
     header_config = blueprint.get("header", {}) if isinstance(blueprint, dict) else {}
     spacing_after = _twips_value(header_config.get("spacing_after_twips"), 0)
@@ -2597,7 +2588,11 @@ def _add_header_logo(doc, logo_path=None, display_name=None):
         apply_to_header(section.header)
         if section.different_first_page_header_footer:
             section.first_page_header.is_linked_to_previous = False
-            apply_to_header(section.first_page_header)
+            for para in list(section.first_page_header.paragraphs):
+                try:
+                    para._element.getparent().remove(para._element)
+                except Exception:
+                    pass
 
 def _add_page_number_field(paragraph):
     run = paragraph.add_run()
@@ -2630,6 +2625,7 @@ def _remove_page_number_restarts(doc):
 
 def _apply_footer(section, blueprint=None):
     blueprint = blueprint or _load_aaa_report_blueprint()
+    section.footer_distance = Inches(0.45)
     footer_config = blueprint.get("footer", {}) if isinstance(blueprint, dict) else {}
     fonts = blueprint.get("fonts", {}) if isinstance(blueprint, dict) else {}
     footer_font = fonts.get("footer", {}) if isinstance(fonts.get("footer"), dict) else {}
@@ -2639,6 +2635,51 @@ def _apply_footer(section, blueprint=None):
     spacing_after = _twips_value(footer_font.get("spacing_after_twips"), 0)
     line_twips = footer_font.get("line_twips")
     line_rule = footer_font.get("line_rule")
+    footer_text_color = "666666"
+
+    def apply_footer_run_style(run):
+        _set_run_font_from_blueprint(run, inherited_font)
+        run.font.name = "Calibri"
+        run.font.size = Pt(10)
+        run.font.color.rgb = _hex_color(footer_text_color)
+
+    def apply_exact_footer_paragraph_format(paragraph):
+        content_width = section.page_width - section.left_margin - section.right_margin
+        content_twips = int(content_width / 635)
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        paragraph.paragraph_format.left_indent = Pt(0)
+        paragraph.paragraph_format.right_indent = Pt(0)
+        paragraph.paragraph_format.first_line_indent = Pt(0)
+        _set_paragraph_spacing_twips(
+            paragraph,
+            before_twips=0,
+            after_twips=0,
+            line_twips=line_twips,
+            line_rule=line_rule,
+        )
+
+        p_pr = paragraph._p.get_or_add_pPr()
+        tabs = p_pr.find(qn("w:tabs"))
+        if tabs is not None:
+            p_pr.remove(tabs)
+        tabs = OxmlElement("w:tabs")
+        tab = OxmlElement("w:tab")
+        tab.set(qn("w:val"), "right")
+        tab.set(qn("w:pos"), str(content_twips))
+        tabs.append(tab)
+        p_pr.append(tabs)
+
+        p_bdr = p_pr.find(qn("w:pBdr"))
+        if p_bdr is not None:
+            p_pr.remove(p_bdr)
+        p_bdr = OxmlElement("w:pBdr")
+        top = OxmlElement("w:top")
+        top.set(qn("w:val"), "single")
+        top.set(qn("w:sz"), "4")
+        top.set(qn("w:space"), "4")
+        top.set(qn("w:color"), "D9D9D9")
+        p_bdr.append(top)
+        p_pr.append(p_bdr)
 
     def clear_footer(footer):
         for paragraph in list(footer.paragraphs):
@@ -2655,17 +2696,18 @@ def _apply_footer(section, blueprint=None):
     def render_footer(footer):
         clear_footer(footer)
         paragraph = footer.add_paragraph()
-        _set_paragraph_spacing_twips(paragraph, before_twips=0, after_twips=spacing_after, line_twips=line_twips, line_rule=line_rule)
-        _apply_blueprint_paragraph_tabs(paragraph, footer_config.get("tabs"))
-        _set_run_font_from_blueprint(paragraph.add_run(str(left_text)), inherited_font)
-        paragraph.add_run("\t\t")
+        apply_exact_footer_paragraph_format(paragraph)
+        apply_footer_run_style(paragraph.add_run(str(left_text)))
+        paragraph.add_run("\t")
         before, after = str(right_format).split("{page}", 1) if "{page}" in str(right_format) else ("", str(right_format))
+        if after == " | Page":
+            after = " | P a g e"
         if before:
-            _set_run_font_from_blueprint(paragraph.add_run(before), inherited_font)
+            apply_footer_run_style(paragraph.add_run(before))
         page_run = _add_page_number_field(paragraph)
-        _set_run_font_from_blueprint(page_run, inherited_font)
+        apply_footer_run_style(page_run)
         if after:
-            _set_run_font_from_blueprint(paragraph.add_run(after), inherited_font)
+            apply_footer_run_style(paragraph.add_run(after))
 
     section.footer.is_linked_to_previous = False
     render_footer(section.footer)
@@ -3981,7 +4023,7 @@ def _add_page9_executive_charts(doc, assessment_data):
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(8)
-        p.add_run().add_picture(chart, width=Inches(6.2), height=Inches(2.45))
+        p.add_run().add_picture(chart, width=Inches(6.2), height=Inches(3.70))
         try:
             os.remove(chart)
         except:
@@ -4946,16 +4988,12 @@ def _add_toc_page(doc, config=None):
         run.font.name = "Calibri"
         run.font.size = Pt(11)
         run.font.bold = True
-        if level <= 2:
-            run.font.underline = True
         page = page_lookup.get(_toc_key(text), "")
         if page:
             page_run = p.add_run(f"\t{page}")
             page_run.font.name = "Calibri"
             page_run.font.size = Pt(11)
             page_run.font.bold = True
-            if level <= 2:
-                page_run.font.underline = True
         return p
 
     def insert_manual_page_break():
@@ -5343,7 +5381,7 @@ def _add_page9_executive_dashboard(doc, assessment_data):
     metrics = _page9_observation_metrics(assessment_data)
 
     chart = _page9_severity_pillars_chart(rows, config)
-    _chart_or_data_not_available(doc, chart, width=Inches(6.20), height=Inches(2.45), config=config)
+    _chart_or_data_not_available(doc, chart, width=Inches(6.20), height=Inches(3.70), config=config)
 
     spacer = doc.add_paragraph()
     spacer.paragraph_format.space_before = Pt(0)

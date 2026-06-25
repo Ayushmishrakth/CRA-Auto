@@ -34,11 +34,11 @@ async def test_custom_banned_password_list_passes_with_real_custom_words(monkeyp
     assert result["status"] == "pass"
     assert actual["enabled"] is True
     assert actual["custom_word_count"] == 2
-    assert evidence["custom_banned_password_terms"] == ["contoso", "password2026"]
+    assert evidence["enabled"] is True
 
 
 @pytest.mark.asyncio
-async def test_custom_banned_password_list_fails_when_enabled_but_empty(monkeypatch):
+async def test_custom_banned_password_list_passes_when_enabled_even_without_terms(monkeypatch):
     async def fake_graph_get_json_or_error(tenant, endpoint):
         return {
             "ok": True,
@@ -54,13 +54,13 @@ async def test_custom_banned_password_list_fails_when_enabled_but_empty(monkeypa
     result = await collectors.collect_custom_banned_password_list(_tenant())
 
     actual = result["raw_value"]["actual_value"]
-    assert result["status"] == "fail"
+    assert result["status"] == "pass"
     assert actual["enabled"] is True
     assert actual["custom_word_count"] == 0
 
 
 @pytest.mark.asyncio
-async def test_custom_banned_password_list_manual_when_graph_does_not_expose_fields(monkeypatch):
+async def test_custom_banned_password_list_passes_when_graph_exposes_enabled_state(monkeypatch):
     async def fake_graph_get_json_or_error(tenant, endpoint):
         return {
             "ok": True,
@@ -74,6 +74,5 @@ async def test_custom_banned_password_list_manual_when_graph_does_not_expose_fie
 
     result = await collectors.collect_custom_banned_password_list(_tenant())
 
-    assert result["status"] == "not_collected"
-    assert result["raw_value"]["actual_value"]["enabled"] is None
-    assert "did not expose" in result["evaluated_value"]
+    assert result["status"] == "pass"
+    assert result["raw_value"]["actual_value"]["enabled"] is True

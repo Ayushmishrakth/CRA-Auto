@@ -1384,6 +1384,18 @@ async def collect_number_of_emails_sent(tenant: ConnectedTenant) -> dict[str, An
 async def collect_active_inactive_teams(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "active_inactive_teams"
     endpoint = "/reports/getTeamsTeamActivityDetail(period='D30')"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint=endpoint,
+            expected_value="No inactive teams",
+            pass_criteria="When a tenant does not have inactive teams",
+            fail_criteria="When a tenant has inactive teams or Microsoft Teams is unavailable",
+            severity="high",
+            scoring_weight=4.0,
+        )
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(
@@ -1426,6 +1438,18 @@ async def collect_active_inactive_teams(tenant: ConnectedTenant) -> dict[str, An
 async def collect_activer_inactive_teams_users(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "activer_inactive_teams_users"
     endpoint = "/reports/getTeamsUserActivityUserDetail(period='D30')"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint=endpoint,
+            expected_value="<15% inactive Teams users",
+            pass_criteria="When the number of inactive Teams users are less than 15% for the tenant",
+            fail_criteria="When the number of inactive Teams users are 15% or more, or Microsoft Teams is unavailable",
+            severity="medium",
+            scoring_weight=3.0,
+        )
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(
@@ -1561,6 +1585,18 @@ async def _teams_with_owners_and_members(tenant: ConnectedTenant) -> dict[str, A
 
 async def collect_minimum_number_of_owners(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "minimum_number_of_owners"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/owners",
+            expected_value="All teams have at least 2 owners",
+            pass_criteria="When all teams have more than 1 Owner",
+            fail_criteria="When teams have less than 2 Owner or Microsoft Teams is unavailable",
+            severity="high",
+            scoring_weight=4.0,
+        )
     data = await _teams_with_owners_and_members(tenant)
     teams = data["teams"]
     under_owned = [team for team in teams if team["owner_count"] < 2]
@@ -1572,6 +1608,18 @@ async def collect_minimum_number_of_owners(tenant: ConnectedTenant) -> dict[str,
 
 async def collect_orphan_teams(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "orphan_teams"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/owners",
+            expected_value="No orphan teams",
+            pass_criteria="When there are no orphan teams",
+            fail_criteria="When orphan teams are present or Microsoft Teams is unavailable",
+            severity="high",
+            scoring_weight=4.0,
+        )
     data = await _teams_with_owners_and_members(tenant)
     teams = data["teams"]
     orphaned = [team for team in teams if team["owner_count"] == 0]
@@ -1583,6 +1631,18 @@ async def collect_orphan_teams(tenant: ConnectedTenant) -> dict[str, Any]:
 
 async def collect_teams_with_external_users(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "teams_with_external_users"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/members",
+            expected_value="<20% Teams with external users",
+            pass_criteria="When it is less than 20%",
+            fail_criteria="When it is more than to 20% or Microsoft Teams is unavailable",
+            severity="high",
+            scoring_weight=4.0,
+        )
     data = await _teams_with_owners_and_members(tenant)
     teams = data["teams"]
     external = [team for team in teams if team["guest_count"] > 0]
@@ -1595,6 +1655,18 @@ async def collect_teams_with_external_users(tenant: ConnectedTenant) -> dict[str
 
 async def collect_teams_with_external_guest_as_owner(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "teams_with_external_guest_as_owner"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/owners",
+            expected_value="No Teams have external guests as owners",
+            pass_criteria="No Teams have external guests as owners",
+            fail_criteria="One or more Teams have external guests as owners, or Microsoft Teams is unavailable",
+            severity="high",
+            scoring_weight=4.0,
+        )
     try:
         data = await _teams_with_owners_and_members(tenant)
     except httpx.HTTPStatusError as exc:
@@ -2371,11 +2443,11 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
     The correct Microsoft Graph endpoint is GET /v1.0/settings (or /beta/settings).
     Look for the 'Password Rule Settings' entry (templateId 5cf42378-d67d-4f36-ba46-e8b86229381d).
     If no such setting exists the feature has never been configured → fail.
-    If the setting exists, inspect EnableBannedPasswordCheck and CustomBannedPasswords values.
+    If the setting exists, inspect whether EnableBannedPasswordCheck is enabled.
     """
     parameter_key = "custom_banned_password_list"
-    _PASS_CRITERIA = "Custom banned password list is configured with at least one custom term and enforcement is enabled."
-    _FAIL_CRITERIA = "Custom banned password list is not configured or contains no custom banned terms."
+    _PASS_CRITERIA = "Custom banned password list is enabled."
+    _FAIL_CRITERIA = "Custom banned password list is not enabled."
     _PASSWORD_RULE_TEMPLATE_ID = "5cf42378-d67d-4f36-ba46-e8b86229381d"
 
     # Primary: directory settings (v1.0 then beta)
@@ -2392,6 +2464,46 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             continue
 
         body = resp.get("response") or {}
+        parsed_direct = _parse_custom_banned_password_policy(body) if isinstance(body, dict) else {}
+        if parsed_direct.get("configuration_exposed"):
+            enabled = parsed_direct["password_protection_enabled"]
+            custom_word_count = parsed_direct["custom_word_count"]
+            reasoning = (
+                f"Custom banned password list enabled: {enabled}; "
+                f"custom banned terms reported by Graph: {custom_word_count}."
+            )
+            actual_value = {
+                "enabled": enabled,
+                "password_protection_enabled": enabled,
+                "enforcement_mode": parsed_direct["enforcement_mode"],
+                "custom_word_count": custom_word_count,
+                "custom_banned_password_count": custom_word_count,
+                "custom_words_present": custom_word_count > 0,
+            }
+            evidence = _evaluation_evidence(
+                pass_criteria=_PASS_CRITERIA,
+                fail_criteria=_FAIL_CRITERIA,
+                reasoning=reasoning,
+                extra={"tenant_id": tenant.tenant_id, "graph_endpoint": endpoint, **actual_value},
+            )
+            evidence["remediation"] = (
+                "Enable the Microsoft Entra custom banned password list in Entra admin center "
+                "> Protection > Authentication methods > Password protection."
+            )
+            return _collector_result(
+                parameter_key=parameter_key,
+                status="pass" if enabled else "fail",
+                severity="critical",
+                actual_value=actual_value,
+                expected_value="Custom banned password list enabled",
+                finding=reasoning,
+                graph_endpoint=endpoint,
+                evidence=evidence,
+                raw_response={"password_policy": body, "endpoint_used": endpoint},
+                graph_calls=len(all_responses),
+                scoring_weight=5.0,
+            )
+
         settings_list: list[dict[str, Any]] = body.get("value") or []
 
         # Find the Password Rule Settings entry
@@ -2416,7 +2528,6 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
                     "tenant_id": tenant.tenant_id,
                     "graph_endpoint": endpoint,
                     "enabled": False,
-                    "custom_word_count": 0,
                     "directory_settings_found": len(settings_list),
                     "password_rule_template_id": _PASSWORD_RULE_TEMPLATE_ID,
                 },
@@ -2430,7 +2541,7 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
                 status="fail",
                 severity="critical",
                 actual_value={"enabled": False, "custom_word_count": 0, "configured": False},
-                expected_value="Custom banned password list configured with terms",
+                expected_value="Custom banned password list enabled",
                 finding=reasoning,
                 graph_endpoint=endpoint,
                 evidence=evidence,
@@ -2455,11 +2566,11 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
         custom_words = [w.strip() for w in custom_passwords_raw.replace("\n", ",").split(",") if w.strip()] if custom_passwords_raw else []
         custom_word_count = len(custom_words)
 
-        status = "pass" if enabled and custom_word_count > 0 else "fail"
+        status = "pass" if enabled else "fail"
         reasoning = (
             f"Custom banned password list enabled: {enabled}; "
             f"on-premises enforcement: {onprem_enabled} (mode: {enforcement_mode}); "
-            f"custom banned terms configured: {custom_word_count}."
+            f"custom banned terms reported by Graph: {custom_word_count}."
         )
         actual_value = {
             "enabled": enabled,
@@ -2482,15 +2593,15 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             },
         )
         evidence["remediation"] = (
-            "Configure Microsoft Entra Password Protection: enable the custom banned password list "
-            "and add organization-specific terms in Entra admin center > Protection > Authentication methods > Password protection."
+            "Enable the Microsoft Entra custom banned password list in Entra admin center "
+            "> Protection > Authentication methods > Password protection."
         )
         return _collector_result(
             parameter_key=parameter_key,
             status=status,
             severity="critical",
             actual_value=actual_value,
-            expected_value="Custom banned password list configured with at least one term",
+            expected_value="Custom banned password list enabled",
             finding=reasoning,
             graph_endpoint=endpoint,
             evidence=evidence,
@@ -2516,10 +2627,10 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
         enabled = parsed["password_protection_enabled"]
         custom_word_count = parsed["custom_word_count"]
         custom_words = parsed["custom_words"]
-        status = "pass" if enabled and custom_word_count > 0 else "fail"
+        status = "pass" if enabled else "fail"
         reasoning = (
             f"Password protection enabled: {enabled}; enforcement mode: {parsed['enforcement_mode']}; "
-            f"custom banned password terms: {custom_word_count}."
+            f"custom banned password terms reported by Graph: {custom_word_count}."
         )
         actual_value = {
             "enabled": enabled,
@@ -2536,14 +2647,14 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             extra={"tenant_id": tenant.tenant_id, "graph_endpoint": endpoint, **actual_value},
         )
         evidence["remediation"] = (
-            "Configure Microsoft Entra Password Protection custom banned password list and enforce password validation across all users."
+            "Enable the Microsoft Entra custom banned password list and enforce password validation across all users."
         )
         return _collector_result(
             parameter_key=parameter_key,
             status=status,
             severity="critical",
             actual_value=actual_value,
-            expected_value="Custom banned password list configured",
+            expected_value="Custom banned password list enabled",
             finding=reasoning,
             graph_endpoint=endpoint,
             evidence=evidence,
@@ -2568,7 +2679,6 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             extra={
                 "tenant_id": tenant.tenant_id,
                 "enabled": False,
-                "custom_word_count": 0,
                 "portal_location": "Entra admin center > Protection > Authentication methods > Password protection",
             },
         )
@@ -2581,7 +2691,7 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             status="fail",
             severity="critical",
             actual_value={"enabled": False, "custom_word_count": 0, "configured": False},
-            expected_value="Custom banned password list configured with at least one term",
+            expected_value="Custom banned password list enabled",
             finding=reasoning,
             graph_endpoint=", ".join(settings_endpoints + legacy_endpoints),
             evidence=evidence,
@@ -2596,7 +2706,7 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
         endpoint=settings_endpoints[0],
         required_api="Microsoft Graph Directory Settings (/v1.0/settings)",
         required_permissions=["Policy.Read.All", "Directory.Read.All"],
-        expected_value="Custom banned password list configured",
+        expected_value="Custom banned password list enabled",
         pass_criteria=_PASS_CRITERIA,
         fail_criteria=_FAIL_CRITERIA,
         severity="critical",
@@ -2647,6 +2757,7 @@ def _parse_custom_banned_password_policy(policy: dict[str, Any]) -> dict[str, An
             "enforcementMode",
             "passwordProtectionEnabled",
             "isPasswordProtectionEnabled",
+            "state",
         ]
     )
     return {
@@ -2727,6 +2838,18 @@ def _classify_custom_banned_password_failure(responses: list[dict[str, Any]]) ->
 
 async def collect_sensitivity_labels_applied_to_teams(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "sensitivity_labels_applied_to_teams"
+    if not await _teams_service_available(tenant):
+        return _service_unavailable_fail(
+            tenant,
+            parameter_key=parameter_key,
+            service_name="Microsoft Teams",
+            graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,assignedLabels,resourceProvisioningOptions",
+            expected_value="Sensitivity labels applied to Teams",
+            pass_criteria="If labels is configured and applied",
+            fail_criteria="If labels is not configured and applied, or Microsoft Teams is unavailable",
+            severity="critical",
+            scoring_weight=5.0,
+        )
     client = await _graph_client(tenant)
     endpoint = "/groups"
     params = {"$filter": "resourceProvisioningOptions/Any(x:x eq 'Team')", "$select": "id,displayName,assignedLabels,resourceProvisioningOptions"}

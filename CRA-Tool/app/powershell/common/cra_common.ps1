@@ -176,15 +176,32 @@ function Connect-CraTeams {
   )
   Assert-CraModule "MicrosoftTeams"
   $mode = (Get-CraAuthMode -SpecificEnvName "CRA_TEAMS_AUTH_MODE" -Collector $Collector).ToLowerInvariant()
-  if ($mode -in @("app", "application", "client_credentials")) {
-    # App-only auth: requires application_access permission granted via admin consent
-    $clientId     = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_ID")
-    $clientSecret = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_SECRET")
-    if (-not $clientId -or -not $clientSecret) {
-      throw "[CRA_TEAMS_SKIP] Teams app auth requires CRA_GRAPH_CLIENT_ID and CRA_GRAPH_CLIENT_SECRET env vars."
+  if ($mode -in @("app", "application", "client_credentials", "certificate", "cert")) {
+    # App-only auth for Microsoft Teams REQUIRES a certificate. The MicrosoftTeams
+    # module (v3+) has NO -ClientSecret parameter — only the ServicePrincipalCertificate
+    # parameter set: -Certificate <X509Certificate2> -ApplicationId -TenantId.
+    # (There is also no -CertificateThumbprint in v7.x.) Load the per-tenant cert
+    # from the PFX (preferred) or the local certificate store by thumbprint.
+    $clientId   = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_ID")
+    $pfxPath    = [Environment]::GetEnvironmentVariable("CRA_CERT_PFX_PATH")
+    $pfxPwd     = [Environment]::GetEnvironmentVariable("CRA_CERT_PFX_PASSWORD")
+    $thumbprint = [Environment]::GetEnvironmentVariable("CRA_CERT_THUMBPRINT")
+    if (-not $clientId) { throw "[CRA_TEAMS_SKIP] Teams certificate auth requires CRA_GRAPH_CLIENT_ID." }
+    $cert = $null
+    if ($pfxPath) {
+      if (-not (Test-Path $pfxPath)) { throw "[CRA_TEAMS_SKIP] Teams certificate PFX not found at $pfxPath." }
+      $cert = if ($pfxPwd) {
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxPath, $pfxPwd)
+      } else {
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxPath)
+      }
+    } elseif ($thumbprint) {
+      $cert = Get-ChildItem -Path "Cert:\CurrentUser\My\$thumbprint", "Cert:\LocalMachine\My\$thumbprint" -ErrorAction SilentlyContinue | Select-Object -First 1
+      if (-not $cert) { throw "[CRA_TEAMS_SKIP] Teams certificate with thumbprint $thumbprint not found in CurrentUser/LocalMachine store." }
+    } else {
+      throw "[CRA_TEAMS_SKIP] Teams certificate auth requires CRA_CERT_PFX_PATH or CRA_CERT_THUMBPRINT."
     }
-    $secureSecret = ConvertTo-SecureString $clientSecret -AsPlainText -Force
-    Connect-MicrosoftTeams -ApplicationId $clientId -ClientSecret $secureSecret -TenantId $TenantId -ErrorAction Stop | Out-Null
+    Connect-MicrosoftTeams -Certificate $cert -ApplicationId $clientId -TenantId $TenantId -ErrorAction Stop | Out-Null
   } elseif ($mode -eq "device") {
     Connect-MicrosoftTeams -TenantId $TenantId -UseDeviceAuthentication -ErrorAction Stop | Out-Null
   } elseif ($mode -in @("browser", "interactive", "delegated")) {
@@ -262,7 +279,34 @@ function Connect-CraPnP {
   )
   Assert-CraModule "PnP.PowerShell"
   $mode = (Get-CraAuthMode -SpecificEnvName "CRA_PNP_AUTH_MODE" -Collector $Collector).ToLowerInvariant()
-  if ($mode -eq "device") {
+  if ($mode -in @("certificate", "cert", "app", "application", "client_credentials")) {
+    # App-only certificate auth: requires the Azure AD app to have the SharePoint
+    # Online API application permission (Sites.FullControl.All on resource
+    # 00000003-0000-0ff1-ce00-000000000000) with admin consent, and the matching
+    # certificate uploaded to the app registration. ACS client-secret auth is
+    # deprecated/disabled in modern tenants, so a certificate is mandatory here.
+    $clientId   = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_ID")
+    $tenantId   = [Environment]::GetEnvironmentVariable("CRA_PNP_TENANT")
+    if (-not $tenantId) { $tenantId = [Environment]::GetEnvironmentVariable("CRA_TENANT_ID") }
+    $pfxPath    = [Environment]::GetEnvironmentVariable("CRA_CERT_PFX_PATH")
+    $pfxPwd     = [Environment]::GetEnvironmentVariable("CRA_CERT_PFX_PASSWORD")
+    $thumbprint = [Environment]::GetEnvironmentVariable("CRA_CERT_THUMBPRINT")
+    if (-not $clientId) { throw "[CRA_PNP_SKIP] PnP certificate auth requires CRA_GRAPH_CLIENT_ID." }
+    if (-not $tenantId) { throw "[CRA_PNP_SKIP] PnP certificate auth requires CRA_PNP_TENANT or CRA_TENANT_ID." }
+    if ($pfxPath) {
+      if (-not (Test-Path $pfxPath)) { throw "[CRA_PNP_SKIP] Certificate PFX not found at $pfxPath." }
+      $securePwd = if ($pfxPwd) { ConvertTo-SecureString $pfxPwd -AsPlainText -Force } else { $null }
+      if ($securePwd) {
+        Connect-PnPOnline -Url $Url -ClientId $clientId -Tenant $tenantId -CertificatePath $pfxPath -CertificatePassword $securePwd -ErrorAction Stop
+      } else {
+        Connect-PnPOnline -Url $Url -ClientId $clientId -Tenant $tenantId -CertificatePath $pfxPath -ErrorAction Stop
+      }
+    } elseif ($thumbprint) {
+      Connect-PnPOnline -Url $Url -ClientId $clientId -Tenant $tenantId -Thumbprint $thumbprint -ErrorAction Stop
+    } else {
+      throw "[CRA_PNP_SKIP] PnP certificate auth requires CRA_CERT_PFX_PATH or CRA_CERT_THUMBPRINT."
+    }
+  } elseif ($mode -eq "device") {
     Connect-PnPOnline -Url $Url -DeviceLogin -PersistLogin -ErrorAction Stop
   } elseif ($mode -in @("browser", "interactive", "delegated")) {
     Connect-PnPOnline -Url $Url -Interactive -PersistLogin -ErrorAction Stop

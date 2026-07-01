@@ -48,8 +48,8 @@ $mfa = Get-MgReportAuthenticationMethodUserRegistrationDetail -All |
   Select-Object Id,UserPrincipalName,UserDisplayName,IsMfaRegistered,IsMfaCapable,IsPasswordlessCapable,MethodsRegistered
 $path = Join-Path $out "mfa_status.csv"; Export-CraCsv $mfa $path; $files.Add($path)
 
-$ca = Get-MgIdentityConditionalAccessPolicy -All |
-  Select-Object Id,DisplayName,State,CreatedDateTime,ModifiedDateTime
+$caPolicies = Get-MgIdentityConditionalAccessPolicy -All
+$ca = $caPolicies | Select-Object Id,DisplayName,State,CreatedDateTime,ModifiedDateTime
 $path = Join-Path $out "conditional_access.csv"; Export-CraCsv $ca $path; $files.Add($path)
 
 $apps = Get-MgApplication -All |
@@ -113,21 +113,72 @@ Export-CraExpectedCsv $guestEvidence $out "guest_users_count.csv" $files "Get-Mg
 $globalAdminEvidence = $globalAdmins | Select-Object Id,AdditionalProperties,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "GlobalAdminMember=$($_.Id)" }},@{Name="evidence_source";Expression={ "Get-MgDirectoryRoleMember" }}
 Export-CraExpectedCsv $globalAdminEvidence $out "global_administrator_accounts.csv" $files "Get-MgDirectoryRoleMember"
 
-$mfaEvidence = $mfa | Select-Object Id,UserPrincipalName,UserDisplayName,IsMfaRegistered,IsMfaCapable,MethodsRegistered,@{Name="status";Expression={ if ($_.IsMfaRegistered -eq $true -or $_.IsMfaCapable -eq $true) { "pass" } else { "fail" } }},@{Name="value";Expression={ "IsMfaRegistered=$($_.IsMfaRegistered);Methods=$($_.MethodsRegistered -join ';')" }},@{Name="evidence_source";Expression={ "Get-MgReportAuthenticationMethodUserRegistrationDetail" }}
+$mfaEvidence = $mfa | Select-Object Id,UserPrincipalName,UserDisplayName,IsMfaRegistered,IsMfaCapable,MethodsRegistered,@{Name="status";Expression={ if ($_.IsMfaRegistered -eq $true) { "pass" } else { "fail" } }},@{Name="value";Expression={ "IsMfaRegistered=$($_.IsMfaRegistered);Methods=$($_.MethodsRegistered -join ';')" }},@{Name="evidence_source";Expression={ "Get-MgReportAuthenticationMethodUserRegistrationDetail" }}
 Export-CraExpectedCsv $mfaEvidence $out "users_without_mfa.csv" $files "Get-MgReportAuthenticationMethodUserRegistrationDetail"
 
-$caEvidence = $ca | Select-Object Id,DisplayName,State,@{Name="status";Expression={ if ($_.State -eq "enabled") { "pass" } else { "fail" } }},@{Name="value";Expression={ "State=$($_.State)" }},@{Name="evidence_source";Expression={ "Get-MgIdentityConditionalAccessPolicy" }}
-Export-CraExpectedCsv $caEvidence $out "cap_policies_for_risky_sign_ins.csv" $files "Get-MgIdentityConditionalAccessPolicy"
-Export-CraExpectedCsv $caEvidence $out "conditional_access_policies_exclusion.csv" $files "Get-MgIdentityConditionalAccessPolicy"
+# Conditional Access exclusions (F4): a policy is a finding when it excludes users or groups.
+$caExclusionEvidence = $caPolicies | ForEach-Object {
+  $excludedUsers = @($_.Conditions.Users.ExcludeUsers).Count
+  $excludedGroups = @($_.Conditions.Users.ExcludeGroups).Count
+  [pscustomobject]@{
+    PolicyName = $_.DisplayName
+    State = $_.State
+    ExcludedUsersCount = $excludedUsers
+    ExcludedGroupsCount = $excludedGroups
+    status = if ($excludedUsers -eq 0 -and $excludedGroups -eq 0) { "pass" } else { "fail" }
+    value = "ExcludedUsers=$excludedUsers;ExcludedGroups=$excludedGroups"
+    evidence_source = "Get-MgIdentityConditionalAccessPolicy"
+  }
+}
+Export-CraExpectedCsv $caExclusionEvidence $out "conditional_access_policies_exclusion.csv" $files "Get-MgIdentityConditionalAccessPolicy"
+
+# CAP policies for risky sign-ins (F5): pass when at least one enabled policy targets sign-in or user risk.
+$riskyPolicies = $caPolicies | Where-Object {
+  (@($_.Conditions.SignInRiskLevels).Count -gt 0 -or @($_.Conditions.UserRiskLevels).Count -gt 0)
+}
+$enabledRiskyPolicies = @($riskyPolicies | Where-Object { $_.State -eq "enabled" })
+$caRiskyEvidence = if ($riskyPolicies) {
+  $riskyPolicies | ForEach-Object {
+    [pscustomobject]@{
+      Name = $_.DisplayName
+      State = $_.State
+      SignInRiskLevels = (@($_.Conditions.SignInRiskLevels) -join ";")
+      UserRiskLevels = (@($_.Conditions.UserRiskLevels) -join ";")
+      GrantControls = (@($_.GrantControls.BuiltInControls) -join ";")
+      status = if ($_.State -eq "enabled") { "pass" } else { "fail" }
+      value = "State=$($_.State);SignInRisk=$(@($_.Conditions.SignInRiskLevels) -join ',');UserRisk=$(@($_.Conditions.UserRiskLevels) -join ',')"
+      evidence_source = "Get-MgIdentityConditionalAccessPolicy"
+    }
+  }
+} else {
+  @([pscustomobject]@{
+    Name = ""
+    State = ""
+    SignInRiskLevels = ""
+    UserRiskLevels = ""
+    GrantControls = ""
+    status = "fail"
+    value = "No conditional access policy targeting sign-in or user risk found"
+    evidence_source = "Get-MgIdentityConditionalAccessPolicy"
+  })
+}
+Export-CraExpectedCsv $caRiskyEvidence $out "cap_policies_for_risky_sign_ins.csv" $files "Get-MgIdentityConditionalAccessPolicy"
 
 $appEvidence = $apps | Select-Object Id,AppId,DisplayName,SignInAudience,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "App=$($_.DisplayName);Audience=$($_.SignInAudience)" }},@{Name="evidence_source";Expression={ "Get-MgApplication" }}
 Export-CraExpectedCsv $appEvidence $out "entra_third_party_app_integrations.csv" $files "Get-MgApplication"
 
 $authPolicyEvidence = $authPolicy | Select-Object Id,DisplayName,DefaultUserRolePermissions,AllowedToUseSspr,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "DefaultUserRolePermissions=$($_.DefaultUserRolePermissions)" }},@{Name="evidence_source";Expression={ "Get-MgPolicyAuthorizationPolicy" }}
-Export-CraExpectedCsv $authPolicyEvidence $out "entra_tenant_creation_by_non_admin.csv" $files "Get-MgPolicyAuthorizationPolicy"
 Export-CraExpectedCsv $authPolicyEvidence $out "restricted_access_to_microsoft_entra_admin_centre.csv" $files "Get-MgPolicyAuthorizationPolicy"
 Export-CraExpectedCsv $authPolicyEvidence $out "user_consent_for_applications.csv" $files "Get-MgPolicyAuthorizationPolicy"
 Export-CraExpectedCsv $authPolicyEvidence $out "self_service_password_reset_authentication_method.csv" $files "Get-MgPolicyAuthorizationPolicy"
+
+# Tenant creation by non-admins (C3): AllowedToCreateTenants must be False.
+$tenantCreationEvidence = $authPolicy | Select-Object Id,@{Name="AllowedToCreateTenants";Expression={ $_.DefaultUserRolePermissions.AllowedToCreateTenants }},@{Name="status";Expression={ if (("$($_.DefaultUserRolePermissions.AllowedToCreateTenants)") -ieq "False") { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowedToCreateTenants=$($_.DefaultUserRolePermissions.AllowedToCreateTenants)" }},@{Name="evidence_source";Expression={ "Get-MgPolicyAuthorizationPolicy" }}
+Export-CraExpectedCsv $tenantCreationEvidence $out "entra_tenant_creation_by_non_admin.csv" $files "Get-MgPolicyAuthorizationPolicy"
+
+# App registration by non-admins (C6): AllowedToCreateApps must be False.
+$appRegistrationEvidence = $authPolicy | Select-Object Id,@{Name="AllowedToCreateApps";Expression={ $_.DefaultUserRolePermissions.AllowedToCreateApps }},@{Name="status";Expression={ if (("$($_.DefaultUserRolePermissions.AllowedToCreateApps)") -ieq "True") { "fail" } else { "pass" } }},@{Name="value";Expression={ "AllowedToCreateApps=$($_.DefaultUserRolePermissions.AllowedToCreateApps)" }},@{Name="evidence_source";Expression={ "Get-MgPolicyAuthorizationPolicy" }}
+Export-CraExpectedCsv $appRegistrationEvidence $out "entra_app_registration_by_non_admin.csv" $files "Get-MgPolicyAuthorizationPolicy"
 
 try {
   $adminConsent = Get-MgPolicyAdminConsentRequestPolicy | Select-Object Id,IsEnabled,NotifyReviewers,RemindersEnabled,RequestDurationInDays

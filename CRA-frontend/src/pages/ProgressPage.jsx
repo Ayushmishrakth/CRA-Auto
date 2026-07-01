@@ -104,7 +104,7 @@ export default function ProgressPage() {
         return;
       }
 
-      if (progress != null) setOverallProgress(Math.round(progress));
+      if (progress != null) setOverallProgress((p) => Math.max(p, Math.round(progress)));
 
       if (!collector || !MODULE_DISPLAY_MAP[collector]) return;
 
@@ -138,7 +138,7 @@ export default function ProgressPage() {
         if (completeRef.current) { stopPolling(); return; }
         try {
           const job = await getAssessmentJob(assessmentId);
-          if (job.progress_pct != null) setOverallProgress(Math.round(job.progress_pct));
+          if (job.progress_pct != null) setOverallProgress((p) => Math.max(p, Math.round(job.progress_pct)));
           const stage = (job.current_stage || "").toLowerCase();
           if (stage && MODULE_DISPLAY_MAP[stage]) {
             setModuleStates((prev) => ({
@@ -163,28 +163,32 @@ export default function ProgressPage() {
       }, 3000);
     };
 
-    // Connect WS; fall back to polling if it doesn't connect
+    // Connect WS for fast push updates. We intentionally keep the REST poll
+    // running as a permanent safety net: a "connected" WebSocket only means the
+    // socket opened, NOT that progress events will keep flowing (the Redis
+    // pub/sub relay can go silent under concurrent load or across workers).
+    // Polling reads the authoritative job.progress_pct and cannot silently
+    // freeze, so the progress bar always advances even if WS delivery stalls.
     let wsConnected = false;
     const unsubscribe = subscribeToAssessment(assessmentId, {
       onEvent: applyEvent,
       onStatus: (status) => {
         if (status === "connected") {
           wsConnected = true;
-          stopPolling();
-        } else if (!wsConnected && (status === "disconnected" || status === "error" || status === "reconnecting")) {
-          startPolling();
         }
+        // Ensure polling is running regardless of WS status.
+        startPolling();
       },
     });
 
-    // Start polling immediately — WS success will cancel it
+    // Start polling immediately and keep it running alongside the WebSocket.
     startPolling();
 
     // Check current job state immediately (handles already-running or already-complete)
     getAssessmentJob(assessmentId)
       .then((job) => {
         if (completeRef.current) return;
-        if (job.progress_pct != null) setOverallProgress(Math.round(job.progress_pct));
+        if (job.progress_pct != null) setOverallProgress((p) => Math.max(p, Math.round(job.progress_pct)));
         if (job.status === "completed") {
           completeRef.current = true;
           setOverallProgress(100);

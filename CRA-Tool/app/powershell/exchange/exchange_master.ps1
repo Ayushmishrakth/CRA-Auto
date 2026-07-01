@@ -73,7 +73,7 @@ $owaPolicies = Get-OwaMailboxPolicy | ForEach-Object {
 }
 $path = Join-Path $out "external_storage_providers_in_owa.csv"; Export-CraCsv $owaPolicies $path; $files.Add($path)
 
-$sharingPolicies = Get-SharingPolicy | ForEach-Object {
+$sharingPolicies = @(Get-SharingPolicy | ForEach-Object {
   $domains = ($_.Domains -join ";")
   [pscustomobject]@{
     Policy = $_.Identity
@@ -83,6 +83,16 @@ $sharingPolicies = Get-SharingPolicy | ForEach-Object {
     value = "Enabled=$($_.Enabled);Domains=$domains"
     evidence_source = "Get-SharingPolicy"
   }
+})
+if ($sharingPolicies.Count -eq 0) {
+  $sharingPolicies = @([pscustomobject]@{
+    Policy = ""
+    Enabled = ""
+    Domains = ""
+    status = "fail"
+    value = "No sharing policy set"
+    evidence_source = "Get-SharingPolicy"
+  })
 }
 $orgCalendar = Get-OrganizationConfig | Select-Object Identity,CalendarVersionStoreEnabled
 $calendarRows = @($sharingPolicies) + @(

@@ -8,7 +8,9 @@ PowerShell runtime. Microsoft Graph collectors plug into this lifecycle later.
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 import traceback
 from typing import Any
 from uuid import UUID
@@ -16,6 +18,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.models.assessment import Assessment
 from app.db.models.assessment_artifact import AssessmentArtifact
 from app.db.models.assessment_finding import AssessmentFinding
@@ -46,9 +49,30 @@ RUNTIME_STAGES = {
     "completed": ("completed", 100.0),
 }
 
-POWERSHELL_REQUIRED_PARAMETERS: set[str] = set()
-# All parameters now route to Graph collectors that return fail when the service
-# is unavailable, rather than requiring PowerShell delegation.
+POWERSHELL_REQUIRED_PARAMETERS: set[str] = {
+    # Entra controls where the manual finding is based on Microsoft Graph
+    # PowerShell report/policy output rather than the app-only Graph fallback.
+    "user_consent_for_applications",
+
+    # Exchange controls whose manual source is Exchange Online PowerShell.
+    "customer_lockbox",
+    "external_storage_providers_in_owa",
+    "full_calendar_schedules_able_to_be_shared_externally",
+
+    # Teams governance controls exposed through Teams PowerShell, not app-only
+    # Microsoft Graph.
+    "guest_access_enabled_disabled",
+    "meeting_recording_retention_policies",
+    "teams_channel_email_addresses",
+    "teams_file_storage_option",
+    "teams_lobby_bypass",
+
+    # SharePoint tenant settings where Graph beta omits the exact manual fields.
+    "days_to_retain_a_deleted_user_s_onedrive",
+    "expiration_policy_for_anyone_links",
+    "permission_setting_for_anyone_links",
+    "sharepoint_and_onedrive_guest_access_expiry",
+}
 
 
 def _utc_now() -> datetime:
@@ -589,6 +613,113 @@ def _finding_payload(
     }
 
 
+# Parameters that cannot be evaluated app-only until pending admin consent / role
+# steps are completed (Teams cert + Teams Administrator role, Exchange Online app
+# RBAC, SharePoint/OneDrive PnP cert). Until then their collectors fail or return a
+# generic placeholder. The post-collection pass in _collect_findings rewrites those
+# generic findings with a specific, actionable message telling the customer exactly
+# what to check manually and what to do to enable automation. It is GUARDED (only
+# replaces generic "could-not-collect" text — never a real PASS/FAIL from live data).
+MANUAL_VERIFICATION_MESSAGES: dict[str, str] = {
+    # --- Teams (require Teams PowerShell app-only: cert + Teams Administrator role) ---
+    "copilot_integration_enabled": (
+        "Copilot integration could not be verified automatically (requires Teams PowerShell "
+        "app-only access). Manual check: Teams Admin Center > Teams apps > Manage apps > "
+        "search 'Copilot'. To enable automated checking: complete Teams Administrator role "
+        "assignment for the CRA app registration."
+    ),
+    "meeting_policies_configuration": (
+        "Meeting policies could not be verified automatically (requires Get-CsTeamsMeetingPolicy "
+        "via Teams PowerShell). Expected: AllowCloudRecording and AllowTranscription both enabled. "
+        "Manual check: Teams Admin Center > Meetings > Meeting policies > Global policy. To enable "
+        "automated checking: complete Teams Administrator role assignment."
+    ),
+    "meeting_transcription_enabled": (
+        "Meeting transcription setting could not be verified automatically (requires "
+        "Get-CsTeamsMeetingPolicy via Teams PowerShell). Manual check: Teams Admin Center > "
+        "Meetings > Meeting policies > Global policy > AllowTranscription. To enable automated "
+        "checking: complete Teams Administrator role assignment."
+    ),
+    "meeting_recording_retention_policies": (
+        "Meeting recording retention could not be verified automatically (requires "
+        "Get-CsTeamsMeetingPolicy via Teams PowerShell). Manual check: Teams Admin Center > "
+        "Meetings > Meeting policies > Global policy > Recording expiration. To enable automated "
+        "checking: complete Teams Administrator role assignment."
+    ),
+    "teams_meeting_chat": (
+        "Meeting chat setting could not be verified automatically (requires Get-CsTeamsMeetingPolicy "
+        "via Teams PowerShell). Manual check: Teams Admin Center > Meetings > Meeting policies > "
+        "Global policy > MeetingChatEnabledType. To enable automated checking: complete Teams "
+        "Administrator role assignment."
+    ),
+    "third_party_apps_allowed": (
+        "Third-party app settings could not be verified automatically (requires "
+        "Get-CsTeamsClientConfiguration via Teams PowerShell). Manual check: Teams Admin Center > "
+        "Teams apps > Manage apps > Org-wide app settings. To enable automated checking: complete "
+        "Teams Administrator role assignment."
+    ),
+    "guest_access_enabled_disabled": (
+        "Guest access setting could not be verified automatically (requires "
+        "Get-CsTeamsClientConfiguration via Teams PowerShell). Manual check: Teams Admin Center > "
+        "Users > Guest access. To enable automated checking: complete Teams Administrator role "
+        "assignment."
+    ),
+    "teams_channel_email_addresses": (
+        "Channel email addresses setting could not be verified automatically (requires "
+        "Get-CsTeamsClientConfiguration via Teams PowerShell). Manual check: Teams Admin Center > "
+        "Teams > Teams settings > Email integration. To enable automated checking: complete Teams "
+        "Administrator role assignment."
+    ),
+    "teams_file_storage_option": (
+        "File storage options could not be verified automatically (requires "
+        "Get-CsTeamsClientConfiguration via Teams PowerShell). Manual check: Teams Admin Center > "
+        "Teams > Teams settings > Files. To enable automated checking: complete Teams Administrator "
+        "role assignment."
+    ),
+    "teams_lobby_bypass": (
+        "Lobby bypass setting could not be verified automatically (requires Get-CsTeamsMeetingPolicy "
+        "via Teams PowerShell). Manual check: Teams Admin Center > Meetings > Meeting policies > "
+        "Global policy > AutoAdmittedUsers. To enable automated checking: complete Teams "
+        "Administrator role assignment."
+    ),
+    # --- Exchange Online (app authenticates but lacks Exchange RBAC role: UnAuthorized) ---
+    "customer_lockbox": (
+        "Customer Lockbox could not be verified automatically — Exchange Online PowerShell returned "
+        "UnAuthorized. The CRA app has Exchange.ManageAsApp consent but is not yet assigned an "
+        "Exchange Online admin role. To enable: in Exchange Admin Center > Roles > Admin roles, "
+        "assign the CRA app service principal a role with View-Only Configuration (or run "
+        "New-ServicePrincipal + Add-RoleGroupMember). Manual check: Microsoft 365 Admin Center > "
+        "Settings > Org settings > Security & privacy > Customer Lockbox "
+        "(Get-OrganizationConfig | fl CustomerLockBoxEnabled)."
+    ),
+    "external_storage_providers_in_owa": (
+        "External storage providers in OWA could not be verified automatically — Exchange Online "
+        "PowerShell returned UnAuthorized. The CRA app has Exchange.ManageAsApp consent but is not "
+        "yet assigned an Exchange Online admin role. To enable: assign the CRA app service principal "
+        "an Exchange role with View-Only Configuration. Manual check: Exchange Admin Center > Outlook "
+        "Web App policies (Get-OwaMailboxPolicy | fl AdditionalStorageProvidersAvailable)."
+    ),
+    "full_calendar_schedules_able_to_be_shared_externally": (
+        "External calendar sharing could not be verified automatically — Exchange Online PowerShell "
+        "returned UnAuthorized. The CRA app has Exchange.ManageAsApp consent but is not yet assigned "
+        "an Exchange Online admin role. To enable: assign the CRA app service principal an Exchange "
+        "role with View-Only Configuration. Manual check: Exchange Admin Center > Organization > "
+        "Sharing (Get-SharingPolicy | fl Domains)."
+    ),
+    # --- SharePoint / OneDrive (require PnP cert app-only: pending consent) ---
+    "days_to_retain_a_deleted_user_s_onedrive": (
+        "OneDrive deleted user retention period could not be verified automatically. To enable: "
+        "complete the SharePoint app-only consent step in the CRA setup. Manual check: SharePoint "
+        "Admin Center > Settings > OneDrive retention."
+    ),
+    "sharepoint_and_onedrive_guest_access_expiry": (
+        "SharePoint and OneDrive guest access expiry settings could not be verified automatically. "
+        "To enable: complete the SharePoint app-only consent step in the CRA setup. Manual check: "
+        "SharePoint Admin Center > Policies > Sharing > Guest access expiry."
+    ),
+}
+
+
 async def _collect_findings(
     db: AsyncSession,
     *,
@@ -624,6 +755,30 @@ async def _collect_findings(
                 logger.warning("[ASSESSMENT] Exchange Online token not available for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
         else:
             logger.warning("[ASSESSMENT] primary_domain not found in deployment_diagnostics for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
+
+        # Certificate app-only auth for PnP/SharePoint + Teams collectors.
+        # The MicrosoftTeams and PnP.PowerShell modules cannot use client-secret
+        # app auth — they require a certificate. Wire the per-tenant cert env vars
+        # so Connect-CraPnP / Connect-CraTeams (cra_common.ps1) can load it.
+        # .env values are read via pydantic settings (not os.environ), so they
+        # must be injected into collector_environment to reach the PS subprocess
+        # (powershell_executor merges env={**os.environ, **collector_environment}).
+        cert_pfx_path = settings.cra_cert_pfx_path or str(
+            Path(__file__).resolve().parents[2] / "secrets" / "cra_cert.pfx"
+        )
+        cert_pfx_password = settings.cra_cert_pfx_password
+        cert_thumbprint = settings.cra_cert_thumbprint
+        if cert_thumbprint or os.path.exists(cert_pfx_path):
+            collector_environment["CRA_PNP_AUTH_MODE"] = "certificate"
+            collector_environment["CRA_PNP_TENANT"] = tenant.tenant_id
+            if os.path.exists(cert_pfx_path):
+                collector_environment["CRA_CERT_PFX_PATH"] = cert_pfx_path
+                if cert_pfx_password:
+                    collector_environment["CRA_CERT_PFX_PASSWORD"] = cert_pfx_password
+            if cert_thumbprint:
+                collector_environment["CRA_CERT_THUMBPRINT"] = cert_thumbprint
+        else:
+            logger.warning("[ASSESSMENT] No certificate configured (CRA_CERT_PFX_PATH / CRA_CERT_THUMBPRINT) for tenant %s — PnP/Teams certificate collectors will be skipped", tenant.tenant_id)
     await db.execute(delete(AssessmentFinding).where(AssessmentFinding.assessment_id == assessment.id))
     await db.execute(delete(AssessmentArtifact).where(AssessmentArtifact.assessment_id == assessment.id))
     await db.commit()
@@ -1023,6 +1178,35 @@ async def _collect_findings(
                 },
             )
             await db.commit()
+
+    # Rewrite generic "could-not-collect" findings with specific, actionable
+    # manual-verification guidance (see MANUAL_VERIFICATION_MESSAGES). Guarded: only
+    # applied when the collector did NOT produce real data, so a real PASS/FAIL result
+    # (e.g. once Teams/Exchange/SharePoint app-only auth is enabled) is never overwritten.
+    _id_to_key = {getattr(p, "id", None): k for k, p in parameter_by_key.items()}
+    _generic_markers = (
+        "collector failed before producing validated cra evidence",
+        "not verifiable via graph",
+        "cannot be read via graph",
+        "not exposed via app-only",
+        "powershell is not available",
+        "manual verification required",
+        "treat as not configured",
+        "service is not available in the tenant",
+    )
+    _rewrote = 0
+    for _finding in findings:
+        _key = _id_to_key.get(getattr(_finding, "parameter_id", None))
+        _msg = MANUAL_VERIFICATION_MESSAGES.get(_key or "")
+        if not _msg or getattr(_finding, "status", "") == "pass":
+            continue
+        _current = (getattr(_finding, "evaluated_value", "") or "").strip().lower()
+        if (not _current) or any(marker in _current for marker in _generic_markers):
+            _finding.evaluated_value = _msg
+            _rewrote += 1
+    if _rewrote:
+        _runtime_log("MANUAL_VERIFICATION_MESSAGES_APPLIED", count=_rewrote)
+        await db.commit()
 
     job.metadata_payload = {
         **(job.metadata_payload or {}),

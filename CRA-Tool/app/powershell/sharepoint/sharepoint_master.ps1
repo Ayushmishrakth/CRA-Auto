@@ -103,7 +103,6 @@ $sharingLinks = foreach ($site in $sites) {
 }
 $path = Join-Path $out "sharing_links.csv"; Export-CraCsv $sharingLinks $path; $files.Add($path)
 $path = Join-Path $out "checking_sharing_permissions_for_each_sites_on_a_tenant.csv"; Export-CraCsv $sharingLinks $path; $files.Add($path)
-$path = Join-Path $out "permission_setting_for_anyone_links.csv"; Export-CraCsv $sharingLinks $path; $files.Add($path)
 
 $keywordRows = foreach ($site in $sites) {
   $haystack = "$($site.Url) $($site.Title)".ToLowerInvariant()
@@ -136,23 +135,41 @@ try {
     value = "SharingCapability=$($tenantSettings.SharingCapability);PreventExternalUsersFromResharing=$($tenantSettings.PreventExternalUsersFromResharing)"
     evidence_source = "Get-PnPTenant"
   })
+  # Guest Access Expiry (E7): ExternalUserExpirationRequired must be True.
   $guestExpiry = @([pscustomobject]@{
     RequireAnonymousLinksExpireInDays = $tenantSettings.RequireAnonymousLinksExpireInDays
     ExternalUserExpirationRequired = $tenantSettings.ExternalUserExpirationRequired
     ExternalUserExpireInDays = $tenantSettings.ExternalUserExpireInDays
-    status = if ($tenantSettings.ExternalUserExpirationRequired -eq $true -or $tenantSettings.RequireAnonymousLinksExpireInDays) { "pass" } else { "fail" }
+    status = if ($tenantSettings.ExternalUserExpirationRequired -eq $true) { "pass" } else { "fail" }
     value = "ExternalUserExpirationRequired=$($tenantSettings.ExternalUserExpirationRequired);ExternalUserExpireInDays=$($tenantSettings.ExternalUserExpireInDays)"
+    evidence_source = "Get-PnPTenant"
+  })
+  # Expiration Policy for Anyone Links (E5): RequireAnonymousLinksExpireInDays must be > 0 (-1 means not set).
+  $anyoneExpiry = @([pscustomobject]@{
+    RequireAnonymousLinksExpireInDays = $tenantSettings.RequireAnonymousLinksExpireInDays
+    status = if ($tenantSettings.RequireAnonymousLinksExpireInDays -gt 0) { "pass" } else { "fail" }
+    value = "RequireAnonymousLinksExpireInDays=$($tenantSettings.RequireAnonymousLinksExpireInDays)"
+    evidence_source = "Get-PnPTenant"
+  })
+  # Permissions for Anyone Links (E6): neither file nor folder anonymous links may allow Edit.
+  $anyonePermissions = @([pscustomobject]@{
+    FileAnonymousLinkType = $tenantSettings.FileAnonymousLinkType
+    FolderAnonymousLinkType = $tenantSettings.FolderAnonymousLinkType
+    status = if ($tenantSettings.FileAnonymousLinkType -ne "Edit" -and $tenantSettings.FolderAnonymousLinkType -ne "Edit") { "pass" } else { "fail" }
+    value = "File=$($tenantSettings.FileAnonymousLinkType);Folder=$($tenantSettings.FolderAnonymousLinkType)"
     evidence_source = "Get-PnPTenant"
   })
 } catch {
   $modernAuth = @([pscustomobject]@{ LegacyAuthProtocolsEnabled = ""; status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-PnPTenant" })
   $sharingSettings = @([pscustomobject]@{ SharingCapability = ""; OneDriveSharingCapability = ""; PreventExternalUsersFromResharing = ""; status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-PnPTenant" })
   $guestExpiry = @([pscustomobject]@{ RequireAnonymousLinksExpireInDays = ""; ExternalUserExpirationRequired = ""; ExternalUserExpireInDays = ""; status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-PnPTenant" })
+  $anyoneExpiry = @([pscustomobject]@{ RequireAnonymousLinksExpireInDays = ""; status = "fail"; value = $_.Exception.Message; evidence_source = "Get-PnPTenant" })
+  $anyonePermissions = @([pscustomobject]@{ FileAnonymousLinkType = ""; FolderAnonymousLinkType = ""; status = "fail"; value = $_.Exception.Message; evidence_source = "Get-PnPTenant" })
 }
 $path = Join-Path $out "sharepoint_modern_authentication.csv"; Export-CraCsv $modernAuth $path; $files.Add($path)
 $path = Join-Path $out "sharing_settings_external_internal.csv"; Export-CraCsv $sharingSettings $path; $files.Add($path)
 $path = Join-Path $out "sharepoint_and_onedrive_guest_access_expiry.csv"; Export-CraCsv $guestExpiry $path; $files.Add($path)
-$anyoneExpiry = $guestExpiry | Select-Object RequireAnonymousLinksExpireInDays,ExternalUserExpirationRequired,ExternalUserExpireInDays,status,value,evidence_source
 $path = Join-Path $out "expiration_policy_for_anyone_links.csv"; Export-CraCsv $anyoneExpiry $path; $files.Add($path)
+$path = Join-Path $out "permission_setting_for_anyone_links.csv"; Export-CraCsv $anyonePermissions $path; $files.Add($path)
 
 Write-CraContract -CollectorName $CollectorName -TenantId $TenantId -ParameterKey $ParameterKey -GeneratedFiles $files.ToArray()

@@ -269,6 +269,14 @@ def _chart_actual(row: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {}
     actual = _evidence_actual(raw)
+    if isinstance(actual, dict) and "users" not in actual:
+        # The per-user list (with assignedLicenses) lives in the nested "evidence"
+        # block; _evidence_actual collapses to actual_value, which omits it. Re-attach
+        # it so the license / user-info charts can read real per-user data instead of
+        # falling back to a 0-licensed placeholder.
+        nested = raw.get("evidence")
+        if isinstance(nested, dict) and isinstance(nested.get("users"), list):
+            actual = {**actual, "users": nested["users"]}
     return actual if isinstance(actual, dict) else raw
 
 
@@ -318,18 +326,22 @@ def _license_chart_counts(
             break
 
     counts: dict[str, int] = {}
+    licensed = 0
     unlicensed = 0
     for user in users:
         if not isinstance(user, dict):
             continue
-        plans = _assigned_licenses(user)
-        if not plans:
+        # A user is "licensed" if they hold at least one assigned license SKU.
+        # Counting per-SKU here double-counts users with multiple licenses and
+        # renders raw SKU GUIDs as slice labels, so report a clean Licensed vs
+        # Unlicensed split that matches the user total.
+        if _assigned_licenses(user):
+            licensed += 1
+        else:
             unlicensed += 1
-            continue
-        for plan in plans:
-            name = _license_name(plan)
-            counts[name] = counts.get(name, 0) + 1
 
+    if licensed:
+        counts["Licensed"] = licensed
     if unlicensed:
         counts["Unlicensed"] = unlicensed
 

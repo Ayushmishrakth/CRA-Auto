@@ -25,6 +25,8 @@ ENV/
 *.pem
 *.key
 *.pfx
+*.cer
+secrets/
 *.p12
 *.crt
 *.cer

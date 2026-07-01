@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from io import StringIO
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -248,6 +248,37 @@ def _has_activity(row: dict[str, Any], *, date_field: str = "Last Activity Date"
         }
     ]
     return any(_float_value(row, key) > 0 for key in activity_fields)
+
+
+def _has_recent_activity(
+    row: dict[str, Any], *, within_days: int, date_field: str = "Last Activity Date"
+) -> bool:
+    """A user/site is considered active only if its Last Activity Date is within
+    the last ``within_days`` days from today. Rows with no parseable activity
+    date are treated as inactive."""
+    raw = str(row.get(date_field) or "").strip()
+    if not raw:
+        return False
+    last_activity: datetime | None = None
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            last_activity = datetime.strptime(raw, fmt)
+            break
+        except ValueError:
+            continue
+    if last_activity is None:
+        return False
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=within_days)
+    return last_activity >= cutoff
+
+
+def _active_email_activity_rows(rows: list[dict[str, Any]], *, within_days: int = 60) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if str(row.get("Is Deleted") or "").lower() != "true"
+        and _has_recent_activity(row, within_days=within_days)
+    ]
 
 
 def _collector_result(
@@ -648,41 +679,39 @@ async def collect_entra_third_party_app_integrations(tenant: ConnectedTenant) ->
 async def collect_tenant_collaboration_invitations(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "tenant_collaboration_invitations"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
+    RESTRICTIVE_VALUES = {"none", "adminsAndGuestInviters", "adminsGuestInvitersAndMemberUsers"}
     client = await _graph_client(tenant)
     policy_endpoint = "/policies/crossTenantAccessPolicy"
     partners_endpoint = "/policies/crossTenantAccessPolicy/partners"
     policy = await client.get(policy_endpoint)
     partners = await _get_all(client, partners_endpoint)
     partner_values = partners.get("value") or []
-    default = policy.get("default") or {}
-    outbound = default.get("b2bCollaborationOutbound") or {}
-    inbound = default.get("b2bCollaborationInbound") or {}
-    outbound_targets = outbound.get("usersAndGroups", {}).get("accessType")
-    inbound_targets = inbound.get("usersAndGroups", {}).get("accessType")
-    unrestricted = not partner_values and outbound_targets in {None, "allowed"} and inbound_targets in {None, "allowed"}
-    status = "fail" if unrestricted else "pass"
-    reasoning = (
-        "Tenant collaboration appears open to any domain"
-        if status == "fail"
-        else "Tenant collaboration has partner or default restrictions configured"
-    )
+    # Primary pass/fail gate: allowInvitesFrom from the authorization policy.
+    authorization_policy = await _authorization_policy(tenant)
+    allow_invites_from = authorization_policy.get("allowInvitesFrom")
+    if allow_invites_from in RESTRICTIVE_VALUES:
+        status = "pass"
+        reasoning = f"Guest invitations restricted to: {allow_invites_from}"
+    else:
+        status = "fail"
+        reasoning = f"Guest invitations allowed for: {allow_invites_from} (most permissive setting)"
     evidence = _evaluation_evidence(
-        pass_criteria="Allow invitations only to the specified domain or deny invitations to specified domains",
-        fail_criteria="Allow invitations to be sent to any domain",
+        pass_criteria="allowInvitesFrom is none, adminsAndGuestInviters, or adminsGuestInvitersAndMemberUsers",
+        fail_criteria="allowInvitesFrom is everyone or any non-restrictive value",
         reasoning=reasoning,
-        extra={"tenant_id": tenant.tenant_id, "policy": policy, "partners": partner_values},
+        extra={"tenant_id": tenant.tenant_id, "allowInvitesFrom": allow_invites_from, "crossTenantAccessPolicy": policy, "partners": partner_values},
     )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="high",
-        actual_value={"partner_count": len(partner_values), "default": default},
-        expected_value="Tenant collaboration invitations restricted by allowed or denied domain policy",
+        actual_value={"allowInvitesFrom": allow_invites_from, "partner_count": len(partner_values)},
+        expected_value="allowInvitesFrom restricted (not 'everyone')",
         finding=reasoning,
-        graph_endpoint="/policies/crossTenantAccessPolicy + /policies/crossTenantAccessPolicy/partners",
+        graph_endpoint="/policies/authorizationPolicy + /policies/crossTenantAccessPolicy + /policies/crossTenantAccessPolicy/partners",
         evidence=evidence,
-        raw_response={"policy": policy, "partners": partners},
-        graph_calls=2,
+        raw_response={"authorizationPolicy": authorization_policy, "crossTenantAccessPolicy": policy, "partners": partners},
+        graph_calls=3,
         scoring_weight=4.0,
     )
 
@@ -698,7 +727,8 @@ async def collect_authentication_methods_enabled(tenant: ConnectedTenant) -> dic
         if str(item.get("state") or "").lower() == "enabled"
     ]
     status = "pass" if len(enabled) > 2 else "fail"
-    reasoning = f"{len(enabled)} authentication method(s) are enabled"
+    enabled_names = ", ".join(item["method"] for item in enabled)
+    reasoning = f"{len(enabled)} authentication method(s) are enabled: {enabled_names}"
     evidence = _evaluation_evidence(
         pass_criteria="Authentication method has more than 2 authentication methods",
         fail_criteria="Authentication method has less than 2 authentication methods",
@@ -798,7 +828,14 @@ async def collect_users_without_mfa(tenant: ConnectedTenant) -> dict[str, Any]:
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
     client = await _graph_client(tenant)
     users_response = await _collect_users(tenant)
-    users = users_response.get("value") or []
+    all_users = users_response.get("value") or []
+    eligible_users = [
+        u for u in all_users
+        if u.get("accountEnabled") is True
+        and u.get("userType") == "Member"
+        and len(u.get("assignedLicenses", []) or []) > 0
+    ]
+    users = eligible_users
     method_rows = []
     raw_methods: dict[str, Any] = {}
     for user in users:
@@ -821,7 +858,10 @@ async def collect_users_without_mfa(tenant: ConnectedTenant) -> dict[str, Any]:
         })
     without_mfa = [item for item in method_rows if not item["mfaMethodTypes"]]
     status = "pass" if not without_mfa else "fail"
-    reasoning = f"{len(without_mfa)} user(s) do not have a non-password MFA authentication method registered"
+    if status == "pass":
+        reasoning = f"All {len(method_rows)} licensed Member accounts have MFA registered"
+    else:
+        reasoning = f"{len(without_mfa)} licensed Member account(s) do not have a non-password MFA method registered"
     evidence = _evaluation_evidence(
         pass_criteria="MFA is enabled for all capable users",
         fail_criteria="MFA is not configured for some capable users",
@@ -846,12 +886,27 @@ async def collect_users_without_mfa(tenant: ConnectedTenant) -> dict[str, Any]:
 async def collect_user_consent_for_applications(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "user_consent_for_applications"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
+    MICROSOFT_MANAGED_POLICIES = {
+        "microsoft-user-default-low-risk",
+        "microsoft-user-default-recommended",
+        "microsoft-user-default-lowrisk",
+        "microsoft-user-default-recommendedpolicyforworktenants",
+    }
     policy = await _authorization_policy(tenant)
     permissions = policy.get("defaultUserRolePermissions") or {}
     assigned = permissions.get("permissionGrantPoliciesAssigned") or []
-    users_can_consent = bool(assigned)
-    status = "fail" if users_can_consent else "pass"
-    reasoning = "Users can consent for applications" if users_can_consent else "Users cannot consent for applications by default"
+    if not assigned:
+        status = "pass"
+        reasoning = "Users cannot consent for applications by default"
+    elif all(
+        any(managed in str(item).lower() for managed in MICROSOFT_MANAGED_POLICIES)
+        for item in assigned
+    ):
+        status = "pass"
+        reasoning = "User consent managed by Microsoft policy (low-risk only)"
+    else:
+        status = "fail"
+        reasoning = "Users can consent to applications"
     evidence = _evaluation_evidence(
         pass_criteria="User consent is not set to Users can consent",
         fail_criteria="User consent is set to Users can consent",
@@ -942,29 +997,55 @@ async def collect_self_service_password_reset_authentication_method(tenant: Conn
         for item in methods
         if str(item.get("state") or "").lower() == "enabled"
     ]
-    status = "pass" if enabled else "fail"
-    reasoning = f"{len(enabled)} SSPR/authentication method(s) are enabled"
+
+    # Determine actual SSPR scope. NOTE: beta/policies/selfServicePasswordResetPolicy
+    # is not a valid Graph segment (returns 400 BadRequest), so this call is expected
+    # to fail and the registration-details fallback below is the effective source of
+    # truth (counts users with isSsprRegistered AND isSsprEnabled).
+    sspr_policy = await _graph_get_json_or_error(
+        tenant, "https://graph.microsoft.com/beta/policies/selfServicePasswordResetPolicy"
+    )
+    registration_rows = registration_response.get("value") or []
+    sspr_enabled_users = [
+        row for row in registration_rows
+        if row.get("isSsprRegistered") is True and row.get("isSsprEnabled") is True
+    ]
+    sspr_scope = None
+    if sspr_policy.get("ok"):
+        sspr_scope = str((sspr_policy.get("response") or {}).get("policyMode") or "").lower()
+
+    if sspr_scope == "disabled" or (sspr_scope is None and len(sspr_enabled_users) == 0):
+        status = "fail"
+        reasoning = "SSPR is not enabled for any users in this tenant"
+    elif (sspr_scope in {"selected", "all"}) or len(sspr_enabled_users) >= 1:
+        status = "pass"
+        reasoning = f"{len(sspr_enabled_users)} user(s) have SSPR enabled and registered"
+    else:
+        status = "fail"
+        reasoning = "SSPR is not enabled for any users in this tenant"
     evidence = _evaluation_evidence(
-        pass_criteria="Enabled to see how many methods registered",
-        fail_criteria="No methods enabled",
+        pass_criteria="SSPR scope is selected/all and at least one user is SSPR-registered",
+        fail_criteria="SSPR scope is disabled or no users have SSPR enabled",
         reasoning=reasoning,
         extra={
             "tenant_id": tenant.tenant_id,
             "enabled_methods": enabled,
-            "user_registration_details": registration_response.get("value") or [],
+            "sspr_scope": sspr_scope,
+            "sspr_enabled_user_count": len(sspr_enabled_users),
+            "user_registration_details": registration_rows,
         },
     )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="critical",
-        actual_value={"enabled_methods": len(enabled), "methods": enabled},
-        expected_value="At least one SSPR/authentication method enabled",
+        actual_value={"sspr_scope": sspr_scope, "sspr_enabled_users": len(sspr_enabled_users), "enabled_methods": len(enabled)},
+        expected_value="SSPR enabled (scope selected/all) with registered users",
         finding=reasoning,
-        graph_endpoint="https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy + /reports/authenticationMethods/userRegistrationDetails",
+        graph_endpoint="https://graph.microsoft.com/beta/policies/selfServicePasswordResetPolicy + /reports/authenticationMethods/userRegistrationDetails",
         evidence=evidence,
-        raw_response={"authenticationMethodsPolicy": methods_response, "userRegistrationDetails": registration_response},
-        graph_calls=2,
+        raw_response={"authenticationMethodsPolicy": methods_response, "selfServicePasswordResetPolicy": sspr_policy, "userRegistrationDetails": registration_response},
+        graph_calls=3,
         scoring_weight=5.0,
     )
 
@@ -1112,6 +1193,27 @@ async def collect_devices_without_compliance_policies(tenant: ConnectedTenant) -
             scoring_weight=1.0,
         )
     devices = response.get("value") or []
+    if len(devices) == 0:
+        reasoning = "No managed devices found. Intune/MDM is not configured in this tenant."
+        evidence = _evaluation_evidence(
+            pass_criteria="Compliance policy is configured",
+            fail_criteria="Compliance policy is not configured",
+            reasoning=reasoning,
+            extra={"tenant_id": tenant.tenant_id, "non_compliant_devices": [], "total_devices": 0},
+        )
+        return _collector_result(
+            parameter_key=parameter_key,
+            status="fail",
+            severity="info",
+            actual_value={"non_compliant_devices": 0, "total_devices": 0},
+            expected_value="No non-compliant or unmanaged devices",
+            finding=reasoning,
+            graph_endpoint="/deviceManagement/managedDevices",
+            evidence=evidence,
+            raw_response={"managedDevices": response},
+            graph_calls=1,
+            scoring_weight=1.0,
+        )
     non_compliant = [
         {
             "id": item.get("id"),
@@ -1193,7 +1295,7 @@ def _report_error_result(
 
 async def collect_mailboxes_status_active_inactive(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "mailboxes_status_active_inactive"
-    endpoint = "/reports/getEmailActivityUserDetail(period='D30')"
+    endpoint = "/reports/getEmailActivityUserDetail(period='D90')"
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(
@@ -1201,21 +1303,24 @@ async def collect_mailboxes_status_active_inactive(tenant: ConnectedTenant) -> d
             parameter_key=parameter_key,
             report=report,
             expected_value=">85% active mailboxes",
-            pass_criteria="When the number active mailboxes are more than 85%",
-            fail_criteria="When the number active mailboxes are less than 85%",
+            pass_criteria="When more than 85% of non-deleted mailboxes have Last Activity Date within the last 60 days in the D90 email activity report",
+            fail_criteria="When less than 85% of non-deleted mailboxes have Last Activity Date within the last 60 days in the D90 email activity report",
             graph_endpoint=endpoint,
             severity="critical",
             scoring_weight=5.0,
         )
     mailboxes = [row for row in rows if str(row.get("Is Deleted") or "").lower() != "true"]
-    active = [row for row in mailboxes if _has_activity(row)]
+    active = _active_email_activity_rows(rows, within_days=60)
     inactive = [row for row in mailboxes if row not in active]
     ratio = _percent(len(active), len(mailboxes))
     status = "pass" if ratio > 85 else "fail"
-    reasoning = f"{len(active)} active mailbox(es), {len(inactive)} inactive mailbox(es), active ratio {ratio}%"
+    reasoning = (
+        f"{len(active)}/{len(mailboxes)} active mailbox(es) ({ratio}%) based on D90 email activity; "
+        "active means Last Activity Date is within the last 60 days"
+    )
     evidence = _evaluation_evidence(
-        pass_criteria="When the number active mailboxes are more than 85%",
-        fail_criteria="When the number active mailboxes are less than 85%",
+        pass_criteria="When more than 85% of non-deleted mailboxes have Last Activity Date within the last 60 days in the D90 email activity report",
+        fail_criteria="When less than 85% of non-deleted mailboxes have Last Activity Date within the last 60 days in the D90 email activity report",
         reasoning=reasoning,
         extra={"tenant_id": tenant.tenant_id, "active_mailboxes": active, "inactive_mailboxes": inactive, "active_ratio": ratio},
     )
@@ -1250,9 +1355,24 @@ async def collect_mailbox_storage_usage(tenant: ConnectedTenant) -> dict[str, An
             severity="medium",
             scoring_weight=3.0,
         )
+    # getMailboxUsageDetail does NOT expose a recipient/mailbox type column, so we
+    # cannot exclude shared/room/equipment mailboxes from this report alone. Detect
+    # whether any type column is present; if absent, report that no type filtering
+    # was possible rather than silently pretending to exclude non-user mailboxes.
+    type_column = next(
+        (col for col in ("Recipient Type", "Mailbox Type", "Recipient Type Details")
+         if rows and col in rows[0]),
+        None,
+    )
     mailboxes = []
     over_threshold = []
+    excluded_non_user = 0
     for row in rows:
+        if type_column:
+            recipient_type = str(row.get(type_column) or "").lower()
+            if recipient_type and recipient_type != "usermailbox":
+                excluded_non_user += 1
+                continue
         used = _float_value(row, "Storage Used (Byte)")
         quota = _float_value(row, "Prohibit Send/Receive Quota (Byte)") or _float_value(row, "Prohibit Send Quota (Byte)")
         ratio = round(used / quota * 100, 2) if quota else 0.0
@@ -1264,11 +1384,16 @@ async def collect_mailbox_storage_usage(tenant: ConnectedTenant) -> dict[str, An
             "storage_usage_ratio": ratio,
         }
         mailboxes.append(item)
-        if ratio > 75:
+        if ratio > 95:
             over_threshold.append(item)
     max_ratio = max([item["storage_usage_ratio"] for item in mailboxes], default=0.0)
     status = "pass" if not over_threshold else "fail"
-    reasoning = f"{len(over_threshold)} mailbox(es) exceed 75% storage utilization; maximum utilization {max_ratio}%"
+    if type_column:
+        reasoning = f"{len(over_threshold)} user mailbox(es) exceed 95% storage; max {max_ratio}% — {excluded_non_user} non-user mailboxes excluded"
+    else:
+        reasoning = f"{len(over_threshold)} mailbox(es) exceed 95% storage; max {max_ratio}% — mailbox type not available in report, no exclusion applied"
+    if over_threshold:
+        reasoning += " Note: Graph usage reports do not include mailbox type — shared/room mailboxes cannot be excluded automatically. Verify via Exchange PowerShell: Get-EXOMailbox -RecipientTypeDetails UserMailbox"
     evidence = _evaluation_evidence(
         pass_criteria="When the active storage on mailbox is less than 75%",
         fail_criteria="When the active storage on mailbox is more than 75%",
@@ -1292,7 +1417,7 @@ async def collect_mailbox_storage_usage(tenant: ConnectedTenant) -> dict[str, An
 
 async def collect_number_of_emails_read_received(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "number_of_emails_read_received"
-    endpoint = "/reports/getEmailActivityUserDetail(period='D30')"
+    endpoint = "/reports/getEmailActivityUserDetail(period='D90')"
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(
@@ -1300,15 +1425,16 @@ async def collect_number_of_emails_read_received(tenant: ConnectedTenant) -> dic
             parameter_key=parameter_key,
             report=report,
             expected_value=">75% users read more than 70% of received email",
-            pass_criteria="More than 75% of users have read more than 70% of their emails.",
-            fail_criteria="Less than 75% of users have read more than 70% of their emails.",
+            pass_criteria="More than 75% of users active in the last 60 days have read more than 70% of received email in the D90 email activity report",
+            fail_criteria="Less than 75% of users active in the last 60 days have read more than 70% of received email in the D90 email activity report",
             graph_endpoint=endpoint,
             severity="info",
             scoring_weight=1.0,
         )
+    active_rows = _active_email_activity_rows(rows, within_days=60)
     metrics = []
     engaged = []
-    for row in rows:
+    for row in active_rows:
         received = _int_value(row, "Receive Count")
         read = _int_value(row, "Read Count")
         read_ratio = _percent(read, received)
@@ -1318,10 +1444,10 @@ async def collect_number_of_emails_read_received(tenant: ConnectedTenant) -> dic
             engaged.append(item)
     engagement_ratio = _percent(len(engaged), len(metrics))
     status = "pass" if engagement_ratio > 75 else "fail"
-    reasoning = f"{engagement_ratio}% of users read more than 70% of received emails"
+    reasoning = f"{len(engaged)}/{len(metrics)} active user(s) ({engagement_ratio}%) read more than 70% of received emails"
     evidence = _evaluation_evidence(
-        pass_criteria="More than 75% of users have read more than 70% of their emails.",
-        fail_criteria="Less than 75% of users have read more than 70% of their emails.",
+        pass_criteria="More than 75% of users active in the last 60 days have read more than 70% of received email in the D90 email activity report",
+        fail_criteria="Less than 75% of users active in the last 60 days have read more than 70% of received email in the D90 email activity report",
         reasoning=reasoning,
         extra={"tenant_id": tenant.tenant_id, "read_ratio": engagement_ratio, "engagement_metrics": metrics},
     )
@@ -1329,7 +1455,7 @@ async def collect_number_of_emails_read_received(tenant: ConnectedTenant) -> dic
         parameter_key=parameter_key,
         status=status,
         severity="info",
-        actual_value={"read_ratio": engagement_ratio, "engaged_users": len(engaged), "total_users": len(metrics)},
+        actual_value={"read_ratio": engagement_ratio, "engaged_users": len(engaged), "active_users": len(metrics)},
         expected_value=">75% users read more than 70% of received email",
         finding=reasoning,
         graph_endpoint=endpoint,
@@ -1342,36 +1468,38 @@ async def collect_number_of_emails_read_received(tenant: ConnectedTenant) -> dic
 
 async def collect_number_of_emails_sent(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "number_of_emails_sent"
-    endpoint = "/reports/getEmailActivityUserDetail(period='D30')"
+    endpoint = "/reports/getEmailActivityUserDetail(period='D90')"
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(
             tenant=tenant,
             parameter_key=parameter_key,
             report=report,
-            expected_value=">30 average sent emails per user",
-            pass_criteria="When the number of emails sent by the users are more than 30",
-            fail_criteria="When the number of emails sent by the users are less than 30",
+            expected_value=">75% active users sent 30 or more emails",
+            pass_criteria="More than 75% of users active in the last 60 days sent 30 or more emails in the D90 email activity report",
+            fail_criteria="Less than 75% of users active in the last 60 days sent 30 or more emails in the D90 email activity report",
             graph_endpoint=endpoint,
             severity="info",
             scoring_weight=1.0,
         )
-    sent_counts = [{"userPrincipalName": row.get("User Principal Name"), "send_count": _int_value(row, "Send Count")} for row in rows]
-    average_sent = round(sum(item["send_count"] for item in sent_counts) / len(sent_counts), 2) if sent_counts else 0.0
-    status = "pass" if average_sent > 30 else "fail"
-    reasoning = f"Average sent email count per user is {average_sent}"
+    active_rows = _active_email_activity_rows(rows, within_days=60)
+    sent_counts = [{"userPrincipalName": row.get("User Principal Name"), "send_count": _int_value(row, "Send Count")} for row in active_rows]
+    users_over_threshold = [item for item in sent_counts if item["send_count"] >= 30]
+    sent_ratio = _percent(len(users_over_threshold), len(sent_counts))
+    status = "pass" if sent_ratio > 75 else "fail"
+    reasoning = f"{len(users_over_threshold)}/{len(sent_counts)} active user(s) ({sent_ratio}%) sent 30 or more emails"
     evidence = _evaluation_evidence(
-        pass_criteria="When the number of emails sent by the users are more than 30",
-        fail_criteria="When the number of emails sent by the users are less than 30",
+        pass_criteria="More than 75% of users active in the last 60 days sent 30 or more emails in the D90 email activity report",
+        fail_criteria="Less than 75% of users active in the last 60 days sent 30 or more emails in the D90 email activity report",
         reasoning=reasoning,
-        extra={"tenant_id": tenant.tenant_id, "average_sent_per_user": average_sent, "users": sent_counts},
+        extra={"tenant_id": tenant.tenant_id, "sent_ratio": sent_ratio, "users": sent_counts, "users_over_threshold": users_over_threshold},
     )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="info",
-        actual_value={"average_sent_per_user": average_sent, "total_users": len(sent_counts)},
-        expected_value=">30 average sent emails per user",
+        actual_value={"sent_ratio": sent_ratio, "users_sent_30_or_more": len(users_over_threshold), "active_users": len(sent_counts)},
+        expected_value=">75% active users sent 30 or more emails",
         finding=reasoning,
         graph_endpoint=endpoint,
         evidence=evidence,
@@ -1410,10 +1538,29 @@ async def collect_active_inactive_teams(tenant: ConnectedTenant) -> dict[str, An
             scoring_weight=4.0,
         )
     teams = [row for row in rows if str(row.get("Is Deleted") or "").lower() != "true"]
-    active = [row for row in teams if _has_activity(row)]
-    inactive = [row for row in teams if row not in active]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=60)
+    active = []
+    inactive = []
+    for row in teams:
+        last_activity_raw = row.get("Last Activity Date", "") or ""
+        if not last_activity_raw.strip():
+            inactive.append(row)
+            continue
+        try:
+            last_activity = datetime.strptime(last_activity_raw.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if last_activity < cutoff:
+                inactive.append(row)
+            else:
+                active.append(row)
+        except Exception:
+            inactive.append(row)
+    total = len(teams)
+    inactive_pct = _percent(len(inactive), total)
     status = "pass" if not inactive else "fail"
-    reasoning = f"{len(active)} active team(s), {len(inactive)} inactive team(s)"
+    if inactive:
+        reasoning = f"{len(inactive)} inactive team(s) out of {total} ({inactive_pct}%) — last activity date older than 60 days or never active"
+    else:
+        reasoning = f"All {total} team(s) were active within the last 60 days"
     evidence = _evaluation_evidence(
         pass_criteria="When a tenant does not have inactive teams",
         fail_criteria="When a tenant has inactive teams",
@@ -1464,7 +1611,7 @@ async def collect_activer_inactive_teams_users(tenant: ConnectedTenant) -> dict[
             scoring_weight=3.0,
         )
     users = [row for row in rows if str(row.get("Is Deleted") or "").lower() != "true"]
-    active = [row for row in users if _has_activity(row)]
+    active = [row for row in users if _has_recent_activity(row, within_days=60)]
     inactive = [row for row in users if row not in active]
     inactive_ratio = _percent(len(inactive), len(users))
     status = "pass" if inactive_ratio < 15 else "fail"
@@ -1492,7 +1639,7 @@ async def collect_activer_inactive_teams_users(tenant: ConnectedTenant) -> dict[
 
 async def collect_active_sites_count(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "active_sites_count"
-    endpoint = "/reports/getSharePointSiteUsageDetail(period='D30')"
+    endpoint = "/reports/getSharePointSiteUsageDetail(period='D180')"
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(
@@ -1506,11 +1653,11 @@ async def collect_active_sites_count(tenant: ConnectedTenant) -> dict[str, Any]:
             severity="medium",
             scoring_weight=3.0,
         )
-    sites = [row for row in rows if str(row.get("Is Deleted") or "").lower() != "true"]
-    active = [row for row in sites if _has_activity(row)]
+    sites = [row for row in rows if str(row.get("Is Deleted") or "").strip().lower() != "true"]
+    active = [row for row in sites if _has_recent_activity(row, within_days=60)]
     ratio = _percent(len(active), len(sites))
-    status = "pass" if ratio > 85 else "fail"
-    reasoning = f"{len(active)} active SharePoint site(s) out of {len(sites)} ({ratio}%)"
+    status = "pass" if ratio >= 85 else "fail"
+    reasoning = f"{len(active)} active SharePoint site(s) out of {len(sites)} ({ratio}%) — active means Last Activity Date within the last 60 days"
     evidence = _evaluation_evidence(
         pass_criteria="When the number active sites on SharePoint are more than 85%",
         fail_criteria="When the number active sites on SharePoint are less than 85%",
@@ -1522,32 +1669,32 @@ async def collect_active_sites_count(tenant: ConnectedTenant) -> dict[str, Any]:
 
 async def collect_active_users_on_sharepoint(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "active_users_on_sharepoint"
-    endpoint = "/reports/getSharePointActivityUserDetail(period='D30')"
+    endpoint = "/reports/getSharePointActivityUserDetail(period='D90')"
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
         return _report_error_result(tenant=tenant, parameter_key=parameter_key, report=report, expected_value=">85% active SharePoint users", pass_criteria="When the number active users on SharePoint are more than 85%", fail_criteria="When the number active users on SharePoint are less than 85%", graph_endpoint=endpoint, severity="medium", scoring_weight=3.0)
     users = [row for row in rows if str(row.get("Is Deleted") or "").lower() != "true"]
-    active = [row for row in users if _has_activity(row)]
+    active = [row for row in users if _has_recent_activity(row, within_days=60)]
     ratio = _percent(len(active), len(users))
-    status = "pass" if ratio > 85 else "fail"
-    reasoning = f"{len(active)} active SharePoint user(s) out of {len(users)} ({ratio}%)"
-    evidence = _evaluation_evidence(pass_criteria="When the number active users on SharePoint are more than 85%", fail_criteria="When the number active users on SharePoint are less than 85%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="medium", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">85% active SharePoint users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=3.0)
+    status = "pass" if ratio >= 85 else "fail"
+    reasoning = f"{len(active)} active SharePoint user(s) out of {len(users)} ({ratio}%) — active means Last Activity Date within the last 60 days"
+    evidence = _evaluation_evidence(pass_criteria="When the number active users on SharePoint are more than or equal to 85%", fail_criteria="When the number active users on SharePoint are less than 85%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
+    return _collector_result(parameter_key=parameter_key, status=status, severity="medium", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">=85% active SharePoint users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=3.0)
 
 
 async def collect_total_active_users_on_onedrive(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "total_active_users_on_onedrive"
-    endpoint = "/reports/getOneDriveActivityUserDetail(period='D30')"
+    endpoint = "/reports/getOneDriveUsageAccountDetail(period='D180')"
     rows, report = await _m365_report_rows(tenant, endpoint)
     if not report.get("ok"):
-        return _report_error_result(tenant=tenant, parameter_key=parameter_key, report=report, expected_value=">80% active OneDrive users", pass_criteria="When the total active user on OneDrive are more than than 80%", fail_criteria="When the total active user on OneDrive are more than than 80%", graph_endpoint=endpoint, severity="info", scoring_weight=1.0)
-    users = [row for row in rows if str(row.get("Is Deleted") or "").lower() != "true"]
-    active = [row for row in users if _has_activity(row)]
+        return _report_error_result(tenant=tenant, parameter_key=parameter_key, report=report, expected_value=">=85% active OneDrive users", pass_criteria="When the total active user on OneDrive are more than or equal to 85%", fail_criteria="When the total active user on OneDrive are less than 85%", graph_endpoint=endpoint, severity="info", scoring_weight=1.0)
+    users = [row for row in rows if str(row.get("Is Deleted") or "").strip().lower() != "true"]
+    active = [row for row in users if _has_recent_activity(row, within_days=60)]
     ratio = _percent(len(active), len(users))
-    status = "pass" if ratio > 80 else "fail"
-    reasoning = f"{len(active)} active OneDrive user(s) out of {len(users)} ({ratio}%)"
-    evidence = _evaluation_evidence(pass_criteria="When the total active user on OneDrive are more than than 80%", fail_criteria="When the total active user on OneDrive are more than than 80%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">80% active OneDrive users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=1.0)
+    status = "pass" if ratio >= 85 else "fail"
+    reasoning = f"{len(active)} active OneDrive user(s) out of {len(users)} ({ratio}%) — active within last 60 days (D180 usage report)"
+    evidence = _evaluation_evidence(pass_criteria="When the total active user on OneDrive are more than or equal to 85%", fail_criteria="When the total active user on OneDrive are less than 85%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
+    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">=85% active OneDrive users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=1.0)
 
 
 async def _teams_with_owners_and_members(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -1820,13 +1967,15 @@ async def collect_copilot_integration_enabled(tenant: ConnectedTenant) -> dict[s
             pass_criteria="When it is enabled", fail_criteria="When it is disabled",
             severity="critical", scoring_weight=5.0,
         )
-    return _governance_unverifiable_fail(
+    result = _governance_unverifiable_fail(
         tenant, parameter_key="copilot_integration_enabled", service_name="Microsoft Teams",
         portal_location="Microsoft 365 Admin Center > Settings > Copilot",
         graph_endpoint="beta/teamwork", expected_value="Copilot app integration enabled",
         pass_criteria="When it is enabled", fail_criteria="When it is disabled",
         severity="critical", scoring_weight=5.0,
     )
+    result["evaluated_value"] = "Microsoft Teams Copilot governance settings require PowerShell (Get-CsTeamsMeetingPolicy) and cannot be read via Graph API with app-only authentication. Manual verification required."
+    return result
 
 
 async def collect_meeting_transcription_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -1951,7 +2100,7 @@ async def collect_third_party_apps_allowed(tenant: ConnectedTenant) -> dict[str,
             fail_criteria="Enabled — custom apps are available in the organization's app",
             severity="high", scoring_weight=4.0,
         )
-    endpoint = "beta/teamwork/teamsAppSettings"
+    endpoint = "https://graph.microsoft.com/beta/teamwork/teamsAppSettings"
     response = await _graph_get_json_or_error(tenant, endpoint)
     if not response.get("ok"):
         return _governance_unverifiable_fail(
@@ -2084,12 +2233,12 @@ def _manual_validation_required_result(
 
 
 async def _teams_service_available(tenant: ConnectedTenant) -> bool:
-    response = await _graph_get_json_or_error(tenant, "beta/teamwork")
+    response = await _graph_get_json_or_error(tenant, "https://graph.microsoft.com/beta/teamwork")
     return bool(response.get("ok"))
 
 
 async def _exchange_service_available(tenant: ConnectedTenant) -> bool:
-    response = await _graph_get_json_or_error(tenant, "beta/admin/exchange/settings")
+    response = await _graph_get_json_or_error(tenant, "https://graph.microsoft.com/beta/admin/exchange/settings")
     return bool(response.get("ok"))
 
 
@@ -3269,8 +3418,13 @@ async def collect_external_sharing_settings(tenant: ConnectedTenant) -> dict[str
         return _licensing_required_result(tenant, parameter_key=parameter_key, endpoint=endpoint, required_sku="SharePoint Online", required_service="SharePoint tenant settings", required_role="SharePoint Administrator or Global Administrator", required_permissions=["SharePointTenantSettings.Read.All"], expected_value="New and existing guests or more restrictive", pass_criteria="When it is set to New and existing guests or more restrictive", fail_criteria="When it is set to Anyone(Least restrictive)", severity="high", scoring_weight=4.0, graph_response=response)
     settings = response.get("response") or {}
     sharing = str(settings.get("sharingCapability") or settings.get("oneDriveSharingCapability") or "")
-    status = "fail" if "anonymous" in sharing.lower() or "guest" in sharing.lower() else "pass"
-    reasoning = f"SharePoint sharingCapability is {sharing or 'not returned'}"
+    PASS_VALUES = {"disabled"}
+    if sharing.lower() in PASS_VALUES:
+        status = "pass"
+        reasoning = f"External sharing restricted: {sharing}"
+    else:
+        status = "fail"
+        reasoning = f"External sharing enabled: {sharing or 'not returned'} — external users can access content"
     evidence = _evaluation_evidence(pass_criteria="When it is set to New and existing guests or more restrictive", fail_criteria="When it is set to Anyone(Least restrictive)", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
     return _collector_result(parameter_key=parameter_key, status=status, severity="high", actual_value={"sharingCapability": settings.get("sharingCapability"), "oneDriveSharingCapability": settings.get("oneDriveSharingCapability")}, expected_value="New and existing guests or more restrictive", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=4.0)
 
@@ -3298,8 +3452,11 @@ async def collect_sharing_settings_external_internal(tenant: ConnectedTenant) ->
     settings = response.get("response") or {}
     prevent_resharing = settings.get("isResharingByExternalUsersEnabled")
     sharing = str(settings.get("sharingCapability") or "")
-    status = "pass" if prevent_resharing is False and "anonymous" not in sharing.lower() else "fail"
-    reasoning = f"External resharing enabled: {prevent_resharing}; sharingCapability: {sharing or 'not returned'}"
+    # This parameter evaluates ONLY the sharing capability level (check #1).
+    # Resharing prevention is a separate concern and must not gate this result.
+    PASS_VALUES = {"disabled", "existingexternalusersharingonly", "externalusersharingonly"}
+    status = "pass" if sharing.lower() in PASS_VALUES else "fail"
+    reasoning = f"Sharing capability level: {sharing or 'not returned'} (resharing prevention tracked separately; isResharingByExternalUsersEnabled={prevent_resharing})"
     evidence = _evaluation_evidence(pass_criteria="When settings enabled", fail_criteria="When restrictive setting no set up", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
     return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"isResharingByExternalUsersEnabled": prevent_resharing, "sharingCapability": settings.get("sharingCapability")}, expected_value="Restrictive sharing settings enabled", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=5.0)
 
@@ -3400,12 +3557,19 @@ async def collect_permission_setting_for_anyone_links(tenant: ConnectedTenant) -
         return blocked
     assert settings is not None
     sharing = str(settings.get("sharingCapability") or "")
-    default_link = str(settings.get("defaultSharingLinkType") or settings.get("defaultLinkPermission") or "")
+    default_link = str(settings.get("defaultLinkPermission") or settings.get("defaultSharingLinkType") or "")
     file_link = str(settings.get("fileAnonymousLinkType") or "")
     folder_link = str(settings.get("folderAnonymousLinkType") or "")
-    risky = any("edit" in item.lower() for item in [default_link, file_link, folder_link]) or "anonymous" in sharing.lower()
-    status = "fail" if risky else "pass"
-    reasoning = f"Anyone link permissions: sharingCapability={sharing or 'not returned'}, default={default_link or 'not returned'}, file={file_link or 'not returned'}, folder={folder_link or 'not returned'}"
+    PASS_VALUES = {"view", "none"}
+    if not default_link:
+        status = "fail"
+        reasoning = "Anyone link permission level could not be verified — treating as unverified gap"
+    elif default_link.lower() in PASS_VALUES:
+        status = "pass"
+        reasoning = f"Anyone link permission set to: {default_link}"
+    else:
+        status = "fail"
+        reasoning = f"Anyone link permission set to: {default_link} — Edit access allows data exposure"
     evidence = _evaluation_evidence(pass_criteria="Anyone links are disabled or restricted to view-only least privilege access", fail_criteria="Anyone links allow edit or overly permissive access", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings, "required_powershell_command": command})
     return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"sharingCapability": sharing, "defaultSharingLinkType": default_link, "fileAnonymousLinkType": file_link, "folderAnonymousLinkType": folder_link}, expected_value="Anyone links are disabled or restricted to view-only least privilege access", finding=reasoning, graph_endpoint="https://graph.microsoft.com/beta/admin/sharepoint/settings", evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=5.0)
 
@@ -3456,6 +3620,33 @@ async def collect_site_ownership_policies(tenant: ConnectedTenant) -> dict[str, 
     _FAIL_CRITERIA = "One or more Microsoft 365 Groups lack an assigned owner, creating ungoverned sites."
 
     client = await _graph_client(tenant)
+
+    # SharePoint Advanced Management (SAM) license is required for the site ownership
+    # policies feature. If the tenant is not licensed for SAM, the feature is unavailable.
+    sku_response = await _subscribed_skus(tenant)
+    sku_parts = [str(sku.get("skuPartNumber") or "").upper() for sku in (sku_response.get("value") or [])]
+    sam_licensed = any("SHAREPOINTADVANCEDMANAGEMENT" in part or "ADVANCED_COMMUNICATIONS" in part for part in sku_parts)
+    if not sam_licensed:
+        reasoning = "SharePoint Advanced Management license not found — site ownership policies feature not available in this tenant"
+        evidence = _evaluation_evidence(
+            pass_criteria=_PASS_CRITERIA,
+            fail_criteria=_FAIL_CRITERIA,
+            reasoning=reasoning,
+            extra={"tenant_id": tenant.tenant_id, "subscribed_sku_parts": sku_parts, "sam_licensed": False},
+        )
+        return _collector_result(
+            parameter_key=parameter_key,
+            status="fail",
+            severity="medium",
+            actual_value={"sam_licensed": False},
+            expected_value="SharePoint Advanced Management licensed and site ownership policy configured",
+            finding=reasoning,
+            graph_endpoint="/subscribedSkus",
+            evidence=evidence,
+            raw_response={"subscribedSkus": sku_response},
+            graph_calls=1,
+            scoring_weight=3.0,
+        )
 
     # Use M365 Groups as proxy for SharePoint team sites — no SPO license required
     groups_resp = await _graph_get_json_or_error(

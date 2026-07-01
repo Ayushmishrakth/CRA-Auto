@@ -301,7 +301,12 @@ function buildDashboardModel(result) {
   const totalParams = findings.length;
   const passCount = findings.filter((item) => rawStatus(item) === "pass").length;
   const failCount = findings.filter((item) => rawStatus(item) === "fail").length;
-  const readinessScore = totalParams ? Math.round((passCount / totalParams) * 10000) / 100 : 0;
+  // Prefer the authoritative score computed by the backend scoring engine
+  // (assessment.overall_score). Fall back to a local pass-ratio only when the
+  // backend score is unavailable (e.g. an assessment that has not been scored yet).
+  const computedReadiness = totalParams ? Math.round((passCount / totalParams) * 10000) / 100 : 0;
+  const backendOverall = Number(assessment.overall_score);
+  const readinessScore = Number.isFinite(backendOverall) && backendOverall > 0 ? backendOverall : computedReadiness;
   const readiness = readinessMeta(readinessScore, assessment.readiness_level);
 
   const pillarData = PILLAR_CONFIG.map((pillar) => {

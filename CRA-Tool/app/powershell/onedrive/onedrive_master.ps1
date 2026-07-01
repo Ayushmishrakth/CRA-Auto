@@ -29,7 +29,15 @@ if (-not (Test-Path $activityPath)) { throw "OneDrive activity CSV was not gener
 $files.Add($activityPath)
 
 $activityRows = Import-Csv $activityPath
-$activeUserEvidence = $activityRows | Select-Object *,@{Name="status";Expression={ if ($_.'Last Activity Date') { "pass" } else { "fail" } }},@{Name="value";Expression={ "LastActivityDate=$($_.'Last Activity Date')" }},@{Name="evidence_source";Expression={ "Get-MgReportOneDriveActivityUserDetail" }}
+$activityThreshold = (Get-Date).AddDays(-60)
+$activeUserEvidence = $activityRows | Select-Object *,@{Name="status";Expression={
+    $lastActivity = $null
+    $parseSuccess = $false
+    if ($_.'Last Activity Date') {
+      try { $lastActivity = [datetime]::Parse($_.'Last Activity Date'); $parseSuccess = $true } catch { $parseSuccess = $false }
+    }
+    if ($parseSuccess -and $lastActivity -ge $activityThreshold) { "pass" } else { "fail" }
+  }},@{Name="value";Expression={ "LastActivityDate=$($_.'Last Activity Date')" }},@{Name="evidence_source";Expression={ "Get-MgReportOneDriveActivityUserDetail" }}
 Export-CraExpectedCsv $activeUserEvidence $out "total_active_users_on_onedrive.csv" $files "Get-MgReportOneDriveActivityUserDetail"
 
 $retentionRows = @()
@@ -39,7 +47,7 @@ try {
     $retentionDays = $tenantSettings.OrphanedPersonalSitesRetentionPeriod
     $retentionRows = @([pscustomobject]@{
       OrphanedPersonalSitesRetentionPeriod = $retentionDays
-      status = if ($retentionDays -and [int]$retentionDays -gt 0) { "pass" } else { "fail" }
+      status = if ($retentionDays -and [int]$retentionDays -gt 180) { "pass" } else { "fail" }
       value = "OrphanedPersonalSitesRetentionPeriod=$retentionDays"
       evidence_source = "Get-SPOTenant"
     })

@@ -107,6 +107,23 @@ class Settings(BaseSettings):
     azure_authority: str | None = None
     azure_redirect_uri: str | None = None
 
+    # --- Certificate app-only auth (PnP/SharePoint + Teams collectors) ---
+    # MicrosoftTeams and PnP.PowerShell cannot authenticate app-only with a
+    # client secret — they require a certificate. These configure the per-tenant
+    # cert used by Connect-CraPnP / Connect-CraTeams in cra_common.ps1.
+    cra_cert_pfx_path: str | None = Field(
+        default=None,
+        description="Path to the app-registration certificate PFX (private key). Defaults to <repo>/secrets/cra_cert.pfx when unset.",
+    )
+    cra_cert_pfx_password: str | None = Field(
+        default=None,
+        description="Password protecting the certificate PFX (env CRA_CERT_PFX_PASSWORD).",
+    )
+    cra_cert_thumbprint: str | None = Field(
+        default=None,
+        description="Optional certificate thumbprint (alternative to the PFX path; loads from the local certificate store).",
+    )
+
     @field_validator("debug", mode="before")
     @classmethod
     def parse_debug_mode(cls, value):

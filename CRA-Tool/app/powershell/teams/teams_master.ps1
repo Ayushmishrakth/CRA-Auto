@@ -139,22 +139,38 @@ Export-CraExpectedCsv $transcriptionEvidence $out "meeting_transcription_enabled
 $recordingRetentionEvidence = $meetingPolicies | Select-Object Identity,AllowCloudRecording,NewMeetingRecordingExpirationDays,@{Name="status";Expression={ if ($_.AllowCloudRecording -eq $true -and $_.NewMeetingRecordingExpirationDays) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowCloudRecording=$($_.AllowCloudRecording);NewMeetingRecordingExpirationDays=$($_.NewMeetingRecordingExpirationDays)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
 Export-CraExpectedCsv $recordingRetentionEvidence $out "meeting_recording_retention_policies.csv" $files "Get-CsTeamsMeetingPolicy"
 
-$lobbyEvidence = $meetingPolicies | Select-Object Identity,AutoAdmittedUsers,@{Name="status";Expression={ if ($_.AutoAdmittedUsers -eq "EveryoneInCompanyExcludingGuests" -or $_.AutoAdmittedUsers -eq "OrganizerOnly") { "pass" } else { "fail" } }},@{Name="value";Expression={ "AutoAdmittedUsers=$($_.AutoAdmittedUsers)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
+$lobbyEvidence = $meetingPolicies | Select-Object Identity,AutoAdmittedUsers,@{Name="status";Expression={ if ($_.AutoAdmittedUsers -and $_.AutoAdmittedUsers -notin @("Everyone","EveryoneInCompany")) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AutoAdmittedUsers=$($_.AutoAdmittedUsers)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
 Export-CraExpectedCsv $lobbyEvidence $out "teams_lobby_bypass.csv" $files "Get-CsTeamsMeetingPolicy"
 
-$chatEvidence = $meetingPolicies | Select-Object Identity,MeetingChatEnabledType,@{Name="status";Expression={ if ($_.MeetingChatEnabledType) { "pass" } else { "fail" } }},@{Name="value";Expression={ "MeetingChatEnabledType=$($_.MeetingChatEnabledType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
+$chatEvidence = $meetingPolicies | Select-Object Identity,MeetingChatEnabledType,@{Name="status";Expression={ if ($_.MeetingChatEnabledType -eq "Enabled") { "pass" } else { "fail" } }},@{Name="value";Expression={ "MeetingChatEnabledType=$($_.MeetingChatEnabledType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
 Export-CraExpectedCsv $chatEvidence $out "teams_meeting_chat.csv" $files "Get-CsTeamsMeetingPolicy"
 
+# Anonymous Users (F1): anonymous join must be disabled.
+$anonymousEvidence = $meetingPolicies | Select-Object Identity,AllowAnonymousUsersToJoinMeeting,@{Name="status";Expression={ if ($_.AllowAnonymousUsersToJoinMeeting -eq $false) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowAnonymousUsersToJoinMeeting=$($_.AllowAnonymousUsersToJoinMeeting)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
+Export-CraExpectedCsv $anonymousEvidence $out "teams_anonymous_users.csv" $files "Get-CsTeamsMeetingPolicy"
+
+# External Unmanaged User Communication (F2): consumer (Teams personal) federation must be disabled.
 try {
-  $clientConfig = Get-CsTeamsClientConfiguration | Select-Object Identity,AllowGuestUser,AllowEmailIntoChannel,RestrictedSenderList,AllowDropBox,AllowBox,AllowGoogleDrive,AllowShareFile
+  $federation = Get-CsTenantFederationConfiguration -ErrorAction Stop | Select-Object Identity,AllowTeamsConsumer
+  $unmanagedEvidence = $federation | Select-Object Identity,AllowTeamsConsumer,@{Name="status";Expression={ if ($_.AllowTeamsConsumer -eq $false) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowTeamsConsumer=$($_.AllowTeamsConsumer)" }},@{Name="evidence_source";Expression={ "Get-CsTenantFederationConfiguration" }}
+} catch {
+  $unmanagedEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTenantFederationConfiguration" })
+}
+Export-CraExpectedCsv $unmanagedEvidence $out "teams_external_unmanaged_users.csv" $files "Get-CsTenantFederationConfiguration"
+
+try {
+  $clientConfig = Get-CsTeamsClientConfiguration | Select-Object Identity,AllowGuestUser,AllowEmailIntoChannel,RestrictedSenderList,AllowDropBox,AllowBox,AllowGoogleDrive,AllowShareFile,AllowEgnyte
   $guestAccessEvidence = $clientConfig | Select-Object Identity,AllowGuestUser,@{Name="status";Expression={ if ($_.AllowGuestUser -eq $false) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowGuestUser=$($_.AllowGuestUser)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
-  $fileStorageEvidence = $clientConfig | Select-Object Identity,AllowDropBox,AllowBox,AllowGoogleDrive,AllowShareFile,@{Name="status";Expression={ if ($_.AllowDropBox -or $_.AllowBox -or $_.AllowGoogleDrive -or $_.AllowShareFile) { "fail" } else { "pass" } }},@{Name="value";Expression={ "AllowDropBox=$($_.AllowDropBox);AllowBox=$($_.AllowBox);AllowGoogleDrive=$($_.AllowGoogleDrive);AllowShareFile=$($_.AllowShareFile)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
+  $fileStorageEvidence = $clientConfig | Select-Object Identity,AllowDropBox,AllowBox,AllowGoogleDrive,AllowShareFile,AllowEgnyte,@{Name="status";Expression={ if ($_.AllowDropBox -or $_.AllowBox -or $_.AllowGoogleDrive -or $_.AllowShareFile -or $_.AllowEgnyte) { "fail" } else { "pass" } }},@{Name="value";Expression={ "AllowDropBox=$($_.AllowDropBox);AllowBox=$($_.AllowBox);AllowGoogleDrive=$($_.AllowGoogleDrive);AllowShareFile=$($_.AllowShareFile);AllowEgnyte=$($_.AllowEgnyte)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
+  $channelEmailEvidence = $clientConfig | Select-Object Identity,AllowEmailIntoChannel,@{Name="RestrictedSenderCount";Expression={ @($_.RestrictedSenderList).Count }},@{Name="status";Expression={ if ($_.AllowEmailIntoChannel -eq $false -or (@($_.RestrictedSenderList).Count -gt 0)) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowEmailIntoChannel=$($_.AllowEmailIntoChannel);RestrictedSenderCount=$(@($_.RestrictedSenderList).Count)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
 } catch {
   $guestAccessEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTeamsClientConfiguration" })
   $fileStorageEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTeamsClientConfiguration" })
+  $channelEmailEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTeamsClientConfiguration" })
 }
 Export-CraExpectedCsv $guestAccessEvidence $out "guest_access_enabled_disabled.csv" $files "Get-CsTeamsClientConfiguration"
 Export-CraExpectedCsv $fileStorageEvidence $out "teams_file_storage_option.csv" $files "Get-CsTeamsClientConfiguration"
+Export-CraExpectedCsv $channelEmailEvidence $out "teams_channel_email_addresses.csv" $files "Get-CsTeamsClientConfiguration"
 
 try {
   $appPolicy = Get-CsTeamsAppPermissionPolicy | Select-Object Identity,GlobalCatalogAppsType,PrivateCatalogAppsType

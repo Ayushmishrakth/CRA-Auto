@@ -780,6 +780,41 @@ def _has_licensing_gap(raw):
 def _teams_unavailable(raw):
     return raw.get('service_available') is False and str(raw.get('service', '')).lower() == 'microsoft teams'
 
+def _finding_message(raw):
+    '''Return the finding text the collector stored (== assessment_findings.evaluated_value).
+
+    evaluated_value is the source of truth for the report Description. PowerShell
+    collectors store it at collector_contract.findings[].message; Graph collectors store
+    it at reasoning / evidence.reasoning. Used to keep the Description from contradicting
+    the finding when a handler's recomputation reads evidence keys the collector no longer
+    populates. Returns None if no message is present (handler falls back to its own text).'''
+    cc = raw.get('collector_contract')
+    if isinstance(cc, dict):
+        for finding in (cc.get('findings') or []):
+            if isinstance(finding, dict) and finding.get('message'):
+                return str(finding['message'])
+    if raw.get('reasoning'):
+        return str(raw['reasoning'])
+    evidence = raw.get('evidence')
+    if isinstance(evidence, dict) and evidence.get('reasoning'):
+        return str(evidence['reasoning'])
+    return None
+
+def _report_description(row):
+    '''The report "Description:" line must equal assessment_findings.evaluated_value.
+
+    evaluated_value is the single source of truth. The detail row carries it directly as
+    row['finding'] (== finding.evaluated_value); as a safety net we also read the message
+    stored in raw evidence. Returns the finding text, or None only when there is genuinely
+    no finding (e.g. NOT COLLECTED) so the caller can fall back to a generic description.'''
+    if not isinstance(row, dict):
+        return None
+    for candidate in (row.get('evaluated_value'), row.get('finding')):
+        text = str(candidate or '').strip()
+        if text and text.upper() not in ('NOT COLLECTED', 'NOT_COLLECTED', 'NONE'):
+            return text
+    return _finding_message(_normalise_raw_value(row.get('evidence')))
+
 def resolve_description(parameter_key, raw_value, status):
     '''
     Returns the correct description string for a parameter based on live evidence.
@@ -811,16 +846,17 @@ def resolve_description(parameter_key, raw_value, status):
             if r.get('audit_logs_queryable') else
             "Audit logs are not currently enabled."
         ),
-        'secure_score_percentage': lambda r: (
+        'secure_score_percentage': lambda r: _finding_message(r) or (
             f"Secure score is {_num(r.get('secure_score_percentage')):.2f}% "
-            f"which {'meets' if _num(r.get('secure_score_percentage')) >= 80 else 'is below'} "
-            f"the recommended industry standard (80%)."
+            f"which {'meets' if _num(r.get('secure_score_percentage')) >= 70 else 'is below'} "
+            f"the recommended threshold (70%)."
         ),
-        'compliance_score_overview': lambda r: (
-            f"Compliance score proxy is {_num(r.get('compliance_score_proxy', r.get('compliance_score_proxy_percentage', r.get('current_score')))):.2f}% "
-            f"based on Secure Score."
+        'compliance_score_overview': lambda r: _finding_message(r) or (
+            "Microsoft Purview Compliance Manager does not expose an officially supported public API "
+            "for retrieving the overall Compliance Score; review the score directly in the Purview "
+            "compliance portal (compliance.microsoft.com/compliancemanager)."
         ),
-        'users_without_mfa': lambda r: (
+        'users_without_mfa': lambda r: _finding_message(r) or (
             f"{_int(r.get('users_without_mfa'))} out of {_int(r.get('total_users'))} users do not have MFA registered."
         ),
         'global_administrator_accounts': lambda r: (
@@ -855,14 +891,14 @@ def resolve_description(parameter_key, raw_value, status):
             f"{_int(r.get('active_mailboxes'))} out of {_int(r.get('active_mailboxes')) + _int(r.get('inactive_mailboxes'))} "
             f"({_fmt_pct(r.get('active_ratio'), 0)}%) mailboxes are active."
         ),
-        'number_of_emails_read_received': lambda r: (
+        'number_of_emails_read_received': lambda r: _finding_message(r) or (
             f"{_int(r.get('engaged_users'))} out of {_int(r.get('total_users'))} ({_fmt_pct(r.get('read_ratio'), 0)}%) "
             f"have read more than 70% of their mail."
         ),
-        'number_of_emails_sent': lambda r: (
+        'number_of_emails_sent': lambda r: _finding_message(r) or (
             f"{_int(r.get('total_users'))} users sent an average of {_num(r.get('average_sent_per_user')):.1f} mails."
         ),
-        'meeting_recording_retention_policies': lambda r: (
+        'meeting_recording_retention_policies': lambda r: _finding_message(r) or (
             f"It is enabled and meeting recordings are set to automatically expire after {_int(r.get('expiration_days'))} days."
         ),
         'total_active_users_on_onedrive': lambda r: (
@@ -871,7 +907,7 @@ def resolve_description(parameter_key, raw_value, status):
         'active_users_on_sharepoint': lambda r: (
             f"{_int(r.get('active_users'))} out of {_int(r.get('total_users'))} ({_fmt_pct(r.get('active_ratio'), 0)}%) users are active."
         ),
-        'storage_quota_consumption': lambda r: (
+        'storage_quota_consumption': lambda r: _finding_message(r) or (
             "Total storage consumption data could not be retrieved."
             if _int(r.get('site_count')) == 0 else
             f"{_int(r.get('sites_over_90_percent'))} out of {_int(r.get('site_count'))} sites are over 90% storage quota; maximum usage is {_fmt_pct(r.get('max_storage_quota_ratio'), 1)}%."
@@ -880,10 +916,10 @@ def resolve_description(parameter_key, raw_value, status):
             f"{_int(r.get('active_site_count'))} out of {_int(r.get('total_sites'))} ({_fmt_pct(r.get('active_ratio'), 0)}%) sites are active."
         ),
         'third_party_apps_allowed': lambda r: str(r.get('status_text') or r.get('message') or r.get('actual_value') or 'Third-party apps are allowed.'),
-        'guest_access_enabled_disabled': lambda r: (
+        'guest_access_enabled_disabled': lambda r: _finding_message(r) or (
             f"Guest access on Teams is {'enabled' if r.get('guest_access_enabled') or r.get('AllowGuestUser') else 'disabled'}."
         ),
-        'teams_lobby_bypass': lambda r: str(r.get('lobby_bypass') or r.get('AutoAdmittedUsers') or r.get('message') or 'Teams lobby bypass setting could not be determined.'),
+        'teams_lobby_bypass': lambda r: _finding_message(r) or str(r.get('lobby_bypass') or r.get('AutoAdmittedUsers') or r.get('message') or 'Teams lobby bypass setting could not be determined.'),
     }
 
     handler = descriptions.get(parameter_key)
@@ -947,8 +983,6 @@ def _page6_pie_chart(labels, values, colors, title, figure_size=(6.34, 2.5)):
 
     fig, ax = plt.subplots(figsize=figure_size, dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('#000000')
-    fig.patch.set_linewidth(1.0)
     _add_chart_panel_shadow(fig)
 
     radius = 0.58
@@ -1023,7 +1057,7 @@ def _page6_pie_chart(labels, values, colors, title, figure_size=(6.34, 2.5)):
     ax.set_axis_off()
     plt.tight_layout(pad=0.35)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', edgecolor='#000000')
+    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', pad_inches=0)
     plt.close(fig)
     return path
 
@@ -1119,8 +1153,6 @@ def _page7_risk_pie_chart(labels, values, colors, title, figure_size):
 
     fig, ax = plt.subplots(figsize=figure_size, dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor('white')
-    fig.patch.set_edgecolor('#000000')
-    fig.patch.set_linewidth(1.0)
     _add_chart_panel_shadow(fig)
 
     radius = 0.62
@@ -1193,7 +1225,7 @@ def _page7_risk_pie_chart(labels, values, colors, title, figure_size):
     ax.set_axis_off()
     plt.tight_layout(pad=0.45)
     path = tempfile.mktemp(suffix='.png')
-    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', edgecolor='#000000')
+    plt.savefig(path, dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', pad_inches=0)
     plt.close(fig)
     return path
 
@@ -1704,9 +1736,17 @@ def _page10_license_pie_chart(license_counts, title, config=None):
             return "#AEE8D2"
         if "no license" in text or "none" == text.strip():
             return "#D9D9D9"
+        if "copilot" in text:
+            return "#ED7D31"
         if "business basic" in text:
             return "#F9D976"
+        if "business standard" in text:
+            return "#E6A0D8"
         if "business premium" in text:
+            return "#B4A7D6"
+        if "e5" in text:
+            return "#8FAADC"
+        if "e3" in text:
             return "#A9C2E8"
         if "exchange online" in text:
             return "#F4B183"
@@ -1723,8 +1763,6 @@ def _page10_license_pie_chart(license_counts, title, config=None):
 
     fig, ax = plt.subplots(figsize=(6.35, 3.05), dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor("white")
-    fig.patch.set_edgecolor("#000000")
-    fig.patch.set_linewidth(1.0)
     _add_chart_panel_shadow(fig)
     radius = 0.82
     startangle = 112
@@ -1779,7 +1817,7 @@ def _page10_license_pie_chart(license_counts, title, config=None):
     ax.set_axis_off()
     fig.subplots_adjust(left=0.03, right=0.97, top=0.90, bottom=0.14)
     path = tempfile.mktemp(suffix=".png")
-    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", edgecolor="#000000", bbox_inches=None)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", bbox_inches=None, pad_inches=0)
     plt.close(fig)
     return path
 
@@ -1798,8 +1836,18 @@ def _page10_user_info_chart(fields_dict, total_users, title, added_label, not_ad
 
     fig, ax = plt.subplots(figsize=(6.35, 2.95), dpi=REPORT_CHART_DPI)
     fig.patch.set_facecolor("white")
-    fig.patch.set_edgecolor("#000000")
-    fig.patch.set_linewidth(1.0)
+    fig.patches.append(
+        mpatches.Rectangle(
+            (0, 0),
+            1,
+            1,
+            transform=fig.transFigure,
+            fill=False,
+            edgecolor='#000000',
+            linewidth=1.0,
+            zorder=1000,
+        )
+    )
     bars_added = ax.bar(x, added, width, color=pass_color, label=added_label)
     bars_missing = ax.bar(x, missing, width, bottom=added, color=fail_color, label=not_added_label)
     for bar, value in zip(bars_added, added):
@@ -1821,7 +1869,7 @@ def _page10_user_info_chart(fields_dict, total_users, title, added_label, not_ad
         spine.set_linewidth(0.8)
     fig.subplots_adjust(left=0.04, right=0.985, top=0.84, bottom=0.20)
     path = tempfile.mktemp(suffix=".png")
-    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", edgecolor="#000000", bbox_inches=None)
+    plt.savefig(path, dpi=REPORT_CHART_DPI, facecolor="white", bbox_inches=None, pad_inches=0)
     plt.close(fig)
     return path
 
@@ -1875,7 +1923,7 @@ def _make_donut_chart_img(active, total, title, size=(2.5, 2.5)):
 
         fig, ax = plt.subplots(figsize=size, dpi=REPORT_CHART_DPI, facecolor='white')
         fig.patch.set_edgecolor('#000000')
-        fig.patch.set_linewidth(1.0)
+        fig.patch.set_linewidth(1.2)
         ax.set_facecolor('white')
         ax.pie(
             [pct, max(0, 100 - pct)],
@@ -1895,7 +1943,7 @@ def _make_donut_chart_img(active, total, title, size=(2.5, 2.5)):
         ax.set_axis_off()
 
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', edgecolor='#000000')
+        plt.savefig(buf, format='png', dpi=REPORT_CHART_DPI, bbox_inches=None, facecolor='white', pad_inches=0)
         plt.close(fig)
         buf.seek(0)
         return buf.read()
@@ -4384,6 +4432,22 @@ def _detail_paragraph(doc, text="", config=None, before=0, after=5, bold=False, 
     _apply_run_style(run, config, size_key, bold=bold, color=color)
     return p
 
+def _detail_multiline_paragraph(doc, text="", config=None, before=0, after=5, bold=False, color=None, size_key="caption_size"):
+    '''Like _detail_paragraph but renders embedded newlines as real line breaks, so a
+    multi-line evaluated_value (e.g. "Allowed:\\nGoogleDrive\\n...") shows correctly.'''
+    config = config or DEFAULT_REPORT_CONFIG
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(before)
+    p.paragraph_format.space_after = Pt(after)
+    p.paragraph_format.line_spacing = 1.03
+    lines = str(text or "").split("\n")
+    for i, line in enumerate(lines):
+        run = p.add_run(line)
+        _apply_run_style(run, config, size_key, bold=bold, color=color)
+        if i < len(lines) - 1:
+            run.add_break()
+    return p
+
 def _add_detail_finding_block(doc, row, idx, config, meter_cache=None, compact_top=False):
     title = row.get('title') or row.get('parameter') or DATA_NOT_AVAILABLE
     bar_path = _detail_title_bar(f"{str(idx).zfill(2)}: {title}")
@@ -4436,12 +4500,15 @@ def _add_detail_finding_block(doc, row, idx, config, meter_cache=None, compact_t
                 pass
 
     _detail_paragraph(doc, "Description:", config, after=7, bold=True)
+    # The Description must mirror assessment_findings.evaluated_value (source of truth).
+    # Only when a finding has no evaluated_value do we fall back to the computed/static text.
     description = (
-        resolve_description(row.get('parameter_key'), row.get('evidence'), status)
+        _report_description(row)
+        or resolve_description(row.get('parameter_key'), row.get('evidence'), status)
         or row.get('description', '')
         or DATA_NOT_AVAILABLE
     )
-    _detail_paragraph(doc, description, config, after=9)
+    _detail_multiline_paragraph(doc, description, config, after=9)
 
     _detail_paragraph(doc, "Risk:", config, after=7, bold=True)
     risk_text = row.get('risk') or _get_risk_text(severity)
@@ -5398,6 +5465,18 @@ def _add_page9_executive_dashboard(doc, assessment_data):
     values = defaultdict(lambda: DATA_NOT_AVAILABLE)
     values.update(metrics)
     for template in page_text.get("bullets", []):
+        # The Copilot license-eligibility bullet is narrative-only, sourced from an
+        # eligibility parameter that is NOT part of the scored 65 controls. When no reliable
+        # count is available it resolves to 0 — a placeholder, not a real tenant reading — so
+        # omit the statement entirely rather than display "0". When a real count is present
+        # (> 0) it renders normally with the live value.
+        if "{copilot_eligible_users}" in str(template):
+            try:
+                _eligible_count = int(float(values.get("copilot_eligible_users") or 0))
+            except (TypeError, ValueError):
+                _eligible_count = 0
+            if _eligible_count <= 0:
+                continue
         text = str(template).format_map(values)
         bold_terms = [
             f"{metrics.get('failed_parameters', 0)} gaps out of {metrics.get('total_assessed', 0)} parameters",

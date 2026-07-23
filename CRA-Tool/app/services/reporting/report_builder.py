@@ -3061,7 +3061,7 @@ def _build_cover_page(doc, report_data):
     header_trH.set(qn('w:hRule'), 'exact')
     header_trPr.append(header_trH)
 
-    # Add logo to header (right aligned)
+    # Add logo to header (right aligned) - logo only, no company name text
     header_para = header_cell.paragraphs[0]
     header_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     header_para.paragraph_format.space_before = Pt(12)
@@ -3075,13 +3075,6 @@ def _build_cover_page(doc, report_data):
             logo_run.font.name = 'Calibri'
         except Exception as e:
             logger.warning(f'[COVER] Could not load logo: {e}')
-            logo_header_run = header_para.add_run('[Company Logo]')
-            logo_header_run.font.size = Pt(10)
-            logo_header_run.font.color.rgb = R('0078D4')
-    else:
-        logo_header_run = header_para.add_run('[Company Logo]')
-        logo_header_run.font.size = Pt(10)
-        logo_header_run.font.color.rgb = R('0078D4')
 
     # Add spacing after header
     doc.add_paragraph()

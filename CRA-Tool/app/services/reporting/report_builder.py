@@ -3061,8 +3061,12 @@ def _build_cover_page(doc, report_data):
     header_trH.set(qn('w:hRule'), 'exact')
     header_trPr.append(header_trH)
 
+    # Clear header cell of all default content
+    for p in list(header_cell.paragraphs):
+        p._element.getparent().remove(p._element)
+
     # Add logo to header (right aligned) - logo only, no company name text
-    header_para = header_cell.paragraphs[0]
+    header_para = header_cell.add_paragraph()
     header_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     header_para.paragraph_format.space_before = Pt(12)
     header_para.paragraph_format.space_after = Pt(12)

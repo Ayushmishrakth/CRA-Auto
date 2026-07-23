@@ -1717,6 +1717,43 @@ def _page9_observation_metrics(assessment_data):
         'total_users': int(total_users or 0),
     }
 
+def _adjust_label_positions(label_positions):
+    """Adjust pie chart label positions to prevent overlapping leader lines."""
+    min_spacing = 0.22
+
+    left_labels = []
+    right_labels = []
+
+    for pos in label_positions:
+        if pos['x'] >= 0:
+            right_labels.append(pos)
+        else:
+            left_labels.append(pos)
+
+    for group in [left_labels, right_labels]:
+        if len(group) <= 1:
+            for pos in group:
+                pos['adjusted_pos'] = (1.36 * np.sign(pos['x']), 0.86 * pos['y'])
+            continue
+
+        group.sort(key=lambda p: p['y'], reverse=True)
+        adjusted_y = []
+        for i, pos in enumerate(group):
+            base_y = 0.86 * pos['y']
+            if i == 0:
+                adjusted_y.append(base_y)
+            else:
+                prev_y = adjusted_y[-1]
+                if base_y < prev_y - min_spacing:
+                    adjusted_y.append(base_y)
+                else:
+                    adjusted_y.append(prev_y - min_spacing)
+
+        for pos, adj_y in zip(group, adjusted_y):
+            pos['adjusted_pos'] = (1.36 * np.sign(pos['x']), adj_y)
+
+    return label_positions
+
 def _page10_license_pie_chart(license_counts, title, config=None):
     config = config or DEFAULT_REPORT_CONFIG
     cleaned = {
@@ -1784,15 +1821,35 @@ def _page10_license_pie_chart(license_counts, title, config=None):
         labels=None,
         wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
     )
+
+    label_positions = []
     for wedge, label, value in zip(wedges, labels, values):
         angle = (wedge.theta1 + wedge.theta2) / 2
         x = np.cos(np.deg2rad(angle))
         y = np.sin(np.deg2rad(angle))
-        label_x = 1.36 * np.sign(x)
-        label_y = 0.86 * y
+        label_positions.append({
+            'wedge': wedge,
+            'label': label,
+            'value': value,
+            'angle': angle,
+            'x': x,
+            'y': y,
+            'xy': (0.72 * x, 0.72 * y)
+        })
+
+    adjusted_positions = _adjust_label_positions(label_positions)
+
+    for pos_data in adjusted_positions:
+        wedge = pos_data['wedge']
+        label = pos_data['label']
+        value = pos_data['value']
+        x = pos_data['x']
+        xy = pos_data['xy']
+        label_x, label_y = pos_data['adjusted_pos']
+
         ax.annotate(
             f"{label}; {value}",
-            xy=(0.72 * x, 0.72 * y),
+            xy=xy,
             xytext=(label_x, label_y),
             ha="left" if x >= 0 else "right",
             va="center",

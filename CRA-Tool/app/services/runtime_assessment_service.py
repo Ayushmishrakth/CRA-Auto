@@ -53,6 +53,10 @@ RUNTIME_STAGES = {
 }
 
 POWERSHELL_REQUIRED_PARAMETERS: set[str] = {
+    # Purview audit log retention policies — requires Compliance Administrator role
+    # and Connect-IPPSSession (Security & Compliance PowerShell).
+    "audit_log_retention_duration",
+
     # Exchange controls whose manual source is Exchange Online PowerShell.
     "customer_lockbox",
     "external_storage_providers_in_owa",

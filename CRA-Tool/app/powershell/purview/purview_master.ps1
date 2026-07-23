@@ -61,6 +61,40 @@ if (-not $retentionEvidence -or $retentionEvidence.Count -eq 0) {
 }
 $path = Join-Path $out "audit_log_retention_duration.csv"; Export-CraCsv $retentionEvidence $path; $files.Add($path)
 
+$auditLogRetentionPolicies = Get-UnifiedAuditLogRetentionPolicy | Sort-Object -Property Priority -Descending | Select-Object Priority,Name,Description,RecordTypes,Operations,UserIds,RetentionDuration
+$auditLogRetentionEvidence = @()
+
+if ($auditLogRetentionPolicies -and $auditLogRetentionPolicies.Count -gt 0) {
+  $auditLogRetentionEvidence = $auditLogRetentionPolicies | ForEach-Object {
+    [pscustomobject]@{
+      Priority = $_.Priority
+      Name = $_.Name
+      Description = $_.Description
+      RecordTypes = ($_.RecordTypes -join ";")
+      Operations = ($_.Operations -join ";")
+      UserIds = ($_.UserIds -join ";")
+      RetentionDuration = $_.RetentionDuration
+      status = "pass"
+      value = "Audit log retention policy configured: $($_.RetentionDuration)"
+      evidence_source = "Get-UnifiedAuditLogRetentionPolicy"
+    }
+  }
+} else {
+  $auditLogRetentionEvidence = @([pscustomobject]@{
+    Priority = ""
+    Name = ""
+    Description = ""
+    RecordTypes = ""
+    Operations = ""
+    UserIds = ""
+    RetentionDuration = ""
+    status = "fail"
+    value = "No audit log retention policy configured"
+    evidence_source = "Get-UnifiedAuditLogRetentionPolicy"
+  })
+}
+$path = Join-Path $out "unified_audit_log_retention_policy.csv"; Export-CraCsv $auditLogRetentionEvidence $path; $files.Add($path)
+
 $audit = Get-AdminAuditLogConfig | Select-Object UnifiedAuditLogIngestionEnabled,AdminAuditLogEnabled,TestCmdletLoggingEnabled
 $path = Join-Path $out "audit_logging.csv"; Export-CraCsv $audit $path; $files.Add($path)
 $auditEvidence = $audit | Select-Object UnifiedAuditLogIngestionEnabled,AdminAuditLogEnabled,TestCmdletLoggingEnabled,@{Name="status";Expression={ if ($_.UnifiedAuditLogIngestionEnabled -eq $true -or $_.AdminAuditLogEnabled -eq $true) { "pass" } else { "fail" } }},@{Name="value";Expression={ "UnifiedAuditLogIngestionEnabled=$($_.UnifiedAuditLogIngestionEnabled);AdminAuditLogEnabled=$($_.AdminAuditLogEnabled)" }},@{Name="evidence_source";Expression={ "Get-AdminAuditLogConfig" }}

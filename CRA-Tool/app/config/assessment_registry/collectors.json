@@ -713,18 +713,18 @@
     }
   },
   {
-    "collection_method": "graph",
-    "collector_name": "graph.audit_log_retention_duration",
-    "collector_type": "graph",
-    "graph_endpoint": "/auditLogs/directoryAudits",
+    "collection_method": "powershell",
+    "collector_name": "powershell.audit_log_retention_duration",
+    "collector_type": "powershell",
+    "graph_endpoint": "",
     "parameter_key": "audit_log_retention_duration",
     "parser_mapping": {
-      "expected_output": "List of Audit log retention policies",
+      "expected_output": "Audit log retention policies with duration",
       "status_field": "status",
       "value_field": "value"
     },
-    "portal_mapping": "On the Purview portal, Solutions --> Audit --> Policies",
-    "powershell_script": "",
+    "portal_mapping": "On the Purview portal, Solutions --> Audit --> Retention Policies",
+    "powershell_script": "Get-UnifiedAuditLogRetentionPolicy; Connect-IPPSSession",
     "throttling_strategy": {
       "backoff_seconds": [
         2,

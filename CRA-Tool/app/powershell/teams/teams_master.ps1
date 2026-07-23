@@ -126,11 +126,48 @@ if ($ParameterKey -in $teamInventoryParameters) {
   Export-CraExpectedCsv $orphanEvidence $out "orphan_teams.csv" $files "Get-TeamUser -Role Owner"
 }
 
-$meetingPolicies = Get-CsTeamsMeetingPolicy |
+# Evaluate the org-wide Global meeting policy (the effective default for most users),
+# matching how the manual assessment scores these controls. Reading ALL policies here
+# would fail a control whenever any built-in/custom policy differs from Global, even
+# though the tenant default passes (the CSV evaluator fails on any single "fail" row).
+$meetingPolicies = Get-CsTeamsMeetingPolicy -Identity Global |
   Select-Object Identity,AllowCloudRecording,AllowTranscription,AllowAnonymousUsersToJoinMeeting,AutoAdmittedUsers,MeetingChatEnabledType,NewMeetingRecordingExpirationDays
 $path = Join-Path $out "meeting_policies.csv"; Export-CraCsv $meetingPolicies $path; $files.Add($path)
 
-$meetingPolicyEvidence = $meetingPolicies | Select-Object Identity,AllowCloudRecording,AllowTranscription,AllowAnonymousUsersToJoinMeeting,AutoAdmittedUsers,MeetingChatEnabledType,NewMeetingRecordingExpirationDays,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "AllowCloudRecording=$($_.AllowCloudRecording);AllowTranscription=$($_.AllowTranscription);MeetingChatEnabledType=$($_.MeetingChatEnabledType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
+# parameter_key -> @{ status; message; severity }; emitted directly to the contract so the
+# runtime persists the manual evaluated_value text (not the generic CSV placeholder).
+$findingMap = @{}
+
+# meeting_policies_configuration: recommended = cloud recording + transcription enabled.
+$mpRecommended = ($meetingPolicies.AllowCloudRecording -eq $true -and $meetingPolicies.AllowTranscription -eq $true)
+$findingMap["meeting_policies_configuration"] = @{ status = if ($mpRecommended) { "pass" } else { "fail" }; message = if ($mpRecommended) { "Recommended settings are configured" } else { "Recommended settings are not configured" }; severity = "medium" }
+
+# meeting_transcription_enabled
+$trOn = ($meetingPolicies.AllowTranscription -eq $true)
+$findingMap["meeting_transcription_enabled"] = @{ status = if ($trOn) { "pass" } else { "fail" }; message = if ($trOn) { "Meeting transcription is enabled" } else { "Meeting transcription is disabled" }; severity = "low" }
+
+# meeting_recording_retention_policies: recording enabled AND an expiration configured.
+$recOn = ($meetingPolicies.AllowCloudRecording -eq $true -and $meetingPolicies.NewMeetingRecordingExpirationDays)
+$findingMap["meeting_recording_retention_policies"] = @{ status = if ($recOn) { "pass" } else { "fail" }; message = if ($recOn) { "Retention policy is enabled expiration is set to $($meetingPolicies.NewMeetingRecordingExpirationDays) days" } else { "Retention policy is not enabled" }; severity = "medium" }
+
+# teams_lobby_bypass: restrictive lobby (not Everyone / EveryoneInCompany / federated) is a pass.
+$lobbyDesc = switch ("$($meetingPolicies.AutoAdmittedUsers)") {
+  "Everyone" { "Everyone (including anonymous users)" }
+  "EveryoneInCompany" { "Everyone in the organisation" }
+  "EveryoneInSameAndFederatedCompany" { "Everyone in the organisation and federated organisations" }
+  "EveryoneInCompanyExcludingGuests" { "Everyone in the organisation excluding guests" }
+  "OrganizerOnly" { "Organizer only" }
+  "InvitedUsers" { "Invited users only" }
+  default { "$($meetingPolicies.AutoAdmittedUsers)" }
+}
+$lobbyPass = ($meetingPolicies.AutoAdmittedUsers -and ($meetingPolicies.AutoAdmittedUsers -notin @("Everyone","EveryoneInCompany","EveryoneInSameAndFederatedCompany")))
+$findingMap["teams_lobby_bypass"] = @{ status = if ($lobbyPass) { "pass" } else { "fail" }; message = $lobbyDesc; severity = "medium" }
+
+# teams_meeting_chat: manual baseline treats MeetingChatEnabledType=Enabled as a pass.
+$chatOn = ("$($meetingPolicies.MeetingChatEnabledType)" -eq "Enabled")
+$findingMap["teams_meeting_chat"] = @{ status = if ($chatOn) { "pass" } else { "fail" }; message = if ($chatOn) { "Enabled on global policy" } else { "$($meetingPolicies.MeetingChatEnabledType)" }; severity = "low" }
+
+$meetingPolicyEvidence = $meetingPolicies | Select-Object Identity,AllowCloudRecording,AllowTranscription,AllowAnonymousUsersToJoinMeeting,AutoAdmittedUsers,MeetingChatEnabledType,NewMeetingRecordingExpirationDays,@{Name="status";Expression={ if ($_.AllowCloudRecording -eq $true -and $_.AllowTranscription -eq $true) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowCloudRecording=$($_.AllowCloudRecording);AllowTranscription=$($_.AllowTranscription);MeetingChatEnabledType=$($_.MeetingChatEnabledType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
 Export-CraExpectedCsv $meetingPolicyEvidence $out "meeting_policies_configuration.csv" $files "Get-CsTeamsMeetingPolicy"
 
 $transcriptionEvidence = $meetingPolicies | Select-Object Identity,AllowTranscription,@{Name="status";Expression={ if ($_.AllowTranscription -eq $true) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowTranscription=$($_.AllowTranscription)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsMeetingPolicy" }}
@@ -162,7 +199,10 @@ try {
   $clientConfig = Get-CsTeamsClientConfiguration | Select-Object Identity,AllowGuestUser,AllowEmailIntoChannel,RestrictedSenderList,AllowDropBox,AllowBox,AllowGoogleDrive,AllowShareFile,AllowEgnyte
   $guestAccessEvidence = $clientConfig | Select-Object Identity,AllowGuestUser,@{Name="status";Expression={ if ($_.AllowGuestUser -eq $false) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowGuestUser=$($_.AllowGuestUser)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
   $fileStorageEvidence = $clientConfig | Select-Object Identity,AllowDropBox,AllowBox,AllowGoogleDrive,AllowShareFile,AllowEgnyte,@{Name="status";Expression={ if ($_.AllowDropBox -or $_.AllowBox -or $_.AllowGoogleDrive -or $_.AllowShareFile -or $_.AllowEgnyte) { "fail" } else { "pass" } }},@{Name="value";Expression={ "AllowDropBox=$($_.AllowDropBox);AllowBox=$($_.AllowBox);AllowGoogleDrive=$($_.AllowGoogleDrive);AllowShareFile=$($_.AllowShareFile);AllowEgnyte=$($_.AllowEgnyte)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
-  $channelEmailEvidence = $clientConfig | Select-Object Identity,AllowEmailIntoChannel,@{Name="RestrictedSenderCount";Expression={ @($_.RestrictedSenderList).Count }},@{Name="status";Expression={ if ($_.AllowEmailIntoChannel -eq $false -or (@($_.RestrictedSenderList).Count -gt 0)) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowEmailIntoChannel=$($_.AllowEmailIntoChannel);RestrictedSenderCount=$(@($_.RestrictedSenderList).Count)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
+  # NOTE: @($null).Count returns 1 in PowerShell, so an empty/null RestrictedSenderList
+  # would falsely look like a configured whitelist. Filter out null entries before counting
+  # so a truly empty list counts as 0 (email-into-channel enabled with no restriction => FAIL).
+  $channelEmailEvidence = $clientConfig | Select-Object Identity,AllowEmailIntoChannel,@{Name="RestrictedSenderCount";Expression={ @($_.RestrictedSenderList | Where-Object { $_ }).Count }},@{Name="status";Expression={ if ($_.AllowEmailIntoChannel -eq $false -or (@($_.RestrictedSenderList | Where-Object { $_ }).Count -gt 0)) { "pass" } else { "fail" } }},@{Name="value";Expression={ "AllowEmailIntoChannel=$($_.AllowEmailIntoChannel);RestrictedSenderCount=$(@($_.RestrictedSenderList | Where-Object { $_ }).Count)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsClientConfiguration" }}
 } catch {
   $guestAccessEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTeamsClientConfiguration" })
   $fileStorageEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTeamsClientConfiguration" })
@@ -172,61 +212,82 @@ Export-CraExpectedCsv $guestAccessEvidence $out "guest_access_enabled_disabled.c
 Export-CraExpectedCsv $fileStorageEvidence $out "teams_file_storage_option.csv" $files "Get-CsTeamsClientConfiguration"
 Export-CraExpectedCsv $channelEmailEvidence $out "teams_channel_email_addresses.csv" $files "Get-CsTeamsClientConfiguration"
 
+if ($clientConfig) {
+  # guest_access_enabled_disabled: guest access must be disabled.
+  $guestOn = ($clientConfig.AllowGuestUser -eq $true)
+  $findingMap["guest_access_enabled_disabled"] = @{ status = if ($guestOn) { "fail" } else { "pass" }; message = if ($guestOn) { "Guest access is enabled" } else { "Guest access is disabled" }; severity = "high" }
+  # teams_file_storage_option: no third-party cloud storage providers may be allowed.
+  $storageProviders = @()
+  if ($clientConfig.AllowGoogleDrive) { $storageProviders += "GoogleDrive" }
+  if ($clientConfig.AllowDropBox)     { $storageProviders += "Dropbox" }
+  if ($clientConfig.AllowBox)         { $storageProviders += "Box" }
+  if ($clientConfig.AllowShareFile)   { $storageProviders += "ShareFile" }
+  if ($clientConfig.AllowEgnyte)      { $storageProviders += "Egnyte" }
+  $findingMap["teams_file_storage_option"] = @{ status = if ($storageProviders.Count -gt 0) { "fail" } else { "pass" }; message = if ($storageProviders.Count -gt 0) { "Allowed:`n" + ($storageProviders -join "`n") } else { "No third-party file storage providers are allowed" }; severity = "medium" }
+  # teams_channel_email_addresses: email-into-channel must be off or sender-restricted.
+  $restrictedCount = @($clientConfig.RestrictedSenderList | Where-Object { $_ }).Count
+  $emailOn = ($clientConfig.AllowEmailIntoChannel -eq $true)
+  $findingMap["teams_channel_email_addresses"] = @{ status = if (-not $emailOn -or $restrictedCount -gt 0) { "pass" } else { "fail" }; message = if (-not $emailOn) { "Disabled" } elseif ($restrictedCount -gt 0) { "Enabled (restricted to $restrictedCount sender domain(s))" } else { "Enabled" }; severity = "medium" }
+} else {
+  foreach ($k in @("guest_access_enabled_disabled","teams_file_storage_option","teams_channel_email_addresses")) {
+    $findingMap[$k] = @{ status = "fail"; message = "Teams client configuration could not be verified"; severity = "high" }
+  }
+}
+
 try {
-  $appPolicy = Get-CsTeamsAppPermissionPolicy | Select-Object Identity,GlobalCatalogAppsType,PrivateCatalogAppsType
-  $thirdPartyEvidence = $appPolicy | Select-Object Identity,GlobalCatalogAppsType,PrivateCatalogAppsType,@{Name="status";Expression={ if ($_.GlobalCatalogAppsType -eq "BlockedAppList") { "pass" } else { "fail" } }},@{Name="value";Expression={ "GlobalCatalogAppsType=$($_.GlobalCatalogAppsType);PrivateCatalogAppsType=$($_.PrivateCatalogAppsType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsAppPermissionPolicy" }}
+  # GlobalCatalogAppsType: "BlockedAppList" = allow ALL third-party apps except a blocklist
+  # (permissive ⇒ apps ARE allowed). Only "BlockAllApps" effectively disables third-party
+  # apps. The previous rule treated BlockedAppList as pass, which was inverted.
+  $appPolicy = Get-CsTeamsAppPermissionPolicy -Identity Global | Select-Object Identity,GlobalCatalogAppsType,PrivateCatalogAppsType
+  $thirdPartyEvidence = $appPolicy | Select-Object Identity,GlobalCatalogAppsType,PrivateCatalogAppsType,@{Name="status";Expression={ if ($_.GlobalCatalogAppsType -eq "BlockAllApps") { "pass" } else { "fail" } }},@{Name="value";Expression={ "GlobalCatalogAppsType=$($_.GlobalCatalogAppsType);PrivateCatalogAppsType=$($_.PrivateCatalogAppsType)" }},@{Name="evidence_source";Expression={ "Get-CsTeamsAppPermissionPolicy" }}
 } catch {
   $thirdPartyEvidence = @([pscustomobject]@{ status = "not_collected"; value = $_.Exception.Message; evidence_source = "Get-CsTeamsAppPermissionPolicy" })
 }
 Export-CraExpectedCsv $thirdPartyEvidence $out "third_party_apps_allowed.csv" $files "Get-CsTeamsAppPermissionPolicy"
 
+if ($appPolicy) {
+  $appsEffectivelyDisabled = ("$($appPolicy.GlobalCatalogAppsType)" -eq "BlockAllApps")
+  $findingMap["third_party_apps_allowed"] = @{ status = if ($appsEffectivelyDisabled) { "pass" } else { "fail" }; message = if ($appsEffectivelyDisabled) { "Third-party apps are not allowed" } else { "Third-party apps are allowed" }; severity = "high" }
+} else {
+  $findingMap["third_party_apps_allowed"] = @{ status = "fail"; message = "Third-party app policy could not be verified"; severity = "high" }
+}
+
+# Copilot integration is governed org-wide by CopilotFromHomeTenant on the
+# multi-tenant org configuration — a single effective value, so no per-policy
+# aggregation is needed. Matches the manual assessment (PASS when Copilot is
+# enabled) and the value verified live via cert auth (CopilotFromHomeTenant=Enabled).
 try {
-  $copilotApps = @(Get-TeamsApp -DisplayName "Copilot" -ErrorAction Stop)
-  $setupPolicies = @(Get-CsTeamsAppSetupPolicy -ErrorAction Stop | Select-Object Identity,AllowUserPinning,PinnedAppBarApps,PinnedMessageBarApps,AppPresetList)
-  $permissionPolicies = @(Get-CsTeamsAppPermissionPolicy -ErrorAction Stop | Select-Object Identity,DefaultCatalogAppsType,GlobalCatalogAppsType,PrivateCatalogAppsType,DefaultCatalogApps,GlobalCatalogApps,PrivateCatalogApps)
-  $copilotEvidence = foreach ($policy in $permissionPolicies) {
-    $allowsMicrosoftApps = $policy.DefaultCatalogAppsType -ne "AllowedAppList" -or @($policy.DefaultCatalogApps).Count -gt 0
-    [pscustomobject]@{
-      Identity = $policy.Identity
-      CopilotAppMatches = @($copilotApps).Count
-      DefaultCatalogAppsType = $policy.DefaultCatalogAppsType
-      GlobalCatalogAppsType = $policy.GlobalCatalogAppsType
-      PrivateCatalogAppsType = $policy.PrivateCatalogAppsType
-      SetupPolicyCount = @($setupPolicies).Count
-      AllowsMicrosoftApps = $allowsMicrosoftApps
-      status = if (@($copilotApps).Count -gt 0 -and $allowsMicrosoftApps) { "pass" } else { "fail" }
-      value = "CopilotAppMatches=$(@($copilotApps).Count);DefaultCatalogAppsType=$($policy.DefaultCatalogAppsType);AllowsMicrosoftApps=$allowsMicrosoftApps"
-      evidence_source = "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
-    }
-  }
-  if (-not $copilotEvidence -or @($copilotEvidence).Count -eq 0) {
-    $copilotEvidence = @([pscustomobject]@{
-      Identity = ""
-      CopilotAppMatches = @($copilotApps).Count
-      DefaultCatalogAppsType = ""
-      GlobalCatalogAppsType = ""
-      PrivateCatalogAppsType = ""
-      SetupPolicyCount = @($setupPolicies).Count
-      AllowsMicrosoftApps = $false
-      status = if (@($copilotApps).Count -gt 0) { "pass" } else { "fail" }
-      value = "CopilotAppMatches=$(@($copilotApps).Count);No app permission policies returned"
-      evidence_source = "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
-    })
-  }
+  $copilotConfig = Get-CsTeamsMultiTenantOrganizationConfiguration -ErrorAction Stop | Select-Object CopilotFromHomeTenant
+  $copilotOn = ("$($copilotConfig.CopilotFromHomeTenant)" -in @("Enabled","True")) -or ($copilotConfig.CopilotFromHomeTenant -eq $true)
+  $copilotEvidence = @([pscustomobject]@{
+    Identity = "Global"
+    CopilotFromHomeTenant = "$($copilotConfig.CopilotFromHomeTenant)"
+    status = if ($copilotOn) { "pass" } else { "fail" }
+    value = "CopilotFromHomeTenant=$($copilotConfig.CopilotFromHomeTenant)"
+    evidence_source = "Get-CsTeamsMultiTenantOrganizationConfiguration"
+  })
 } catch {
   $copilotEvidence = @([pscustomobject]@{
     Identity = ""
-    CopilotAppMatches = ""
-    DefaultCatalogAppsType = ""
-    GlobalCatalogAppsType = ""
-    PrivateCatalogAppsType = ""
-    SetupPolicyCount = ""
-    AllowsMicrosoftApps = ""
+    CopilotFromHomeTenant = ""
     status = "not_collected"
     value = $_.Exception.Message
-    evidence_source = "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
+    evidence_source = "Get-CsTeamsMultiTenantOrganizationConfiguration"
   })
 }
-Export-CraExpectedCsv $copilotEvidence $out "copilot_integration_enabled.csv" $files "Get-TeamsApp / Get-CsTeamsAppPermissionPolicy / Get-CsTeamsAppSetupPolicy"
+Export-CraExpectedCsv $copilotEvidence $out "copilot_integration_enabled.csv" $files "Get-CsTeamsMultiTenantOrganizationConfiguration"
 
-Write-CraContract -CollectorName $CollectorName -TenantId $TenantId -ParameterKey $ParameterKey -GeneratedFiles $files.ToArray()
+if ($copilotConfig) {
+  $findingMap["copilot_integration_enabled"] = @{ status = if ($copilotOn) { "pass" } else { "fail" }; message = if ($copilotOn) { "Copilot integration is enabled" } else { "Copilot integration is disabled" }; severity = "low" }
+} else {
+  $findingMap["copilot_integration_enabled"] = @{ status = "fail"; message = "Copilot integration could not be verified"; severity = "low" }
+}
+
+# Emit the real finding for the current parameter (manual evaluated_value text). Falls back
+# to the generic CSV-evidence path only for a parameter not covered by the map.
+if ($findingMap.ContainsKey($ParameterKey)) {
+  $f = $findingMap[$ParameterKey]
+  Write-CraContract -CollectorName $CollectorName -TenantId $TenantId -ParameterKey $ParameterKey -GeneratedFiles $files.ToArray() -FindingStatus $f.status -FindingMessage $f.message -FindingSeverity $f.severity
+} else {
+  Write-CraContract -CollectorName $CollectorName -TenantId $TenantId -ParameterKey $ParameterKey -GeneratedFiles $files.ToArray()
+}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 import traceback
@@ -31,11 +32,13 @@ from app.db.session import AsyncSessionLocal
 from app.services.audit_service import AuditEvent, audit_service
 from app.services.event_bus import emit_event
 from app.services.exchange_token_service import get_exchange_access_token
-from app.services.graph_cra_collector_service import GRAPH_COLLECTORS
+from app.services.graph.graph_client import GraphClient
+from app.services.graph_cra_collector_service import GRAPH_COLLECTORS, get_app_graph_token
 from app.services.powershell import PowerShellExecutionEngine
 from app.services.registry_service import get_registry
 from app.services.runtime_recommendation_service import calculate_priority_score, generate_recommendations
 from app.services.runtime_scoring_service import apply_scores
+from app.services.tenant_certificate_service import load_certificate_from_tenant
 from app.services.tenant_secret_service import decrypt_client_secret
 from app.utils.logger import logger
 
@@ -50,25 +53,33 @@ RUNTIME_STAGES = {
 }
 
 POWERSHELL_REQUIRED_PARAMETERS: set[str] = {
-    # Entra controls where the manual finding is based on Microsoft Graph
-    # PowerShell report/policy output rather than the app-only Graph fallback.
-    "user_consent_for_applications",
-
     # Exchange controls whose manual source is Exchange Online PowerShell.
     "customer_lockbox",
     "external_storage_providers_in_owa",
     "full_calendar_schedules_able_to_be_shared_externally",
+    # Evaluated via Get-EXOMailboxStatistics (Exchange PS) instead of the Microsoft Graph
+    # usage-report download, which 302-redirects to a report host that can fail DNS
+    # resolution ("[Errno 11001] getaddrinfo failed") in restricted networks.
+    "mailbox_storage_usage",
 
     # Teams governance controls exposed through Teams PowerShell, not app-only
-    # Microsoft Graph.
+    # Microsoft Graph. All confirmed live via certificate app-only auth
+    # (Connect-CraTeams -Certificate) with the Teams Administrator role assigned.
     "guest_access_enabled_disabled",
     "meeting_recording_retention_policies",
     "teams_channel_email_addresses",
     "teams_file_storage_option",
     "teams_lobby_bypass",
+    "copilot_integration_enabled",
+    "meeting_policies_configuration",
+    "meeting_transcription_enabled",
+    "teams_meeting_chat",
+    "third_party_apps_allowed",
 
-    # SharePoint tenant settings where Graph beta omits the exact manual fields.
-    "days_to_retain_a_deleted_user_s_onedrive",
+    # SharePoint tenant settings where Graph beta omits the exact manual fields
+    # (anonymous link type, anonymous link expiry, external-user expiry). These must be
+    # read from PnP Get-PnPTenant. days_to_retain is intentionally NOT here — Graph beta
+    # DOES expose deletedUserPersonalSiteRetentionPeriodInDays, so it uses the Graph path.
     "expiration_policy_for_anyone_links",
     "permission_setting_for_anyone_links",
     "sharepoint_and_onedrive_guest_access_expiry",
@@ -190,6 +201,84 @@ def _runtime_parameters(parameters: list[dict[str, Any]]) -> list[dict[str, Any]
     """Run the approved registry list; each parameter chooses Graph or PowerShell at execution time."""
 
     return parameters
+
+
+def _sharepoint_admin_url_from_onmicrosoft(domain: str | None) -> str | None:
+    """Derive the SharePoint admin URL from a tenant's .onmicrosoft.com domain.
+
+    e.g. contoso.onmicrosoft.com -> https://contoso-admin.sharepoint.com
+    Returns None for custom domains (caller falls back to a Graph lookup).
+    """
+    if not domain:
+        return None
+    normalized = domain.strip().lower()
+    if not normalized.endswith(".onmicrosoft.com"):
+        return None
+    prefix = normalized[: -len(".onmicrosoft.com")].split(".")[0]
+    return f"https://{prefix}-admin.sharepoint.com" if prefix else None
+
+
+async def _derive_exchange_organization(
+    tenant: ConnectedTenant, primary_domain: str | None
+) -> str | None:
+    """Resolve the Exchange Online organization (the tenant's initial .onmicrosoft.com
+    domain) used by app-only Connect-ExchangeOnline. Prefers the cached primary domain;
+    otherwise queries the tenant's initial verified domain via Microsoft Graph so Exchange
+    collectors are never skipped merely because primary_domain was not cached at deploy time.
+    """
+    if primary_domain:
+        return primary_domain
+    try:
+        token = await get_app_graph_token(tenant)
+        client = GraphClient(access_token=token)
+        response = await client.get("/organization", params={"$select": "verifiedDomains"})
+        first_onmicrosoft: str | None = None
+        for org in response.get("value") or []:
+            for domain in org.get("verifiedDomains") or []:
+                name = str(domain.get("name") or "")
+                if not name.lower().endswith(".onmicrosoft.com"):
+                    continue
+                if domain.get("isInitial"):
+                    return name
+                first_onmicrosoft = first_onmicrosoft or name
+        if first_onmicrosoft:
+            return first_onmicrosoft
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[ASSESSMENT] Could not derive Exchange organization via Graph for tenant %s: %s",
+            tenant.tenant_id,
+            exc,
+        )
+    return None
+
+
+async def _derive_sharepoint_admin_url(
+    tenant: ConnectedTenant, primary_domain: str | None
+) -> str | None:
+    """Resolve the tenant SharePoint admin URL (multi-tenant, no hardcoded values).
+
+    Prefers the stored primary domain when it is the .onmicrosoft.com initial domain;
+    otherwise queries the tenant's initial verified domain via Microsoft Graph.
+    """
+    url = _sharepoint_admin_url_from_onmicrosoft(primary_domain)
+    if url:
+        return url
+    try:
+        token = await get_app_graph_token(tenant)
+        client = GraphClient(access_token=token)
+        response = await client.get("/organization", params={"$select": "verifiedDomains"})
+        for org in response.get("value") or []:
+            for domain in org.get("verifiedDomains") or []:
+                name = str(domain.get("name") or "")
+                if domain.get("isInitial") and name.lower().endswith(".onmicrosoft.com"):
+                    return _sharepoint_admin_url_from_onmicrosoft(name)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[ASSESSMENT] Could not derive SharePoint admin URL via Graph for tenant %s: %s",
+            tenant.tenant_id,
+            exc,
+        )
+    return None
 
 
 def _select_runtime(
@@ -682,30 +771,12 @@ MANUAL_VERIFICATION_MESSAGES: dict[str, str] = {
         "Global policy > AutoAdmittedUsers. To enable automated checking: complete Teams "
         "Administrator role assignment."
     ),
-    # --- Exchange Online (app authenticates but lacks Exchange RBAC role: UnAuthorized) ---
-    "customer_lockbox": (
-        "Customer Lockbox could not be verified automatically — Exchange Online PowerShell returned "
-        "UnAuthorized. The CRA app has Exchange.ManageAsApp consent but is not yet assigned an "
-        "Exchange Online admin role. To enable: in Exchange Admin Center > Roles > Admin roles, "
-        "assign the CRA app service principal a role with View-Only Configuration (or run "
-        "New-ServicePrincipal + Add-RoleGroupMember). Manual check: Microsoft 365 Admin Center > "
-        "Settings > Org settings > Security & privacy > Customer Lockbox "
-        "(Get-OrganizationConfig | fl CustomerLockBoxEnabled)."
-    ),
-    "external_storage_providers_in_owa": (
-        "External storage providers in OWA could not be verified automatically — Exchange Online "
-        "PowerShell returned UnAuthorized. The CRA app has Exchange.ManageAsApp consent but is not "
-        "yet assigned an Exchange Online admin role. To enable: assign the CRA app service principal "
-        "an Exchange role with View-Only Configuration. Manual check: Exchange Admin Center > Outlook "
-        "Web App policies (Get-OwaMailboxPolicy | fl AdditionalStorageProvidersAvailable)."
-    ),
-    "full_calendar_schedules_able_to_be_shared_externally": (
-        "External calendar sharing could not be verified automatically — Exchange Online PowerShell "
-        "returned UnAuthorized. The CRA app has Exchange.ManageAsApp consent but is not yet assigned "
-        "an Exchange Online admin role. To enable: assign the CRA app service principal an Exchange "
-        "role with View-Only Configuration. Manual check: Exchange Admin Center > Organization > "
-        "Sharing (Get-SharingPolicy | fl Domains)."
-    ),
+    # --- Exchange Online (customer_lockbox / external_storage_providers_in_owa /
+    # full_calendar_schedules_able_to_be_shared_externally) are intentionally OMITTED here. ---
+    # exchange_master.ps1 now emits the real, self-classified root cause (module not
+    # installed / authentication / admin consent / certificate / RBAC / actual tenant
+    # configuration), so these findings must NOT be overwritten with a hard-coded
+    # "Unauthorized" message. The report displays whatever the collector reported.
     # --- SharePoint / OneDrive (require PnP cert app-only: pending consent) ---
     "days_to_retain_a_deleted_user_s_onedrive": (
         "OneDrive deleted user retention period could not be verified automatically. To enable: "
@@ -733,6 +804,7 @@ async def _collect_findings(
         select(ConnectedTenant).where(ConnectedTenant.tenant_id == assessment.tenant_id)
     )
     collector_environment: dict[str, str] = {}
+    temp_pfx_path: str | None = None
     if tenant and tenant.app_client_id and tenant.encrypted_client_secret:
         client_secret = decrypt_client_secret(tenant)
         collector_environment = {
@@ -745,40 +817,63 @@ async def _collect_findings(
         # The token is for https://outlook.office365.com/.default via client_credentials.
         # primary_domain is stored in deployment_diagnostics during tenant deployment.
         primary_domain: str | None = (tenant.deployment_diagnostics or {}).get("primary_domain")
-        if primary_domain:
+        # Always resolve the Exchange organization (derive it via Graph when it was not cached
+        # at deploy time) so the Exchange collectors ALWAYS attempt app-only cert auth and are
+        # never silently skipped for a missing primary_domain.
+        exchange_org = await _derive_exchange_organization(tenant, primary_domain)
+        if exchange_org:
+            # Exchange app-only auth. Certificate auth (set in the cert block below via
+            # CRA_CERT_PFX_PATH + CRA_GRAPH_CLIENT_ID) is preferred and works with the
+            # Exchange Administrator / Global Reader role. The access token is acquired as a
+            # fallback only; it is rejected in tenants with "role isn't supported in this scenario".
+            collector_environment["CRA_EXCHANGE_AUTH_MODE"] = "app"
+            collector_environment["CRA_EXCHANGE_ORGANIZATION"] = exchange_org
+            if not primary_domain:
+                primary_domain = exchange_org
             exchange_token = await get_exchange_access_token(tenant.tenant_id, tenant.app_client_id, client_secret)
             if exchange_token:
-                collector_environment["CRA_EXCHANGE_AUTH_MODE"] = "app"
                 collector_environment["CRA_EXCHANGE_ACCESS_TOKEN"] = exchange_token
-                collector_environment["CRA_EXCHANGE_ORGANIZATION"] = primary_domain
             else:
-                logger.warning("[ASSESSMENT] Exchange Online token not available for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
+                logger.info("[ASSESSMENT] Exchange Online token not available for tenant %s — Exchange PS collectors will use certificate app-only auth", tenant.tenant_id)
         else:
-            logger.warning("[ASSESSMENT] primary_domain not found in deployment_diagnostics for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
+            logger.warning("[ASSESSMENT] Exchange organization could not be resolved for tenant %s — Exchange PS collectors will be skipped", tenant.tenant_id)
 
-        # Certificate app-only auth for PnP/SharePoint + Teams collectors.
-        # The MicrosoftTeams and PnP.PowerShell modules cannot use client-secret
-        # app auth — they require a certificate. Wire the per-tenant cert env vars
-        # so Connect-CraPnP / Connect-CraTeams (cra_common.ps1) can load it.
-        # .env values are read via pydantic settings (not os.environ), so they
-        # must be injected into collector_environment to reach the PS subprocess
-        # (powershell_executor merges env={**os.environ, **collector_environment}).
-        cert_pfx_path = settings.cra_cert_pfx_path or str(
-            Path(__file__).resolve().parents[2] / "secrets" / "cra_cert.pfx"
-        )
-        cert_pfx_password = settings.cra_cert_pfx_password
-        cert_thumbprint = settings.cra_cert_thumbprint
-        if cert_thumbprint or os.path.exists(cert_pfx_path):
+        # Certificate app-only auth for PnP/SharePoint + Teams collectors. These
+        # modules require a certificate (not a client secret). Load the per-tenant
+        # certificate stored (encrypted) at deployment time, write the PFX to a temp
+        # file for the PowerShell subprocess, and wire the env vars Connect-CraPnP /
+        # Connect-CraTeams read. If no cert is stored yet, skip silently — those
+        # collectors fall back to a graceful, actionable failure message.
+        try:
+            _cert = load_certificate_from_tenant(tenant)
+        except Exception as cert_exc:  # noqa: BLE001
+            _cert = None
+            logger.warning("[ASSESSMENT] Could not load stored certificate for tenant %s: %s", tenant.tenant_id, cert_exc)
+        if _cert:
+            _pfx_bytes, _pfx_password = _cert
+            _fd, temp_pfx_path = tempfile.mkstemp(suffix=".pfx", prefix="cra_cert_")
+            with os.fdopen(_fd, "wb") as _pfx_file:
+                _pfx_file.write(_pfx_bytes)
             collector_environment["CRA_PNP_AUTH_MODE"] = "certificate"
             collector_environment["CRA_PNP_TENANT"] = tenant.tenant_id
-            if os.path.exists(cert_pfx_path):
-                collector_environment["CRA_CERT_PFX_PATH"] = cert_pfx_path
-                if cert_pfx_password:
-                    collector_environment["CRA_CERT_PFX_PASSWORD"] = cert_pfx_password
-            if cert_thumbprint:
-                collector_environment["CRA_CERT_THUMBPRINT"] = cert_thumbprint
+            collector_environment["CRA_CERT_PFX_PATH"] = temp_pfx_path
+            if _pfx_password:
+                collector_environment["CRA_CERT_PFX_PASSWORD"] = _pfx_password
+            if tenant.cert_thumbprint:
+                collector_environment["CRA_CERT_THUMBPRINT"] = tenant.cert_thumbprint
+            # SharePoint PnP collectors need the tenant admin URL. The collector manifest
+            # ships admin_url=null (it is tenant-specific), so derive it here and pass it
+            # via env; without this, sharepoint_master.ps1 early-returns "admin_url missing"
+            # and never evaluates the anyone-links / guest-expiry settings.
+            sharepoint_admin_url = await _derive_sharepoint_admin_url(tenant, primary_domain)
+            if sharepoint_admin_url:
+                collector_environment["CRA_SHAREPOINT_ADMIN_URL"] = sharepoint_admin_url
+                logger.info("[ASSESSMENT] SharePoint admin URL resolved for tenant %s: %s", tenant.tenant_id, sharepoint_admin_url)
+            else:
+                logger.warning("[ASSESSMENT] SharePoint admin URL could not be derived for tenant %s — SharePoint PnP collectors will report admin_url missing", tenant.tenant_id)
+            logger.info("[ASSESSMENT] Per-tenant certificate loaded for tenant %s — PnP/Teams collectors will use app-only cert auth", tenant.tenant_id)
         else:
-            logger.warning("[ASSESSMENT] No certificate configured (CRA_CERT_PFX_PATH / CRA_CERT_THUMBPRINT) for tenant %s — PnP/Teams certificate collectors will be skipped", tenant.tenant_id)
+            logger.info("[ASSESSMENT] No certificate stored for tenant %s — PnP/Teams collectors will fail gracefully with an actionable message", tenant.tenant_id)
     await db.execute(delete(AssessmentFinding).where(AssessmentFinding.assessment_id == assessment.id))
     await db.execute(delete(AssessmentArtifact).where(AssessmentArtifact.assessment_id == assessment.id))
     await db.commit()
@@ -912,7 +1007,7 @@ async def _collect_findings(
                     evaluated_value=(
                         "Service is not available in the tenant — this is a readiness gap."
                         if _dep_status == "service_unavailable"
-                        else "Collector failed before producing validated CRA evidence."
+                        else "Configuration for this control could not be automatically retrieved during this assessment run."
                     ),
                     collector_result=collector_result,
                 )
@@ -1133,7 +1228,7 @@ async def _collect_findings(
                 evaluated_value=(
                     "Service is not available in the tenant — this is a readiness gap."
                     if _exc_dep_status == "service_unavailable"
-                    else "Collector execution raised an exception before producing validated CRA evidence."
+                    else "Configuration for this control could not be automatically retrieved during this assessment run."
                 ),
                 error=error_message,
             )
@@ -1217,6 +1312,14 @@ async def _collect_findings(
         + telemetry_summary["collector_timeouts"],
     }
     await db.commit()
+
+    # Clean up the temporary per-tenant certificate PFX written for the PS subprocess.
+    if temp_pfx_path:
+        try:
+            os.unlink(temp_pfx_path)
+        except OSError:
+            pass
+
     return findings
 
 

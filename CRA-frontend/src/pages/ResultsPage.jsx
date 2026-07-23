@@ -106,31 +106,31 @@ const SERVICE_BY_PARAMETER_KEY = {
 };
 
 const PILLAR_BY_PARAMETER_KEY = {
-  custom_banned_password_list: "Security",
-  restricted_access_to_microsoft_entra_admin_centre: "Security",
-  emergency_access_accounts: "Security",
-  devices_without_compliance_policies: "Security",
+  custom_banned_password_list: "Best Practice",
+  restricted_access_to_microsoft_entra_admin_centre: "Best Practice",
+  emergency_access_accounts: "Best Practice",
+  devices_without_compliance_policies: "Best Practice",
   authentication_methods_enabled: "Security",
   global_administrator_accounts: "Security",
   self_service_password_reset_authentication_method: "Security",
-  tenant_collaboration_invitations: "Governance",
-  user_consent_for_applications: "Governance",
+  tenant_collaboration_invitations: "Security",
+  user_consent_for_applications: "Security",
   entra_third_party_app_integrations: "Governance",
-  auto_expiration_policy_for_inactive_m365_groups: "Governance",
+  auto_expiration_policy_for_inactive_m365_groups: "Security",
   entra_tenant_creation_by_non_admin: "Best Practice",
   admin_consent_workflow: "Best Practice",
-  cap_policies_for_risky_sign_ins: "Best Practice",
+  cap_policies_for_risky_sign_ins: "Governance",
   conditional_access_policies_exclusion: "Best Practice",
-  users_without_mfa: "Best Practice",
-  customer_lockbox: "Best Practice",
-  guest_invite_settings: "Best Practice",
-  guest_users_count: "Best Practice",
+  users_without_mfa: "Security",
+  customer_lockbox: "Security",
+  guest_invite_settings: "Security",
+  guest_users_count: "Governance",
   user_information: "Best Practice",
-  account_enabled: "Best Practice",
+  account_enabled: "Security",
 
   mailboxes_status_active_inactive: "Governance",
   external_storage_providers_in_owa: "Security",
-  mailbox_storage_usage: "Governance",
+  mailbox_storage_usage: "Best Practice",
   full_calendar_schedules_able_to_be_shared_externally: "Security",
   number_of_emails_read_received: "Best Practice",
   number_of_emails_sent: "Best Practice",
@@ -159,7 +159,7 @@ const PILLAR_BY_PARAMETER_KEY = {
   activer_inactive_teams_users: "Best Practice",
   teams_meeting_chat: "Governance",
   meeting_recording_retention_policies: "Best Practice",
-  teams_channel_email_addresses: "Best Practice",
+  teams_channel_email_addresses: "Governance",
 
   external_sharing_settings: "Security",
   days_to_retain_a_deleted_user_s_onedrive: "Governance",
@@ -320,6 +320,14 @@ function buildDashboardModel(result) {
     const rows = findings.filter((item) => serviceForFinding(item) === service.key);
     const failed = rows.filter((item) => serviceDisplayStatus(item) === "fail");
     const passed = rows.filter((item) => serviceDisplayStatus(item) === "pass");
+    // Every parameter that is neither a clean PASS nor a clean FAIL (e.g. warning,
+    // not_collected) belongs to the "review" bucket so it is always rendered. This keeps
+    // total_count === fail + pass + review and prevents the UI from silently hiding a
+    // parameter that was counted in the service total.
+    const reviewed = rows.filter((item) => {
+      const status = serviceDisplayStatus(item);
+      return status !== "fail" && status !== "pass";
+    });
     const severity = Object.fromEntries(SEVERITY_CONFIG.map((item) => [item.key, 0]));
     failed.forEach((item) => {
       const key = serviceDisplaySeverity(item);
@@ -330,6 +338,7 @@ function buildDashboardModel(result) {
       ...service,
       fail_count: failed.length,
       pass_count: passed.length,
+      review_count: reviewed.length,
       total_count: rows.length,
       fail_pct: failPct,
       severity_breakdown: severity,
@@ -663,10 +672,14 @@ function shortEvidence(finding) {
 }
 
 function ParameterList({ serviceName, status, findings }) {
-  const filtered = findings.filter((finding) => (
-    serviceForFinding(finding) === serviceName &&
-    serviceDisplayStatus(finding) === status
-  ));
+  const filtered = findings.filter((finding) => {
+    if (serviceForFinding(finding) !== serviceName) return false;
+    const rowStatus = serviceDisplayStatus(finding);
+    // The "review" bucket surfaces every parameter that is not a clean pass/fail so no
+    // parameter is ever hidden from the customer.
+    if (status === "review") return rowStatus !== "fail" && rowStatus !== "pass";
+    return rowStatus === status;
+  });
 
   if (filtered.length === 0) {
     return (
@@ -717,8 +730,11 @@ function ServiceCard({ service, findings, expandedService, onToggleExpand }) {
   const barColor = service.fail_pct > 66 ? COLORS.red : service.fail_pct > 33 ? COLORS.amber : COLORS.green;
   const failKey = `${service.key}-fail`;
   const passKey = `${service.key}-pass`;
+  const reviewKey = `${service.key}-review`;
   const isFailExpanded = expandedService === failKey;
   const isPassExpanded = expandedService === passKey;
+  const isReviewExpanded = expandedService === reviewKey;
+  const reviewCount = service.review_count || 0;
   return (
     <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 transition-all duration-200">
       <div className="flex items-center justify-between gap-3">
@@ -749,6 +765,19 @@ function ServiceCard({ service, findings, expandedService, onToggleExpand }) {
           >
             {service.pass_count} pass
           </ClickablePill>
+          {reviewCount > 0 && (
+            <ClickablePill
+              color={COLORS.amber}
+              active={isReviewExpanded}
+              ariaLabel={`${isReviewExpanded ? "Collapse" : "Expand"} ${service.label} parameters awaiting review`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleExpand(service.key, "review");
+              }}
+            >
+              {reviewCount} review
+            </ClickablePill>
+          )}
         </div>
       </div>
       <div className="mt-4 h-[5px] overflow-hidden rounded-[3px] bg-gray-100">
@@ -765,10 +794,10 @@ function ServiceCard({ service, findings, expandedService, onToggleExpand }) {
           return <Pill key={sev.key} color={sev.color}>{count} {sev.short || sev.label}</Pill>;
         })}
       </div>
-      {(isFailExpanded || isPassExpanded) && (
+      {(isFailExpanded || isPassExpanded || isReviewExpanded) && (
         <ParameterList
           serviceName={service.key}
-          status={isFailExpanded ? "fail" : "pass"}
+          status={isFailExpanded ? "fail" : isPassExpanded ? "pass" : "review"}
           findings={findings}
         />
       )}

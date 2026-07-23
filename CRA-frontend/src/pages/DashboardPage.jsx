@@ -26,6 +26,13 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 function statusBadge(status) {
   const map = {
     completed: "success",
@@ -150,7 +157,7 @@ export default function DashboardPage() {
       {/* Greeting */}
       <div>
         <h2 className="text-xl font-bold text-[#111827] m-0">
-          Good morning{user?.display_name ? `, ${user.display_name.split(" ")[0]}` : ""} 👋
+          {getGreeting()}{user?.display_name ? `, ${user.display_name.split(" ")[0]}` : ""} 👋
         </h2>
         <p className="text-sm text-[#6B7280] mt-1">Here's what's happening with your assessments.</p>
       </div>

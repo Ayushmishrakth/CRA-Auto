@@ -223,24 +223,28 @@ def _extract_active_pct(all_findings: list[dict[str, Any]], param_key: str) -> i
             actual = raw.get("actual_value")
             if isinstance(actual, dict):
                 raw = actual
+            # NOTE: the collectors store *_ratio fields as percentages (0-100) via _percent(),
+            # NOT as 0-1 fractions. _normalize_percent multiplies by 100 ONLY when the value is
+            # a 0-1 fraction, so it correctly handles both forms. The previous unconditional
+            # "* 100" produced impossible values (e.g. 80 -> 8000%, inactive 20 -> -1900%).
             if "active_ratio" in raw:
-                return round(float(raw["active_ratio"]) * 100)
+                return max(0, min(100, _normalize_percent(raw["active_ratio"])))
             if "read_ratio" in raw:
-                return round(float(raw["read_ratio"]) * 100)
+                return max(0, min(100, _normalize_percent(raw["read_ratio"])))
             if "active_pct" in raw:
-                return round(float(raw["active_pct"]))
+                return max(0, min(100, round(float(raw["active_pct"]))))
             if "active_percent" in raw:
-                return round(float(raw["active_percent"]))
+                return max(0, min(100, round(float(raw["active_percent"]))))
             if "inactive_ratio" in raw:
                 active = _as_number(raw.get("active_users"), 0.0)
                 inactive = _as_number(raw.get("inactive_users"), 0.0)
                 if active + inactive <= 0:
                     return 0
-                return round(100 - (float(raw["inactive_ratio"]) * 100))
+                return max(0, min(100, round(100 - _normalize_percent(raw["inactive_ratio"]))))
             active_users = raw.get("active_users", 0)
             total_users = raw.get("total_users", 0)
             if total_users and float(total_users) > 0:
-                return round(float(active_users) / float(total_users) * 100)
+                return max(0, min(100, round(float(active_users) / float(total_users) * 100)))
         except Exception:
             pass
     return 0
@@ -312,11 +316,66 @@ def _license_name(plan: Any) -> str:
     return SKU_FRIENDLY_NAMES.get(sku, sku[:20] if sku else "Unknown")
 
 
+# Priority-ordered mapping of subscribed-SKU part-number token -> friendly license category.
+# Each user is placed in the first (highest-tier) category any of their SKUs match, so the
+# license chart shows the manual's category breakdown instead of a Licensed/Unlicensed split.
+LICENSE_CATEGORY_RULES: list[tuple[str, str]] = [
+    ("COPILOT", "Copilot"),
+    ("SPE_E5", "Microsoft 365 E5"),
+    ("ENTERPRISEPREMIUM", "Office 365 E5"),
+    ("SPE_E3", "Microsoft 365 E3"),
+    ("ENTERPRISEPACK", "Office 365 E3"),
+    ("SPB", "Business Premium"),
+    ("O365_BUSINESS_PREMIUM", "Business Standard"),
+    ("BUSINESS_STANDARD", "Business Standard"),
+    ("STANDARDWOFFPACK", "Business Standard"),
+    ("O365_BUSINESS_ESSENTIALS", "Business Basic"),
+    ("BUSINESS_BASIC", "Business Basic"),
+    ("O365_BUSINESS", "Apps for Business"),
+    ("EXCHANGEENTERPRISE", "Exchange Online"),
+    ("EXCHANGESTANDARD", "Exchange Online"),
+]
+
+
+def _license_category_for_parts(parts: list[str]) -> str:
+    upper = [str(p or "").upper() for p in parts if p]
+    for token, name in LICENSE_CATEGORY_RULES:
+        if any(token in part for part in upper):
+            return name
+    return "Other Licensed"
+
+
+def _subscribed_sku_map(parameter_rows: list[dict[str, Any]]) -> dict[str, str]:
+    """Build a skuId -> skuPartNumber map from any finding that carries subscribedSkus."""
+    def _find(node: Any) -> list | None:
+        if isinstance(node, dict):
+            value = node.get("value")
+            if isinstance(value, list) and value and isinstance(value[0], dict) and "skuPartNumber" in value[0]:
+                return value
+            for child in node.values():
+                found = _find(child)
+                if found:
+                    return found
+        return None
+    for row in parameter_rows:
+        raw = row.get("evidence") or row.get("raw_value")
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except Exception:
+                continue
+        skus = _find(raw)
+        if skus:
+            return {str(s.get("skuId")): str(s.get("skuPartNumber") or "") for s in skus if isinstance(s, dict)}
+    return {}
+
+
 def _license_chart_counts(
     rv_lookup: dict[str, dict[str, Any]],
     *,
     eligible_users: int,
     total_users: int,
+    sku_id_to_part: dict[str, str] | None = None,
 ) -> dict[str, int]:
     users: list[Any] = []
     for key in ("guest_users_count", "account_enabled", "user_information"):
@@ -325,38 +384,34 @@ def _license_chart_counts(
             users = raw_users
             break
 
-    counts: dict[str, int] = {}
-    licensed = 0
-    unlicensed = 0
-    for user in users:
-        if not isinstance(user, dict):
-            continue
-        # A user is "licensed" if they hold at least one assigned license SKU.
-        # Counting per-SKU here double-counts users with multiple licenses and
-        # renders raw SKU GUIDs as slice labels, so report a clean Licensed vs
-        # Unlicensed split that matches the user total.
-        if _assigned_licenses(user):
-            licensed += 1
-        else:
-            unlicensed += 1
+    sku_id_to_part = sku_id_to_part or {}
+    # Real per-user SKU-category breakdown (mirrors the manual license pie). Requires the
+    # per-user assignedLicenses AND the subscribedSkus skuId->partNumber map. Each user is
+    # counted once in their highest-tier category; users with no license are Unlicensed.
+    if users and sku_id_to_part:
+        category_counts: dict[str, int] = {}
+        licensed_seen = False
+        for user in users:
+            if not isinstance(user, dict):
+                continue
+            assigned = _assigned_licenses(user)
+            parts = [
+                sku_id_to_part.get(str(item.get("skuId") or item.get("sku_id") or ""), "")
+                for item in assigned if isinstance(item, dict)
+            ]
+            parts = [part for part in parts if part]
+            if parts:
+                licensed_seen = True
+                category = _license_category_for_parts(parts)
+            else:
+                category = "Unlicensed"
+            category_counts[category] = category_counts.get(category, 0) + 1
+        if licensed_seen:
+            return {label: count for label, count in category_counts.items() if count > 0}
 
-    if licensed:
-        counts["Licensed"] = licensed
-    if unlicensed:
-        counts["Unlicensed"] = unlicensed
-
-    if counts:
-        return {label: count for label, count in counts.items() if count > 0}
-
-    licensed = max(int(eligible_users or 0), 0)
-    total = max(int(total_users or 0), licensed)
-    unlicensed = max(total - licensed, 0)
-    fallback: dict[str, int] = {}
-    if licensed:
-        fallback["Licensed (M365)"] = licensed
-    if unlicensed:
-        fallback["Unlicensed"] = unlicensed
-    return fallback
+    # Detailed per-SKU breakdown is unavailable — hide the chart rather than render a
+    # misleading Licensed/Unlicensed-only pie that does not match the manual layout.
+    return {}
 
 
 def _user_info_chart_data(rv_lookup: dict[str, dict[str, Any]]) -> tuple[dict[str, int], int]:
@@ -871,6 +926,7 @@ async def build_report_data(
             rv_lookup,
             eligible_users=eligible_users,
             total_users=total_users,
+            sku_id_to_part=_subscribed_sku_map(parameter_rows),
         ),
         'user_info_fields': user_info_fields,
         'user_info_total': user_info_total,
@@ -1231,12 +1287,17 @@ def _parameter_description(*, key: str, evidence: Any, fallback: str) -> str:
         score = actual.get("secure_score_percentage", 0)
         return f"Secure score is {_format_percent(score)}% which meets the recommended industry standard (80%)."
     if key == "compliance_score_overview":
-        score = actual.get("compliance_score_proxy", actual.get("compliance_score_proxy_percentage", 0))
-        return f"Compliance score proxy is {_format_percent(score)}% based on Secure Score."
+        nested_evidence = evidence.get("evidence") if isinstance(evidence, dict) else None
+        reasoning = nested_evidence.get("reasoning") if isinstance(nested_evidence, dict) else None
+        return str(reasoning) if reasoning else (
+            "Microsoft Purview Compliance Manager does not expose an officially supported public API "
+            "for retrieving the overall Compliance Score; review the score directly in the Purview "
+            "compliance portal (compliance.microsoft.com/compliancemanager)."
+        )
     if key == "audit_log_retention_duration" and actual.get("retention_policy_source"):
         return (
-            "Audit log retention duration could not be determined. Purview PowerShell access is required "
-            "to verify the exact retention period. Manual verification needed."
+            "The audit log retention period could not be confirmed automatically and should be verified "
+            "manually in the Microsoft Purview compliance portal (Audit > retention policies)."
         )
     return fallback
 

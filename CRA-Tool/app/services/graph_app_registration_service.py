@@ -65,6 +65,12 @@ def build_spa_redirect_uri(frontend_url: str) -> str:
     return build_redirect_uri(frontend_url)
 
 
+def build_consent_redirect_uri(frontend_url: str) -> str:
+    """Dedicated Web-platform redirect URI for the /adminconsent server-side redirect."""
+    frontend_url = _validate_frontend_url(frontend_url)
+    return f"{frontend_url.rstrip('/')}/tenant/consent-callback"
+
+
 def _validate_frontend_url(frontend_url: str | None) -> str:
     value = (frontend_url or "").strip().rstrip("/")
     if not value:
@@ -130,6 +136,25 @@ def application_has_required_resource_access(
     return True
 
 
+def application_resource_access_matches_exactly(
+    application: dict[str, Any],
+    required_resource_access: list[dict[str, Any]],
+) -> bool:
+    """True only when the app's requiredResourceAccess is EXACTLY the canonical set
+    (nothing missing AND nothing extra). Used to keep the CRA-managed app in sync so
+    stale/invalid resource entitlements (e.g. a permission id that fails admin consent
+    with AADSTS65006) are removed on the next deploy, not just added to."""
+
+    def flatten(rra: list[dict[str, Any]] | None) -> set[tuple[str, str]]:
+        return {
+            (str(resource.get("resourceAppId")), str(item.get("id")))
+            for resource in (rra or [])
+            for item in (resource.get("resourceAccess") or [])
+        }
+
+    return flatten(application.get("requiredResourceAccess")) == flatten(required_resource_access)
+
+
 async def ensure_application_required_resource_access(
     client: GraphClient,
     *,
@@ -137,7 +162,10 @@ async def ensure_application_required_resource_access(
     required_resource_access: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     application = await get_application(client, application_object_id=application_object_id)
-    if application_has_required_resource_access(application, required_resource_access):
+    # Reconcile EXACTLY (not just "superset present") so stale/invalid resource
+    # entitlements — e.g. the Teams Tenant Admin API block that made admin consent
+    # fail with AADSTS65006 — are removed on the next deploy, not left behind.
+    if application_resource_access_matches_exactly(application, required_resource_access):
         return application, None
 
     patch_result = await patch_application_required_resource_access(
@@ -223,6 +251,34 @@ async def ensure_application_redirect_uri(
             },
         )
     return application, patch_result, max_attempts
+
+
+async def ensure_application_web_redirect_uri(
+    client: GraphClient,
+    *,
+    application_object_id: str,
+    web_redirect_uri: str,
+) -> dict[str, Any]:
+    """
+    Additively register a Web-platform redirect URI on the app registration. The
+    /adminconsent endpoint performs a server-side redirect that must land on a Web
+    redirect URI (SPA redirect URIs are not accepted there), so admin consent needs
+    this even though the frontend uses a SPA redirect for token acquisition. Existing
+    web and spa redirect URIs are preserved.
+    """
+    web_redirect_uri = _validate_redirect_uri(web_redirect_uri)
+    application = await get_application(client, application_object_id=application_object_id)
+    configured_web = list((application.get("web") or {}).get("redirectUris") or [])
+    if web_redirect_uri in configured_web:
+        return {"already_present": True, "web_redirect_uris": configured_web}
+    updated = _append_redirect_uri(configured_web, web_redirect_uri)
+    payload = {"web": {"redirectUris": updated}}
+    response = await client.patch(f"/applications/{application_object_id}", json=payload)
+    logger.info(
+        "[DEPLOYMENT] Registered Web consent redirect URI %s",
+        {"application_id": application_object_id, "web_redirect_uri": web_redirect_uri},
+    )
+    return {"already_present": False, "web_redirect_uris": updated, "response": response}
 
 
 async def verify_application_redirect_uri(

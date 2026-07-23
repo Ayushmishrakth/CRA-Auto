@@ -42,6 +42,10 @@ class TenantDeploymentResponse(BaseModel):
     deployment_timestamp: datetime | None = None
     redirect_uri: str | None = None
     deployment_error: str | None
+    # Per-tenant certificate + Teams-role state for the "Connect Tenant" UI cert box.
+    # Without this field the response_model silently strips it and the UI always
+    # renders the "Certificate not yet generated" fallback.
+    certificate: dict[str, Any] | None = None
 
 
 class TenantResponse(BaseModel):

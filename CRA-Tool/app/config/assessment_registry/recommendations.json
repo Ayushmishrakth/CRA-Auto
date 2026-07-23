@@ -408,13 +408,14 @@
     "title": "Remediate DLP rules configured"
   },
   {
-    "copilot_impact": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
-    "impact": "Example: If a document is labeled as Confidential, Copilot will ensure that it doesn’t share or use this document in a summary unless the user has the appropriate permissions, thus reducing the risk of data leakage",
+    "copilot_impact": "Sensitivity labels only protect data once applied. Labels that are configured but never applied leave Copilot-accessible content unprotected.",
+    "impact": "Sensitivity labels only protect data once applied. Labels that are configured but never applied leave Copilot-accessible content unprotected.",
     "parameter_key": "information_protection_labels_applied",
     "priority": 5,
     "reference_urls": [],
     "remediation_steps": [
-      "If labels is configured and applied"
+      "Publish sensitivity labels in the Microsoft Purview portal (Information Protection > Labels).",
+      "Create a label policy that applies a default label and/or auto-labelling so labels are actually applied to Microsoft 365 groups, Teams, SharePoint sites and content — configuring a label is not enough; it must be applied."
     ],
     "severity": "critical",
     "title": "Remediate Information Protection Labels applied"
@@ -444,13 +445,14 @@
     "title": "Remediate Sensitivity Labels applied to Teams"
   },
   {
-    "copilot_impact": "\"Sites labeled with sensitive information (e.g., confidential or highly confidential) ensure that Copilot can only access and generate insights from data the user is permitted to view. Example: A Confidential – HR label ensures Copilot won't generate summaries or responses based on HR-related documents unless the user has the appropriate permissions to view that content. Adding appropriate labels gives clarity on copilot assessment to have this done.\"",
-    "impact": "\"Sites labeled with sensitive information (e.g., confidential or highly confidential) ensure that Copilot can only access and generate insights from data the user is permitted to view. Example: A Confidential – HR label ensures Copilot won't generate summaries or responses based on HR-related documents unless the user has the appropriate permissions to view that content. Adding appropriate labels gives clarity on copilot assessment to have this done.\"",
+    "copilot_impact": "Sensitivity labels only protect data once applied. Labels that are configured but never applied leave Copilot-accessible content unprotected.",
+    "impact": "Sensitivity labels only protect data once applied. Labels that are configured but never applied leave Copilot-accessible content unprotected.",
     "parameter_key": "sensitivity_labels_configured_and_applied",
     "priority": 5,
     "reference_urls": [],
     "remediation_steps": [
-      "If labels is configured and applied"
+      "Publish sensitivity labels in the Microsoft Purview portal (Information Protection > Labels).",
+      "Create a label policy that applies a default label and/or auto-labelling so labels are actually applied to Microsoft 365 groups, Teams, SharePoint sites and content — configuring a label is not enough; it must be applied."
     ],
     "severity": "critical",
     "title": "Remediate Sensitivity Labels configured and applied"
@@ -564,16 +566,17 @@
     "title": "Remediate Custom Banned Password List"
   },
   {
-    "copilot_impact": "Unmanaged devices can be risky. Enforcing rules helps keep Copilot's data safe.",
-    "impact": "Unmanaged devices can be risky. Enforcing rules helps keep Copilot's data safe.",
+    "copilot_impact": "Without device compliance policies, enrolled devices are never evaluated and device-based Conditional Access cannot protect Copilot-accessible content.",
+    "impact": "Without device compliance policies, enrolled devices are never evaluated and device-based Conditional Access cannot protect Copilot-accessible content.",
     "parameter_key": "devices_without_compliance_policies",
     "priority": 1,
     "reference_urls": [],
     "remediation_steps": [
-      "When compliance policy is configured"
+      "In the Microsoft Intune admin center go to Devices > Compliance policies and create at least one policy per platform (Windows, iOS/iPadOS, Android, macOS).",
+      "Require compliant devices via a Conditional Access grant control so non-compliant devices cannot reach Microsoft 365 Copilot data."
     ],
-    "severity": "info",
-    "title": "Remediate Devices without compliance policies"
+    "severity": "medium",
+    "title": "Configure Microsoft Intune device compliance policies"
   },
   {
     "copilot_impact": "These accounts are required to avoid tenant lock out",
@@ -604,9 +607,12 @@
     "impact": "Ensuring only trusted applications are integrated helps maintain data integrity, which is crucial for Copilot's accurate functioning.",
     "parameter_key": "entra_third_party_app_integrations",
     "priority": 4,
-    "reference_urls": [],
+    "reference_urls": [
+      "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent"
+    ],
     "remediation_steps": [
-      "When it is disabled for users"
+      "In Entra admin center, open Enterprise applications > Consent and permissions > User consent settings.",
+      "Enable an appropriate user consent option or assign a validated custom ManagePermissionGrantsForSelf consent policy."
     ],
     "severity": "high",
     "title": "Remediate Entra - Third Party App Integrations"

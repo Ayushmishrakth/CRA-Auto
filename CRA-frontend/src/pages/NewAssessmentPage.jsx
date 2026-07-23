@@ -160,6 +160,7 @@ function Step1({ onNext }) {
               connected: true,
               tenantId: active.tenant_id,
               tenantName: active.tenant_name || active.tenant_id,
+              certificate: validationResult.certificate || null,
             });
             setPhase("success");
           } else {
@@ -241,6 +242,7 @@ function Step1({ onNext }) {
           connected: true,
           tenantId: result.tenant_id || user.microsoft_tid,
           tenantName: result.tenant_name || user.microsoft_tid,
+          certificate: result.certificate || null,
         });
         setPhase("success");
       } else {
@@ -310,12 +312,14 @@ function Step1({ onNext }) {
             <div className="border border-[#0078D4]/20 rounded-lg p-4 bg-[#EFF6FC]">
               <p className="text-sm font-semibold text-[#374151] mb-3">Step 1: Grant Admin Consent</p>
               <p className="text-xs text-[#6B7280] mb-3">
-                A Global Administrator must grant permissions in Azure. Click the button below to open the consent form in a new window.
+                A new tab will open with the Microsoft consent page. Sign in as a <strong>Global
+                Administrator</strong> of the customer tenant and click <strong>Accept</strong>.
+                Once approved, return to this tab and continue to Step 2.
               </p>
               <Button
                 variant="primary"
                 fullWidth
-                onClick={() => window.open(adminConsentUrl, "_blank", "noopener,noreferrer")}
+                onClick={() => window.open(adminConsentUrl, "_blank")}
               >
                 Open Consent Form
               </Button>
@@ -324,9 +328,10 @@ function Step1({ onNext }) {
 
           {/* Validate Step */}
           <div className="border border-[#107C10]/20 rounded-lg p-4 bg-[#F0FDF4]">
-            <p className="text-sm font-semibold text-[#374151] mb-3">Step 2: Validate Connection</p>
+            <p className="text-sm font-semibold text-[#374151] mb-3">Step 2: Confirm &amp; Validate</p>
             <p className="text-xs text-[#6B7280] mb-3">
-              After granting consent, click below to verify the connection.
+              Waiting for consent in the other tab. After a Global Administrator approves the
+              permissions there, click below to validate them and finish setup.
             </p>
             <Button
               variant="primary"
@@ -335,7 +340,7 @@ function Step1({ onNext }) {
               onClick={handleValidateConsent}
               disabled={phase === "validating"}
             >
-              {phase === "validating" ? "Validating..." : "Validate Connection"}
+              {phase === "validating" ? "Validating..." : "I've approved — validate permissions"}
             </Button>
           </div>
 
@@ -373,6 +378,43 @@ function Step1({ onNext }) {
               <code className="text-xs font-mono text-[#111827]">{tenantInfo.tenantId}</code>
             </div>
           </div>
+
+          {/* Certificate / automation status — Teams/SharePoint/Exchange PS auth */}
+          {(() => {
+            const cert = tenantInfo.certificate;
+            if (cert?.automation_ready) {
+              return (
+                <div className="flex gap-3 p-4 rounded-lg bg-[#DFF6DD] border border-[#107C10]/20">
+                  <Check size={18} className="text-[#107C10] flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-[#107C10]">
+                    ✅ Certificate generated and uploaded — Teams, SharePoint, and Exchange parameters
+                    will be assessed automatically.
+                  </p>
+                </div>
+              );
+            }
+            if (cert?.cert_status === "uploaded") {
+              return (
+                <div className="flex gap-3 p-4 rounded-lg bg-[#FFF4CE] border border-[#FF8C00]/30">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#FF8C00] animate-pulse flex-shrink-0 mt-1.5" />
+                  <p className="text-sm text-[#B45309]">
+                    Certificate uploaded. Role assignment in progress — this happens automatically
+                    after consent is approved. Teams and Exchange parameters will be assessed once the
+                    roles finish assigning.
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="flex gap-3 p-4 rounded-lg bg-[#FDE7E9] border border-[#D13438]/20">
+                <AlertCircle size={18} className="text-[#D13438] flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-[#D13438]">
+                  ❌ Certificate not yet generated — re-run deployment to generate and upload the
+                  certificate for automated Teams/SharePoint/Exchange assessment.
+                </p>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -418,7 +460,7 @@ function Step2({ onBack }) {
   const [launching, setLaunching] = useState(false);
 
   const count = Object.values(selectedModules).filter(Boolean).length;
-  const estMins = Math.max(1, Math.ceil(count * 0.67));
+  const estMins = Math.max(1, Math.ceil(count * 3.33));
 
   const handleLaunch = async () => {
     setLaunching(true);

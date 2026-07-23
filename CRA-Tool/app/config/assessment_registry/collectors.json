@@ -1084,14 +1084,14 @@
     "collection_method": "powershell",
     "collector_name": "powershell.devices_without_compliance_policies",
     "collector_type": "powershell",
-    "graph_endpoint": "",
+    "graph_endpoint": "/deviceManagement/deviceCompliancePolicies",
     "parameter_key": "devices_without_compliance_policies",
     "parser_mapping": {
-      "expected_output": "List of non complient devices in the tenant",
+      "expected_output": "At least one Intune device compliance policy configured",
       "status_field": "status",
       "value_field": "value"
     },
-    "portal_mapping": "",
+    "portal_mapping": "Microsoft Intune admin center > Devices > Compliance policies",
     "powershell_script": "Devices without compliance policies",
     "throttling_strategy": {
       "backoff_seconds": [
@@ -1150,17 +1150,17 @@
     }
   },
   {
-    "collection_method": "powershell",
-    "collector_name": "powershell.entra_third_party_app_integrations",
-    "collector_type": "powershell",
-    "graph_endpoint": "",
+    "collection_method": "graph",
+    "collector_name": "graph.entra_third_party_app_integrations",
+    "collector_type": "graph",
+    "graph_endpoint": "/policies/authorizationPolicy?$select=defaultUserRolePermissions",
     "parameter_key": "entra_third_party_app_integrations",
     "parser_mapping": {
       "expected_output": "Third party app integration should be enabled",
       "status_field": "status",
       "value_field": "value"
     },
-    "portal_mapping": "Using Script",
+    "portal_mapping": "Entra admin center --> Identity --> Applications --> Enterprise applications --> Consent and permissions --> User consent settings",
     "powershell_script": "Entra - Third Party App Integrations",
     "throttling_strategy": {
       "backoff_seconds": [
@@ -1360,7 +1360,7 @@
     "collection_method": "powershell",
     "collector_name": "powershell.users_without_mfa",
     "collector_type": "powershell",
-    "graph_endpoint": "",
+    "graph_endpoint": "/reports/authenticationMethods/userRegistrationDetails",
     "parameter_key": "users_without_mfa",
     "parser_mapping": {
       "expected_output": "List of Users and MFA methods enrolled (UserPrincipalName, AuthMethodTypes)",

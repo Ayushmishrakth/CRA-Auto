@@ -1,6 +1,26 @@
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 
+function New-CraCertificate {
+  # Load a PFX for app-only certificate authentication (Connect-ExchangeOnline /
+  # Connect-MicrosoftTeams). The private key is loaded with EphemeralKeySet so it lives in
+  # memory only and is NOT written to a user key container. This is essential when the CRA
+  # backend runs the collector under a service account / container with no loaded user
+  # profile: the default key-storage flags try to persist the key to the user's CSP store,
+  # which fails there with "Keyset does not exist" and breaks certificate auth even when the
+  # certificate, admin consent, and directory role are all correct. MSAL on PowerShell 7
+  # (.NET) signs the client assertion with an EphemeralKeySet key without issue.
+  param(
+    [Parameter(Mandatory=$true)][string]$PfxPath,
+    [string]$PfxPassword
+  )
+  $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+  if ($PfxPassword) {
+    return [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($PfxPath, $PfxPassword, $flags)
+  }
+  return [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($PfxPath, [string]::Empty, $flags)
+}
+
 function Initialize-CraArtifactDirectory {
   param(
     [Parameter(Mandatory=$true)][string]$OutputRoot,
@@ -190,11 +210,7 @@ function Connect-CraTeams {
     $cert = $null
     if ($pfxPath) {
       if (-not (Test-Path $pfxPath)) { throw "[CRA_TEAMS_SKIP] Teams certificate PFX not found at $pfxPath." }
-      $cert = if ($pfxPwd) {
-        [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxPath, $pfxPwd)
-      } else {
-        [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxPath)
-      }
+      $cert = New-CraCertificate -PfxPath $pfxPath -PfxPassword $pfxPwd
     } elseif ($thumbprint) {
       $cert = Get-ChildItem -Path "Cert:\CurrentUser\My\$thumbprint", "Cert:\LocalMachine\My\$thumbprint" -ErrorAction SilentlyContinue | Select-Object -First 1
       if (-not $cert) { throw "[CRA_TEAMS_SKIP] Teams certificate with thumbprint $thumbprint not found in CurrentUser/LocalMachine store." }
@@ -218,15 +234,31 @@ function Connect-CraExchange {
   param([object]$Collector = $null)
   Assert-CraModule "ExchangeOnlineManagement"
   $mode = (Get-CraAuthMode -SpecificEnvName "CRA_EXCHANGE_AUTH_MODE" -Collector $Collector).ToLowerInvariant()
-  if ($mode -in @("app", "application", "client_credentials")) {
-    # App-only auth: use a pre-fetched Exchange Online access token.
-    # The Python runtime acquires this token via client_credentials against
-    # https://outlook.office365.com/.default and passes it as CRA_EXCHANGE_ACCESS_TOKEN.
-    $tok = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ACCESS_TOKEN")
-    $org = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ORGANIZATION")
-    if (-not $tok) { throw "[CRA_EXCHANGE_SKIP] CRA_EXCHANGE_ACCESS_TOKEN is not set. Exchange app auth requires Exchange.ManageAsApp consent and a pre-fetched token." }
+  if ($mode -in @("app", "application", "client_credentials", "certificate", "cert")) {
+    # App-only auth. PREFER certificate app-only (-Certificate -AppId -Organization):
+    # it works with the Exchange Administrator directory role. The pre-fetched
+    # Exchange.ManageAsApp access-token path is rejected in this tenant with
+    # "The role assigned to application isn't supported in this scenario", so the
+    # certificate is used first and the token is only a fallback.
+    $org        = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ORGANIZATION")
     if (-not $org) { throw "[CRA_EXCHANGE_SKIP] CRA_EXCHANGE_ORGANIZATION is not set. Set it to the tenant's primary .onmicrosoft.com domain." }
-    Connect-ExchangeOnline -AccessToken (ConvertTo-SecureString $tok -AsPlainText -Force) -Organization $org -ShowBanner:$false -ErrorAction Stop
+    $clientId   = [Environment]::GetEnvironmentVariable("CRA_GRAPH_CLIENT_ID")
+    $pfxPath    = [Environment]::GetEnvironmentVariable("CRA_CERT_PFX_PATH")
+    $pfxPwd     = [Environment]::GetEnvironmentVariable("CRA_CERT_PFX_PASSWORD")
+    $thumbprint = [Environment]::GetEnvironmentVariable("CRA_CERT_THUMBPRINT")
+    if ($clientId -and ($pfxPath -or $thumbprint)) {
+      if ($pfxPath) {
+        if (-not (Test-Path $pfxPath)) { throw "[CRA_EXCHANGE_SKIP] Certificate PFX not found at $pfxPath." }
+        $cert = New-CraCertificate -PfxPath $pfxPath -PfxPassword $pfxPwd
+        Connect-ExchangeOnline -Certificate $cert -AppId $clientId -Organization $org -ShowBanner:$false -ErrorAction Stop
+      } else {
+        Connect-ExchangeOnline -CertificateThumbprint $thumbprint -AppId $clientId -Organization $org -ShowBanner:$false -ErrorAction Stop
+      }
+    } else {
+      $tok = [Environment]::GetEnvironmentVariable("CRA_EXCHANGE_ACCESS_TOKEN")
+      if (-not $tok) { throw "[CRA_EXCHANGE_SKIP] No certificate (CRA_CERT_PFX_PATH/CRA_CERT_THUMBPRINT + CRA_GRAPH_CLIENT_ID) and CRA_EXCHANGE_ACCESS_TOKEN is not set." }
+      Connect-ExchangeOnline -AccessToken (ConvertTo-SecureString $tok -AsPlainText -Force) -Organization $org -ShowBanner:$false -ErrorAction Stop
+    }
   } elseif ($mode -eq "device") {
     Connect-ExchangeOnline -Device -ShowBanner:$false -ErrorAction Stop
   } elseif ($mode -in @("browser", "interactive", "delegated")) {
@@ -321,14 +353,30 @@ function Write-CraContract {
     [Parameter(Mandatory=$true)][string]$TenantId,
     [Parameter(Mandatory=$true)][string]$ParameterKey,
     [Parameter(Mandatory=$true)][string[]]$GeneratedFiles,
-    [string[]]$Warnings = @()
+    [string[]]$Warnings = @(),
+    # When the collector has already evaluated the control (real status + evaluated_value
+    # text), pass FindingStatus/FindingMessage so the runtime uses the finding directly
+    # instead of routing through the generic CSV finding engine. Backward-compatible:
+    # omit these and the legacy not_collected + CSV-evaluation behaviour is preserved.
+    [string]$FindingStatus = "",
+    [string]$FindingMessage = "",
+    [string]$FindingSeverity = "info"
   )
-  $result = [ordered]@{
-    status = "success"
-    collector = $CollectorName
-    tenant_id = $TenantId
-    timestamp = (Get-Date).ToUniversalTime().ToString("o")
-    findings = @(
+  if ($FindingStatus) {
+    $findings = @(
+      [ordered]@{
+        parameter_key = $ParameterKey
+        status = $FindingStatus
+        severity = $FindingSeverity
+        value = [ordered]@{
+          generated_files = $GeneratedFiles
+        }
+        message = $FindingMessage
+        score_contribution = $(if ($FindingStatus -eq "pass") { 0 } else { $null })
+      }
+    )
+  } else {
+    $findings = @(
       [ordered]@{
         parameter_key = $ParameterKey
         status = "not_collected"
@@ -340,6 +388,13 @@ function Write-CraContract {
         score_contribution = 0
       }
     )
+  }
+  $result = [ordered]@{
+    status = "success"
+    collector = $CollectorName
+    tenant_id = $TenantId
+    timestamp = (Get-Date).ToUniversalTime().ToString("o")
+    findings = $findings
     metrics = [ordered]@{
       generated_files = $GeneratedFiles
       generated_file_count = $GeneratedFiles.Count

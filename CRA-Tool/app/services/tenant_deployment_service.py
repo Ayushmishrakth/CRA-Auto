@@ -18,12 +18,14 @@ from app.services.audit_service import AuditEvent, audit_service
 from app.services.graph.graph_client import GraphClient
 from app.services.graph_app_registration_service import (
     CRA_APPLICATION_DISPLAY_NAME,
+    build_consent_redirect_uri,
     build_redirect_uri,
     build_spa_redirect_uri,
     create_application,
     create_client_secret,
     ensure_application_required_resource_access,
     ensure_application_redirect_uri,
+    ensure_application_web_redirect_uri,
     get_application,
     get_application_by_app_id,
 )
@@ -35,6 +37,11 @@ from app.services.graph_permission_service import (
     build_required_resource_access,
 )
 from app.services.graph_service_principal_service import ensure_service_principal, get_service_principal, get_service_principal_by_app_id
+from app.services.graph_cra_collector_service import get_app_graph_token
+from app.services.tenant_certificate_service import (
+    generate_tenant_certificate,
+    store_certificate_on_tenant,
+)
 from app.services.tenant_secret_service import store_client_secret
 from app.utils.datetime_utils import parse_graph_datetime
 from app.utils.logger import logger
@@ -42,9 +49,16 @@ from app.utils.logger import logger
 
 DEPLOYMENT_SERVICE_VERSION = "2026-06-08.exchange-teams-app-auth.v4"
 
-# Exchange Administrator built-in role template. The role assignment API needs the
-# tenant-activated role id, not this template id.
+# Exchange-supported built-in role templates. For built-in roles the template id IS the
+# unifiedRoleDefinition id used by roleManagement/directory/roleAssignments (same as Teams).
+# Exchange.ManageAsApp alone is NOT enough for EXO app-only — the SP must also hold one of
+# these roles.
 EXCHANGE_ADMIN_ROLE_TEMPLATE_ID = "29232cdf-9323-42fd-ade2-1d097af3e4de"
+GLOBAL_READER_ROLE_TEMPLATE_ID = "f2ef992c-3afb-46b9-b7cf-a126ee74c451"
+
+# Teams Administrator built-in role template id. For built-in roles this value is also
+# the unifiedRoleDefinition id used by roleManagement/directory/roleAssignments.
+TEAMS_ADMIN_ROLE_TEMPLATE_ID = "69091246-20e8-4a56-aa4d-066075b2a7a8"
 
 TENANT_STATUS_NOT_DEPLOYED = "NOT_DEPLOYED"
 TENANT_STATUS_DEPLOYING = "DEPLOYING"
@@ -90,6 +104,11 @@ def _deployment_redirect_uri(request_redirect_uri: str | None) -> str:
 
 def _deployment_spa_redirect_uri() -> str:
     return build_spa_redirect_uri(settings.cra_frontend_url)
+
+
+def _deployment_consent_redirect_uri() -> str:
+    """Web-platform redirect URI used by the /adminconsent server-side redirect."""
+    return build_consent_redirect_uri(settings.cra_frontend_url)
 
 
 def _update_diagnostics(tenant: ConnectedTenant, **values: Any) -> None:
@@ -518,6 +537,30 @@ def _graph_error_detail(exc: Exception) -> str:
     return str(exc)
 
 
+async def _role_assignment_client(tenant: ConnectedTenant, fallback: GraphClient) -> GraphClient:
+    """Return the Graph client to use for directory-role assignment.
+
+    Directory-role assignment (POST /roleManagement/directory/roleAssignments) must be
+    performed with the CRA app's OWN app-only token, which carries the
+    RoleManagement.ReadWrite.Directory APPLICATION permission granted at admin consent.
+    The signed-in admin's DELEGATED token usually lacks that privilege and fails with
+    Authorization_RequestDenied ("Insufficient privileges to complete the operation"),
+    which is exactly why the Exchange/Global Reader/Teams role assignments were failing.
+    Falls back to the delegated client only if the app-only token cannot be acquired.
+    """
+    try:
+        token = await get_app_graph_token(tenant)
+        return GraphClient(access_token=token)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[DEPLOYMENT] Could not acquire app-only token for role assignment (tenant %s) — "
+            "falling back to delegated token: %s",
+            tenant.tenant_id,
+            _graph_error_detail(exc),
+        )
+        return fallback
+
+
 def _looks_like_duplicate_role_assignment(detail: str) -> bool:
     lowered = str(detail or "").lower()
     return any(
@@ -539,116 +582,190 @@ async def _assign_exchange_admin_role(
     tenant_id: str,
 ) -> dict[str, Any]:
     """
-    Assign the Exchange Administrator Azure AD directory role to the CRA service principal.
-    Handles tenants without Exchange Online, inactive role templates, duplicates, and Graph
-    propagation timing as non-fatal deployment states.
+    Assign an Exchange-supported Entra directory role to the CRA service principal so
+    Exchange Online app-only auth works. Exchange.ManageAsApp alone is NOT sufficient —
+    the SP must also hold an Exchange-supported role. Tries Exchange Administrator first,
+    then Global Reader, using the SAME direct roleManagement pattern as the (working)
+    Teams Administrator assignment (roleDefinitionId = built-in role template id — no
+    dependency on the legacy directoryRole being "activated"). Non-fatal: a 403 records a
+    pending action for a Privileged Role Administrator to complete manually.
     """
-    exchange_admin_role_id: str | None = None
+    candidates = [
+        ("Exchange Administrator", EXCHANGE_ADMIN_ROLE_TEMPLATE_ID),
+        ("Global Reader", GLOBAL_READER_ROLE_TEMPLATE_ID),
+    ]
+    pending = (
+        "An Exchange-supported role (Exchange Administrator or Global Reader) could not be "
+        "assigned automatically. To enable Exchange collectors, a Privileged Role Administrator "
+        "must assign the Exchange Administrator role to the CRA service principal."
+    )
+    last_error: str | None = None
+    for role_name, role_id in candidates:
+        try:
+            existing = await client.get(
+                "/roleManagement/directory/roleAssignments",
+                params={
+                    "$filter": f"principalId eq '{service_principal_id}' and roleDefinitionId eq '{role_id}'",
+                    "$select": "id",
+                },
+            )
+            if existing.get("value"):
+                logger.info("[DEPLOYMENT] %s role already assigned — skipped", role_name)
+                return {"status": "already_assigned", "role_definition_id": role_id, "role_name": role_name}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[DEPLOYMENT] Could not check existing %s role assignments: %s", role_name, _graph_error_detail(exc))
 
+        payload = {
+            "@odata.type": "#microsoft.graph.unifiedRoleAssignment",
+            "principalId": service_principal_id,
+            "roleDefinitionId": role_id,
+            "directoryScopeId": "/",
+        }
+        try:
+            result = await client.post("/roleManagement/directory/roleAssignments", json=payload)
+            logger.info("[DEPLOYMENT] %s role assigned to service principal %s in tenant %s", role_name, service_principal_id, tenant_id)
+            return {"status": "assigned", "role_definition_id": role_id, "role_name": role_name, "result": result}
+        except httpx.HTTPStatusError as exc:
+            detail = _graph_error_detail(exc)
+            if exc.response.status_code in {400, 409} and _looks_like_duplicate_role_assignment(detail):
+                logger.info("[DEPLOYMENT] %s role already assigned — skipped", role_name)
+                return {"status": "already_assigned", "role_definition_id": role_id, "role_name": role_name}
+            last_error = detail
+            logger.warning("[DEPLOYMENT] %s role assignment failed — trying next candidate: %s", role_name, detail)
+        except Exception as exc:  # noqa: BLE001
+            last_error = _graph_error_detail(exc)
+            logger.warning("[DEPLOYMENT] %s role assignment failed — trying next candidate: %s", role_name, last_error)
+
+    return {"status": "failed", "error": last_error, "pending_action": pending}
+
+
+async def _ensure_tenant_certificate(
+    client: GraphClient,
+    *,
+    tenant: ConnectedTenant,
+    application_object_id: str,
+) -> dict[str, Any]:
+    """
+    Generate (once, per tenant) a self-signed certificate and upload its public key
+    to the app registration keyCredentials so PnP/Teams PowerShell can authenticate
+    app-only. Non-fatal: never raises out of the deployment flow. If the Graph upload
+    fails the DER stays stored (cert_der_b64) so an admin can upload it manually.
+    """
     try:
-        roles_response = await client.get(
-            "/directoryRoles",
-            params={
-                "$filter": "displayName eq 'Exchange Administrator'",
-                "$select": "id,displayName,roleTemplateId",
+        if not tenant.cert_pfx_encrypted:
+            cert = generate_tenant_certificate(tenant.tenant_id)
+            store_certificate_on_tenant(tenant, cert)
+            logger.info("[DEPLOYMENT] Generated certificate for tenant %s (thumbprint %s)", tenant.tenant_id, tenant.cert_thumbprint)
+    except Exception as exc:  # noqa: BLE001 - deployment must not crash on cert gen
+        detail = _graph_error_detail(exc)
+        tenant.cert_status = "generation_failed"
+        _update_diagnostics(tenant, certificate_setup={"status": "generation_failed", "error": detail})
+        logger.warning("[DEPLOYMENT] Certificate generation failed for tenant %s: %s", tenant.tenant_id, detail)
+        return {"status": "generation_failed", "error": detail}
+
+    der_b64 = tenant.cert_der_b64
+    thumbprint = tenant.cert_thumbprint
+    if not der_b64:
+        return {"status": "generation_failed", "error": "no certificate DER available"}
+
+    # PATCH keyCredentials with the CRA-managed cert. This is a CRA-created app, so the
+    # single managed keyCredential is intentional (Graph uses the client secret; PnP/Teams
+    # use this certificate).
+    try:
+        await client.patch(
+            f"/applications/{application_object_id}",
+            json={
+                "keyCredentials": [
+                    {
+                        "type": "AsymmetricX509Cert",
+                        "usage": "Verify",
+                        "key": der_b64,
+                        "displayName": "CRA-CertAuth",
+                    }
+                ]
             },
         )
-        roles = roles_response.get("value") or []
-
-        if not roles:
-            logger.info(
-                "[DEPLOYMENT] Exchange Administrator role not active in tenant %s — attempting activation",
-                tenant_id,
-            )
-            try:
-                await client.post(
-                    "/directoryRoles",
-                    json={"roleTemplateId": EXCHANGE_ADMIN_ROLE_TEMPLATE_ID},
-                )
-                roles_response = await client.get(
-                    "/directoryRoles",
-                    params={
-                        "$filter": "displayName eq 'Exchange Administrator'",
-                        "$select": "id,displayName,roleTemplateId",
-                    },
-                )
-                roles = roles_response.get("value") or []
-            except Exception as activation_error:
-                logger.info(
-                    "[DEPLOYMENT] Exchange Online not licensed in tenant %s — Exchange parameters will use service availability detection. Detail: %s",
-                    tenant_id,
-                    _graph_error_detail(activation_error),
-                )
-                return {"status": "skipped_no_license", "reason": "no_exchange_license"}
-
-        if not roles:
-            logger.info(
-                "[DEPLOYMENT] Exchange Administrator role not available in tenant %s — no Exchange Online subscription detected",
-                tenant_id,
-            )
-            return {"status": "skipped_no_license", "reason": "role_not_available"}
-
-        exchange_admin_role_id = roles[0]["id"]
-    except Exception as exc:
+        tenant.cert_status = "uploaded"
+        tenant.cert_thumbprint = thumbprint
+        _update_diagnostics(tenant, certificate_setup={"status": "uploaded", "thumbprint": thumbprint})
+        logger.info("[DEPLOYMENT] Certificate uploaded to app registration for tenant %s", tenant.tenant_id)
+        return {"status": "uploaded", "thumbprint": thumbprint}
+    except httpx.HTTPStatusError as exc:
         detail = _graph_error_detail(exc)
-        logger.warning(
-            "[DEPLOYMENT] Could not check Exchange Administrator role in tenant %s — unexpected error: %s",
-            tenant_id,
-            detail,
-        )
-        return {"status": "failed", "reason": "role_check_failed", "error": detail}
+        tenant.cert_status = "upload_failed"
+        note = detail
+        if exc.response.status_code == 403:
+            note = (
+                "The deployment token lacks Application.ReadWrite.All. Add it to the CRA app's "
+                "delegated permissions (or upload the stored certificate manually). Detail: " + detail
+            )
+        _update_diagnostics(tenant, certificate_setup={
+            "status": "upload_failed",
+            "error": note,
+            "thumbprint": thumbprint,
+            "manual_upload_available": bool(tenant.cert_der_b64),
+        })
+        logger.warning("[DEPLOYMENT] Certificate keyCredentials upload failed for tenant %s: %s", tenant.tenant_id, note)
+        return {"status": "upload_failed", "error": note}
+    except Exception as exc:  # noqa: BLE001
+        detail = _graph_error_detail(exc)
+        tenant.cert_status = "upload_failed"
+        _update_diagnostics(tenant, certificate_setup={"status": "upload_failed", "error": detail, "thumbprint": thumbprint})
+        logger.warning("[DEPLOYMENT] Certificate keyCredentials upload failed for tenant %s: %s", tenant.tenant_id, detail)
+        return {"status": "upload_failed", "error": detail}
 
+
+async def _assign_teams_admin_role(
+    client: GraphClient,
+    *,
+    service_principal_id: str,
+    tenant_id: str,
+) -> dict[str, Any]:
+    """
+    Assign the Teams Administrator directory role to the CRA service principal so
+    Teams PowerShell app-only reads (Get-CsTeams*) succeed. Non-fatal: if the admin's
+    token lacks RoleManagement.ReadWrite.Directory this 403s and we record a pending
+    action for a Privileged Role Administrator to complete manually.
+    """
+    role_id = TEAMS_ADMIN_ROLE_TEMPLATE_ID
+    pending = (
+        "Teams Administrator role could not be assigned automatically. To complete setup, "
+        "a Privileged Role Administrator must assign the Teams Administrator role to the CRA "
+        "service principal."
+    )
     try:
         existing = await client.get(
             "/roleManagement/directory/roleAssignments",
             params={
-                "$filter": (
-                    f"principalId eq '{service_principal_id}' and "
-                    f"roleDefinitionId eq '{exchange_admin_role_id}'"
-                ),
+                "$filter": f"principalId eq '{service_principal_id}' and roleDefinitionId eq '{role_id}'",
                 "$select": "id",
             },
         )
         if existing.get("value"):
-            logger.info("[DEPLOYMENT] Exchange Admin role already assigned — skipped")
-            return {"status": "already_assigned", "role_definition_id": exchange_admin_role_id}
-    except Exception as exc:
-        logger.warning(
-            "[DEPLOYMENT] Could not check existing Exchange role assignments: %s",
-            _graph_error_detail(exc),
-        )
+            return {"status": "already_assigned", "role_definition_id": role_id}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[DEPLOYMENT] Could not check existing Teams role assignments: %s", _graph_error_detail(exc))
 
     payload = {
         "@odata.type": "#microsoft.graph.unifiedRoleAssignment",
         "principalId": service_principal_id,
-        "roleDefinitionId": exchange_admin_role_id,
+        "roleDefinitionId": role_id,
         "directoryScopeId": "/",
     }
     try:
         result = await client.post("/roleManagement/directory/roleAssignments", json=payload)
-        logger.info(
-            "[DEPLOYMENT] Exchange Administrator role assigned successfully to service principal %s in tenant %s",
-            service_principal_id,
-            tenant_id,
-        )
-        return {"status": "assigned", "role_definition_id": exchange_admin_role_id, "result": result}
+        logger.info("[DEPLOYMENT] Teams Administrator role assigned to service principal %s in tenant %s", service_principal_id, tenant_id)
+        return {"status": "assigned", "role_definition_id": role_id, "result": result}
     except httpx.HTTPStatusError as exc:
         detail = _graph_error_detail(exc)
         if exc.response.status_code in {400, 409} and _looks_like_duplicate_role_assignment(detail):
-            logger.info("[DEPLOYMENT] Exchange Admin role already assigned — skipped")
-            return {"status": "already_assigned", "role_definition_id": exchange_admin_role_id}
-        logger.warning(
-            "[DEPLOYMENT] Exchange Admin role assignment failed — unexpected error: %s",
-            detail,
-        )
-        return {"status": "failed", "role_definition_id": exchange_admin_role_id, "error": detail}
-    except Exception as exc:
+            return {"status": "already_assigned", "role_definition_id": role_id}
+        logger.warning("[DEPLOYMENT] Teams Administrator role assignment failed: %s", detail)
+        return {"status": "failed", "role_definition_id": role_id, "error": detail, "pending_action": pending}
+    except Exception as exc:  # noqa: BLE001
         detail = _graph_error_detail(exc)
-        logger.warning(
-            "[DEPLOYMENT] Exchange Admin role assignment failed — unexpected error: %s",
-            detail,
-        )
-        return {"status": "failed", "role_definition_id": exchange_admin_role_id, "error": detail}
+        logger.warning("[DEPLOYMENT] Teams Administrator role assignment failed: %s", detail)
+        return {"status": "failed", "role_definition_id": role_id, "error": detail, "pending_action": pending}
 
 
 async def deploy_tenant_access(
@@ -763,6 +880,13 @@ async def deploy_tenant_access(
             redirect_uri=resolved_redirect_uri,
             spa_redirect_uri=spa_redirect_uri,
         )
+        # Register a dedicated Web redirect URI for the /adminconsent server-side redirect
+        # (SPA redirect URIs are not accepted there). Additive — SPA URIs are preserved.
+        await ensure_application_web_redirect_uri(
+            client,
+            application_object_id=app["id"],
+            web_redirect_uri=_deployment_consent_redirect_uri(),
+        )
         if patch_result:
             _deployment_log("Patching Redirect URI", application_id=app["id"], redirect_uri=resolved_redirect_uri)
         _deployment_log("Redirect URI Verified", application_id=app["id"], redirect_uri=resolved_redirect_uri)
@@ -793,6 +917,15 @@ async def deploy_tenant_access(
             expires_at=expires_at,
         )
 
+        # Generate + upload a per-tenant certificate so PnP/Teams PowerShell collectors
+        # can authenticate app-only at assessment time. Non-fatal — deployment continues
+        # regardless of the cert outcome (surfaced via tenant.cert_status / diagnostics).
+        cert_result = await _ensure_tenant_certificate(
+            client, tenant=tenant, application_object_id=app["id"]
+        )
+        _deployment_log("Certificate Setup", tenant_id=tenant_id, cert_status=cert_result.get("status"))
+        await db.commit()
+
         tenant.granted_permissions = {
             "required_application_permissions": REQUIRED_APPLICATION_PERMISSIONS,
             "assignment_status": "required_resource_access_configured",
@@ -808,7 +941,7 @@ async def deploy_tenant_access(
         tenant.admin_consent_url = build_admin_consent_url(
             tenant_id=tenant_id,
             client_id=consent_application_client_id,
-            redirect_uri=resolved_redirect_uri,
+            redirect_uri=_deployment_consent_redirect_uri(),
         )
         _validate_consent_client_id(tenant.admin_consent_url, tenant.app_client_id)
         _deployment_log(
@@ -954,6 +1087,12 @@ async def validate_tenant_deployment(
         redirect_uri=expected_redirect_uri,
         spa_redirect_uri=expected_spa_redirect_uri,
     )
+    # Dedicated Web redirect URI for the /adminconsent server-side redirect (additive).
+    await ensure_application_web_redirect_uri(
+        client,
+        application_object_id=app["id"],
+        web_redirect_uri=_deployment_consent_redirect_uri(),
+    )
     permissions_app, permission_patch_result = await ensure_application_required_resource_access(
         client,
         application_object_id=verified_app["id"],
@@ -1014,7 +1153,7 @@ async def validate_tenant_deployment(
     tenant.admin_consent_url = build_admin_consent_url(
         tenant_id=tenant_id,
         client_id=consent_app["appId"],
-        redirect_uri=expected_redirect_uri,
+        redirect_uri=_deployment_consent_redirect_uri(),
     )
     _validate_consent_client_id(tenant.admin_consent_url, verified_app["appId"])
     _deployment_log(
@@ -1066,8 +1205,14 @@ async def validate_admin_consent(
         raise BusinessLogicException("Tenant deployment has not created a service principal")
     client = GraphClient(access_token=graph_access_token)
     await _assert_graph_token(client, access_token=graph_access_token, tenant_id=tenant_id)
-    _mark_deployment(tenant, step=STEP_DEPLOYMENT_VALIDATION, status=TENANT_STATUS_VALIDATING)
-    await db.commit()
+    # Only move to VALIDATING if the tenant is not ALREADY active. The frontend calls
+    # validate-consent repeatedly; without this guard a re-validation would downgrade an
+    # already-ACTIVE tenant back to VALIDATING, and any assessment start firing in that
+    # window is rejected with "CRA Access must be deployed and ACTIVE". A re-validation of an
+    # active tenant keeps it ACTIVE (the end-state is re-affirmed as ACTIVE on success below).
+    if tenant.status != TENANT_STATUS_ACTIVE:
+        _mark_deployment(tenant, step=STEP_DEPLOYMENT_VALIDATION, status=TENANT_STATUS_VALIDATING)
+        await db.commit()
 
     # Re-verify service principal exists and is correct before validation
     # This handles cases where the stored ID might be stale or incorrect
@@ -1135,12 +1280,14 @@ async def validate_admin_consent(
     tenant.consent_granted_at = datetime.utcnow()
 
     # Assign the Exchange Administrator Azure AD directory role to the service principal so that
-    # Exchange PS app-only auth (Connect-ExchangeOnline -AccessToken) can run Exchange cmdlets.
-    # Non-fatal: if the admin's token lacks RoleManagement.ReadWrite.Directory this will 403 and we log only.
+    # Exchange PS app-only auth (Connect-ExchangeOnline) can run Exchange cmdlets. This uses the
+    # CRA app's OWN app-only token (RoleManagement.ReadWrite.Directory application permission
+    # granted at consent) — the signed-in admin's delegated token typically lacks the privilege.
+    role_client = await _role_assignment_client(tenant, client)
     if tenant.service_principal_id:
         try:
             role_result = await _assign_exchange_admin_role(
-                client,
+                role_client,
                 service_principal_id=tenant.service_principal_id,
                 tenant_id=tenant_id,
             )
@@ -1152,6 +1299,21 @@ async def validate_admin_consent(
                 extra={"tenant_id": tenant_id, "service_principal_id": tenant.service_principal_id},
             )
             _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": _graph_error_detail(role_exc)})
+
+    # Assign the Teams Administrator directory role so Teams PowerShell app-only reads
+    # (Get-CsTeams*) succeed. Uses the same app-only role-assignment client. Non-fatal.
+    if tenant.service_principal_id:
+        try:
+            teams_role_result = await _assign_teams_admin_role(
+                role_client,
+                service_principal_id=tenant.service_principal_id,
+                tenant_id=tenant_id,
+            )
+            tenant.teams_role_status = teams_role_result.get("status")
+            _update_diagnostics(tenant, teams_admin_role_assignment=teams_role_result)
+        except Exception as teams_exc:
+            tenant.teams_role_status = "failed"
+            _update_diagnostics(tenant, teams_admin_role_assignment={"status": "failed", "error": _graph_error_detail(teams_exc)})
 
     await audit_service.log_event(
         db,
@@ -1205,11 +1367,13 @@ async def repair_tenant_deployment(
     else:
         _deployment_log("REPAIR_PERMISSIONS_ALREADY_CURRENT", application_id=tenant.app_registration_id)
 
-    # Try role assignment with the admin's delegated token
+    # Role assignment with the CRA app's OWN app-only token (RoleManagement.ReadWrite.Directory
+    # application permission), not the admin's delegated token which lacks the privilege.
     if tenant.service_principal_id:
+        role_client = await _role_assignment_client(tenant, client)
         try:
             role_result = await _assign_exchange_admin_role(
-                client,
+                role_client,
                 service_principal_id=tenant.service_principal_id,
                 tenant_id=tenant_id,
             )
@@ -1219,10 +1383,16 @@ async def repair_tenant_deployment(
             _update_diagnostics(tenant, exchange_admin_role_assignment={"status": "failed", "error": _graph_error_detail(role_exc)})
 
     expected_redirect_uri = tenant.redirect_uri or build_redirect_uri(settings.cra_frontend_url)
+    # Register the Web consent redirect URI (additive) and point the consent URL at it.
+    await ensure_application_web_redirect_uri(
+        client,
+        application_object_id=tenant.app_registration_id,
+        web_redirect_uri=_deployment_consent_redirect_uri(),
+    )
     consent_url = build_admin_consent_url(
         tenant_id=tenant_id,
         client_id=tenant.app_client_id,
-        redirect_uri=expected_redirect_uri,
+        redirect_uri=_deployment_consent_redirect_uri(),
     )
     tenant.admin_consent_url = consent_url
     tenant.consent_status = "pending_admin_consent"
@@ -1280,4 +1450,41 @@ def deployment_payload(tenant: ConnectedTenant) -> dict[str, Any]:
         "deployment_step": tenant.deployment_step,
         "deployment_timestamp": tenant.deployment_timestamp,
         "deployment_error": tenant.deployment_error,
+        "certificate": _certificate_payload_status(tenant),
+    }
+
+
+def _certificate_payload_status(tenant: ConnectedTenant) -> dict[str, Any]:
+    """Certificate + Teams-role state for the deployment/tenant UI to render."""
+    cert_status = tenant.cert_status or ("none" if not tenant.cert_thumbprint else "generated")
+    teams_role_status = tenant.teams_role_status or "unknown"
+    teams_role_command = None
+    if teams_role_status not in {"assigned", "already_assigned"} and tenant.service_principal_id:
+        teams_role_command = (
+            "New-MgRoleManagementDirectoryRoleAssignment "
+            f"-PrincipalId {tenant.service_principal_id} "
+            f"-RoleDefinitionId {TEAMS_ADMIN_ROLE_TEMPLATE_ID} "
+            '-DirectoryScopeId "/"'
+        )
+    # Exchange role state comes from deployment diagnostics (no dedicated column).
+    diagnostics = tenant.deployment_diagnostics if isinstance(tenant.deployment_diagnostics, dict) else {}
+    exchange_role = diagnostics.get("exchange_admin_role_assignment") or {}
+    exchange_role_status = exchange_role.get("status") or "unknown"
+    exchange_role_command = None
+    if exchange_role_status not in {"assigned", "already_assigned"} and tenant.service_principal_id:
+        exchange_role_command = (
+            "New-MgRoleManagementDirectoryRoleAssignment "
+            f"-PrincipalId {tenant.service_principal_id} "
+            f"-RoleDefinitionId {EXCHANGE_ADMIN_ROLE_TEMPLATE_ID} "
+            '-DirectoryScopeId "/"'
+        )
+    return {
+        "cert_status": cert_status,
+        "cert_thumbprint": tenant.cert_thumbprint,
+        "teams_role_status": teams_role_status,
+        "teams_role_assignment_command": teams_role_command,
+        "exchange_role_status": exchange_role_status,
+        "exchange_role_assignment_command": exchange_role_command,
+        "automation_ready": cert_status == "uploaded"
+        and teams_role_status in {"assigned", "already_assigned"},
     }

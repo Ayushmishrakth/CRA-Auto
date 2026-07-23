@@ -7,7 +7,7 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import { useToast } from "../context/ToastContext";
 
-const TABS = ["Profile", "Branding", "Notifications", "API & Integrations"];
+const TABS = ["Profile", "Notifications", "API & Integrations"];
 
 // ── Profile tab ─────────────────────────────────────────────
 function ProfileTab({ user }) {
@@ -34,74 +34,6 @@ function ProfileTab({ user }) {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ── Branding tab ────────────────────────────────────────────
-function BrandingTab() {
-  const toast = useToast();
-  const [saving, setSaving] = useState(false);
-  const [partnerName, setPartnerName] = useState("Your Company Ltd");
-  const [brandColor, setBrandColor] = useState("#0078D4");
-
-  const handleSave = async () => {
-    setSaving(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    toast.success("Branding saved successfully.");
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[#374151]">Partner company name</label>
-        <input
-          type="text"
-          value={partnerName}
-          onChange={(e) => setPartnerName(e.target.value)}
-          className="w-full h-10 px-3 text-sm border border-[#D1D5DB] rounded-lg focus:outline-none focus:border-[#0078D4] focus:ring-1 focus:ring-[#0078D4]"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[#374151]">Company logo</label>
-        <div className="border-2 border-dashed border-[#D1D5DB] rounded-lg p-6 text-center text-sm text-[#9CA3AF] cursor-pointer hover:border-[#0078D4] hover:text-[#0078D4] transition-colors">
-          Drag & drop logo (PNG/SVG) or{" "}
-          <span className="underline font-semibold">browse</span>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[#374151]">Primary brand color</label>
-        <div className="flex items-center gap-3">
-          <input
-            type="color"
-            value={brandColor}
-            onChange={(e) => setBrandColor(e.target.value)}
-            className="w-10 h-10 rounded-lg border border-[#D1D5DB] cursor-pointer p-1"
-          />
-          <input
-            type="text"
-            value={brandColor}
-            onChange={(e) => setBrandColor(e.target.value)}
-            className="w-32 h-10 px-3 font-mono text-sm border border-[#D1D5DB] rounded-lg focus:outline-none focus:border-[#0078D4]"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[#374151]">Report footer text</label>
-        <textarea
-          rows={2}
-          placeholder="Prepared by Your Company Ltd · Confidential"
-          className="w-full px-3 py-2.5 text-sm border border-[#D1D5DB] rounded-lg focus:outline-none focus:border-[#0078D4] resize-none"
-        />
-      </div>
-
-      <Button variant="primary" loading={saving} onClick={handleSave}>
-        Save Branding
-      </Button>
     </div>
   );
 }
@@ -197,7 +129,6 @@ export default function SettingsPage() {
 
   const CONTENT = [
     <ProfileTab key="profile" user={user} />,
-    <BrandingTab key="branding" />,
     <NotificationsTab key="notif" />,
     <ApiTab key="api" user={user} />,
   ];

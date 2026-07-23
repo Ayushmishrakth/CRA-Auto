@@ -164,8 +164,35 @@ $caRiskyEvidence = if ($riskyPolicies) {
 }
 Export-CraExpectedCsv $caRiskyEvidence $out "cap_policies_for_risky_sign_ins.csv" $files "Get-MgIdentityConditionalAccessPolicy"
 
-$appEvidence = $apps | Select-Object Id,AppId,DisplayName,SignInAudience,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "App=$($_.DisplayName);Audience=$($_.SignInAudience)" }},@{Name="evidence_source";Expression={ "Get-MgApplication" }}
-Export-CraExpectedCsv $appEvidence $out "entra_third_party_app_integrations.csv" $files "Get-MgApplication"
+# Entra third-party app integrations: this control maps to Enterprise applications >
+# Consent and permissions > User consent settings. AllowedToCreateApps is intentionally
+# not used here; it controls app registration, not user consent to enterprise applications.
+$assignedConsentPolicies = @($authPolicy.DefaultUserRolePermissions.PermissionGrantPoliciesAssigned)
+$userConsentPolicies = @($assignedConsentPolicies | Where-Object { "$_" -match '(?i)^ManagePermissionGrantsForSelf\.' })
+$userConsentEnabled = $userConsentPolicies.Count -gt 0
+$supportedEnabledOptionSelected = @($userConsentPolicies | Where-Object {
+  "$_" -match '(?i)(microsoft-user-default-low|microsoft-user-default-recommended)$'
+}).Count -gt 0
+$consentConfiguration = if (-not $userConsentEnabled) {
+  "Do not allow user consent"
+} elseif (@($userConsentPolicies | Where-Object { "$_" -match '(?i)microsoft-user-default-recommended$' }).Count -gt 0) {
+  "Let Microsoft manage your consent settings"
+} elseif (@($userConsentPolicies | Where-Object { "$_" -match '(?i)microsoft-user-default-low$' }).Count -gt 0) {
+  "Allow user consent for apps from verified publishers, for selected permissions"
+} else {
+  "Custom user consent policy"
+}
+$appEvidence = @([pscustomobject]@{
+  UserConsentEnabled = $userConsentEnabled
+  SupportedEnabledOptionSelected = $supportedEnabledOptionSelected
+  ConsentConfiguration = $consentConfiguration
+  PermissionGrantPoliciesAssigned = ($assignedConsentPolicies -join ";")
+  UserConsentPolicies = ($userConsentPolicies -join ";")
+  status = if ($userConsentEnabled) { "pass" } else { "fail" }
+  value = "UserConsentEnabled=$userConsentEnabled;SupportedEnabledOptionSelected=$supportedEnabledOptionSelected;Configuration=$consentConfiguration;Policies=$($userConsentPolicies -join ',')"
+  evidence_source = "Get-MgPolicyAuthorizationPolicy.DefaultUserRolePermissions.PermissionGrantPoliciesAssigned"
+})
+Export-CraExpectedCsv $appEvidence $out "entra_third_party_app_integrations.csv" $files "Get-MgPolicyAuthorizationPolicy"
 
 $authPolicyEvidence = $authPolicy | Select-Object Id,DisplayName,DefaultUserRolePermissions,AllowedToUseSspr,@{Name="status";Expression={ "pass" }},@{Name="value";Expression={ "DefaultUserRolePermissions=$($_.DefaultUserRolePermissions)" }},@{Name="evidence_source";Expression={ "Get-MgPolicyAuthorizationPolicy" }}
 Export-CraExpectedCsv $authPolicyEvidence $out "restricted_access_to_microsoft_entra_admin_centre.csv" $files "Get-MgPolicyAuthorizationPolicy"

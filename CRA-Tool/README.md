@@ -173,7 +173,7 @@ Copy `.env.example` to `.env`. Key variables:
 | Admin Consent Workflow | PowerShell | Medium | No |
 | Guest Invite Settings | PowerShell | Medium | No |
 | Tenant Collaboration Invitations | PowerShell | Medium | No |
-| Entra – Third Party App Integrations | PowerShell | Medium | No |
+| Entra – Third Party App Integrations | Graph | Medium | No |
 | Account Enabled | PowerShell | Medium | No |
 | Custom Banned Password List | Graph | Low | No |
 | Entra – Tenant Creation By Non-Admin | PowerShell | Low | No |

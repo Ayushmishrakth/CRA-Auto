@@ -12,6 +12,7 @@ import ResultsPage         from "../pages/ResultsPage";
 import ReportsPage         from "../pages/ReportsPage";
 import SettingsPage        from "../pages/SettingsPage";
 import TenantDeploymentSuccessPage from "../pages/TenantDeploymentSuccessPage";
+import ConsentCallbackPage from "../pages/ConsentCallbackPage";
 
 // Legacy pages (still functional, now wrapped in AppShell)
 import AssessmentDetailPage  from "../pages/AssessmentDetailPage";
@@ -25,6 +26,9 @@ export default function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
+        {/* Admin-consent redirect target (Web platform). Public so it renders even when
+            the approving admin's tab has no active CRA session. */}
+        <Route path="/tenant/consent-callback" element={<ConsentCallbackPage />} />
 
         {/* Protected — all use AppShell */}
         <Route

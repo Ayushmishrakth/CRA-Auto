@@ -58,7 +58,7 @@ The list below is from `CRA-Tool/app/config/assessment_registry/parameters.json`
 | 7 | `devices_without_compliance_policies` | Device without Compliance Policies | When compliance policy is configured |
 | 8 | `emergency_access_accounts` | Emergency Access Account | When it is Present |
 | 9 | `entra_tenant_creation_by_non_admin` | Entra - Tenant Creation by Non-Admins | When non-admins are not allowed to create tenants |
-| 10 | `entra_third_party_app_integrations` | Entra - Third-Party App Integrations | When it is disabled for users |
+| 10 | `entra_third_party_app_integrations` | Entra - Third-Party App Integrations | Third-party app integrations are enabled for users |
 | 11 | `global_administrator_accounts` | Global Administrator Accounts | When tenant has more than 2 or less then 5 global admins |
 | 12 | `guest_invite_settings` | Guest Invite Settings | When it is set to No one in the organization can invite guest users including admins (most restrictive), Only users assigned to specific admin roles can invite guest users |
 | 13 | `guest_users_count` | Guest Users count | When the ratio of guest accounts to total accounts is less than 15% |

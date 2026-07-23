@@ -221,18 +221,18 @@ Total parameters: 65
 - **Copilot blocker:** False
 - **Scoring weight:** 4.0
 - **Rule type:** boolean_gate
-- **Real description:** Users are allowed to register third-party applications.
+- **Real description:** User consent policy controls whether users can integrate third-party applications.
 - **Risk:** Integrating with inadequately managed third-party applications can expose sensitive user data and permissions accessible to Copilot. These applications may interact with Microsoft 365 services—either contributing or extracting content—which Copilot could process without oversight. This increases the risk of data leakage, compromised data integrity, and diminished control over the information Copilot accesses and shares.
 - **Copilot relevance:** Ensuring only trusted applications are integrated helps maintain data integrity, which is crucial for Copilot's accurate functioning.
 - **Expected evidence/output:** Third party app integration should be enabled
-- **Pass criteria:** When it is disabled for users
-- **Fail criteria:** When it is enabled for users
-- **Collection method:** powershell
-- **Collector name:** powershell.entra_third_party_app_integrations
-- **Graph endpoint:** Not found in registry.
+- **Pass criteria:** Third-party app integrations are enabled for users through a built-in or custom user consent policy
+- **Fail criteria:** Third-party app integrations are disabled for users or the tenant configuration cannot be validated
+- **Collection method:** graph
+- **Collector name:** graph.entra_third_party_app_integrations
+- **Graph endpoint:** /policies/authorizationPolicy?$select=defaultUserRolePermissions
 - **PowerShell mapping:** Entra - Third Party App Integrations
-- **Portal mapping:** Using Script
-- **Documentation URL:** https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions
+- **Portal mapping:** Entra admin center --> Identity --> Applications --> Enterprise applications --> Consent and permissions --> User consent settings
+- **Documentation URL:** https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent
 
 ### 11. Entra – Tenant Creation by Non-Admins
 

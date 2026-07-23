@@ -2,9 +2,21 @@ import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, FileText, Settings,
-  Bell, Menu, X, LogOut, ShieldCheck,
+  Bell, Menu, X, LogOut,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { listTenants } from "../../api/tenantApi";
+import Logo from "../common/Logo";
+
+const ROLE_LABELS = { admin: "Administrator", user: "User" };
+
+function formatStatus(raw) {
+  if (!raw) return null;
+  if (/active|connected/i.test(raw)) return { label: "Connected", ok: true };
+  if (/pending/i.test(raw))          return { label: "Pending", ok: false };
+  if (/failed/i.test(raw))           return { label: "Not connected", ok: false };
+  return { label: raw.replace(/_/g, " ").toLowerCase(), ok: false };
+}
 
 const NAV_LINKS = [
   { to: "/dashboard",   icon: LayoutDashboard, label: "Dashboard" },
@@ -30,7 +42,7 @@ function deriveTitle(pathname) {
   if (pathname.endsWith("/evidence")) return "Evidence";
   if (pathname.endsWith("/report"))   return "Report";
   if (pathname.startsWith("/assessments/")) return "Assessment Details";
-  return "CRA Tool";
+  return "Dashboard";
 }
 
 function initials(name) {
@@ -40,16 +52,40 @@ function initials(name) {
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, loading } = useAuth();
 
+  const [tenantInfo, setTenantInfo] = useState(null);
+
   const pageTitle = deriveTitle(location.pathname);
   const displayName = user?.display_name || user?.name || user?.email || "User";
   const email = user?.email || "";
+  const tenantId = user?.microsoft_tid || user?.tenant_id || "—";
+
+  // Real tenant name/status has a proper display name only if it isn't just the GUID fallback.
+  const hasRealName = tenantInfo?.tenant_name && tenantInfo.tenant_name !== tenantId;
+  const orgName = hasRealName ? tenantInfo.tenant_name : (email.split("@")[1] || "—");
+  const roleLabel = ROLE_LABELS[(user?.role || "").toLowerCase()] || user?.role || "—";
+  const status = formatStatus(tenantInfo?.status || tenantInfo?.consent_status);
 
   // Close sidebar on route change on mobile
   useEffect(() => setSidebarOpen(false), [location.pathname]);
+
+  // Load the signed-in user's tenant details for the account card (existing /tenants endpoint).
+  useEffect(() => {
+    if (!user?.microsoft_tid) return;
+    let cancelled = false;
+    listTenants()
+      .then((tenants) => {
+        if (cancelled) return;
+        const list = Array.isArray(tenants) ? tenants : [];
+        setTenantInfo(list.find((t) => t.tenant_id === user.microsoft_tid) || null);
+      })
+      .catch(() => { if (!cancelled) setTenantInfo(null); });
+    return () => { cancelled = true; };
+  }, [user?.microsoft_tid]);
 
   const handleLogout = async () => {
     await logout();
@@ -77,10 +113,7 @@ export default function AppShell() {
         {/* Logo row */}
         <div className="flex items-center gap-3 px-5 border-b border-[#E5E7EB] flex-shrink-0"
           style={{ height: "var(--topbar-height)" }}>
-          <div className="w-8 h-8 rounded-lg bg-[#0078D4] flex items-center justify-center flex-shrink-0">
-            <ShieldCheck size={18} className="text-white" />
-          </div>
-          <span className="text-base font-bold text-[#111827]">CRA Tool</span>
+          <Logo size="sidebar" className="flex-shrink-0" />
           <button
             className="ml-auto lg:hidden p-1 text-[#9CA3AF] hover:text-[#374151]"
             onClick={() => setSidebarOpen(false)}
@@ -158,10 +191,60 @@ export default function AppShell() {
             <Bell size={20} />
           </button>
           <div
-            className="w-8 h-8 rounded-full bg-[#0078D4] flex items-center justify-center cursor-default"
-            title={displayName}
+            className="relative"
+            onMouseEnter={() => setProfileOpen(true)}
+            onMouseLeave={() => setProfileOpen(false)}
           >
-            <span className="text-xs font-bold text-white">{initials(displayName)}</span>
+            <div
+              className="w-8 h-8 rounded-full bg-[#0078D4] flex items-center justify-center cursor-default focus:outline-none focus:ring-2 focus:ring-[#0078D4]/40"
+              tabIndex={0}
+              role="img"
+              aria-label={`Signed in as ${displayName}`}
+              onFocus={() => setProfileOpen(true)}
+              onBlur={() => setProfileOpen(false)}
+            >
+              <span className="text-xs font-bold text-white">{initials(displayName)}</span>
+            </div>
+
+            {profileOpen && (
+              <div
+                role="tooltip"
+                className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#E5E7EB] rounded-lg shadow-lg z-50 overflow-hidden"
+              >
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E7EB]">
+                  <div className="w-9 h-9 rounded-full bg-[#0078D4] flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-white">{initials(displayName)}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#111827] truncate leading-tight">{displayName}</p>
+                    <p className="text-xs text-[#6B7280] truncate leading-tight">{email}</p>
+                  </div>
+                </div>
+                <dl className="px-4 py-3 space-y-2.5 m-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-xs text-[#6B7280] flex-shrink-0">Organization</dt>
+                    <dd className="text-xs font-medium text-[#111827] text-right m-0 break-words">{orgName}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-xs text-[#6B7280] flex-shrink-0">Role</dt>
+                    <dd className="text-xs font-medium text-[#111827] text-right m-0">{roleLabel}</dd>
+                  </div>
+                  {status && (
+                    <div className="flex items-start justify-between gap-3">
+                      <dt className="text-xs text-[#6B7280] flex-shrink-0">Status</dt>
+                      <dd className="text-xs font-medium text-right m-0 inline-flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${status.ok ? "bg-[#16A34A]" : "bg-[#9CA3AF]"}`} />
+                        <span className={status.ok ? "text-[#111827]" : "text-[#6B7280]"}>{status.label}</span>
+                      </dd>
+                    </div>
+                  )}
+                  <div className="pt-0.5">
+                    <dt className="text-xs text-[#6B7280] mb-1">Tenant ID</dt>
+                    <dd className="text-[11px] font-mono text-[#374151] m-0 break-all leading-snug">{tenantId}</dd>
+                  </div>
+                </dl>
+              </div>
+            )}
           </div>
         </div>
       </header>

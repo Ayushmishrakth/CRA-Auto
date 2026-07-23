@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload, selectinload
 
 from app.core.exceptions import NotFoundException
+from app.services.registry_service import get_registry
 from app.db.models.assessment import Assessment
 from app.db.models.assessment_finding import AssessmentFinding
 from app.db.models.assessment_job import AssessmentJob
@@ -295,12 +296,21 @@ async def get_assessment_results(
         ).scalars().all()
     )
 
+    # The registry (parameters.json) is the single source of truth for severity. Align the
+    # dashboard to it so the displayed severity always matches the parameter's canonical
+    # severity — even when a collector stored a drifted value (e.g. "info" on a warning/error
+    # for a parameter that is actually High).
+    _registry_severity = {
+        p["parameter_key"]: p.get("severity")
+        for p in get_registry().get_parameters()
+    }
     sev_counts: dict[str, int] = {
         "critical": 0, "high": 0, "medium": 0, "low": 0, "passed": 0,
     }
     finding_items: list[FindingItem] = []
     for f in findings:
-        sev = (f.severity or "").lower()
+        eff_severity = _registry_severity.get(f.parameter_key) or f.severity
+        sev = (eff_severity or "").lower()
         if f.status and f.status.lower() in {"pass"}:
             sev_counts["passed"] += 1
         elif sev in sev_counts:
@@ -312,7 +322,7 @@ async def get_assessment_results(
                 parameter_name=f.parameter_name,
                 category=f.category,
                 status=f.status,
-                severity=f.severity,
+                severity=eff_severity,
                 raw_value=f.raw_value,
                 evaluated_value=f.evaluated_value,
                 score_contribution=f.score_contribution,

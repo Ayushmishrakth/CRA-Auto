@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import Logo from "../components/common/Logo";
 
 const MS_ICON = (
   <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -62,11 +63,13 @@ export default function LoginPage() {
         className="hidden md:flex flex-col justify-between p-10"
         style={{ width: "45%", background: "#0078D4" }}
       >
-        <span className="text-white font-bold text-2xl tracking-tight">CRA</span>
+        <div className="inline-flex bg-white rounded-md px-2.5 py-1.5 self-start">
+          <Logo size="corner" />
+        </div>
 
         <div>
-          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
-            <ShieldCheck size={36} className="text-white" />
+          <div className="inline-block bg-white rounded-2xl px-5 py-4 mb-6">
+            <Logo size="hero" />
           </div>
           <h1 className="text-[28px] font-bold text-white leading-tight mb-3">
             Copilot Readiness<br />Assessment
@@ -92,11 +95,8 @@ export default function LoginPage() {
       <div className="flex flex-col items-center justify-center flex-1 bg-white p-8">
         <div className="w-full" style={{ maxWidth: "400px" }}>
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 md:hidden">
-            <div className="w-8 h-8 rounded-lg bg-[#0078D4] flex items-center justify-center">
-              <ShieldCheck size={18} className="text-white" />
-            </div>
-            <span className="font-bold text-lg text-[#111827]">CRA Tool</span>
+          <div className="flex items-center mb-8 md:hidden">
+            <Logo size="mobile" />
           </div>
 
           <p className="text-sm text-[#6B7280] mb-1">Welcome back</p>

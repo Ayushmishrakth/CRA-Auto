@@ -600,13 +600,13 @@
   {
     "copilot_blocking": false,
     "expression": {
-      "fail_criteria": "When compliance policy is not configured",
-      "pass_criteria": "When compliance policy is configured"
+      "fail_criteria": "When no Intune device compliance policy is configured",
+      "pass_criteria": "When at least one Intune device compliance policy is configured"
     },
     "parameter_key": "devices_without_compliance_policies",
     "rule_type": "boolean_gate",
-    "scoring_weight": 1.0,
-    "severity": "info"
+    "scoring_weight": 3.0,
+    "severity": "medium"
   },
   {
     "copilot_blocking": true,
@@ -633,8 +633,8 @@
   {
     "copilot_blocking": false,
     "expression": {
-      "fail_criteria": "When it is enabled for users",
-      "pass_criteria": "When it is disabled for users"
+      "fail_criteria": "Third-party app integrations are disabled for users or the tenant configuration cannot be validated",
+      "pass_criteria": "Third-party app integrations are enabled for users through a built-in or custom user consent policy"
     },
     "parameter_key": "entra_third_party_app_integrations",
     "rule_type": "boolean_gate",

@@ -119,7 +119,6 @@ src/
 ├── auth/          # MSAL config & instance
 ├── components/    # ProtectedRoute, LoadingSpinner
 ├── context/       # AuthProvider (global auth state)
-├── layouts/       # MainLayout with header
 ├── pages/         # Login, Dashboard
 ├── routes/        # React Router
 ├── services/      # Auth business helpers

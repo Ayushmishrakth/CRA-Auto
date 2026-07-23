@@ -22,6 +22,15 @@ TEAMS_APP_PERMISSIONS = [
     {"id": "dc3d2358-0f5d-4ddc-b47e-bf73ef99acfd", "type": "Role"},
 ]
 
+# SharePoint Online API (NOT Microsoft Graph) — Sites.FullControl.All here is what
+# Connect-PnPOnline requires for app-only certificate auth. This is a different
+# resource/role than the Microsoft Graph "Sites.FullControl.All" above.
+SHAREPOINT_ONLINE_RESOURCE_APP_ID = "00000003-0000-0ff1-ce00-000000000000"
+SHAREPOINT_ONLINE_APP_PERMISSIONS = [
+    # Sites.FullControl.All (SharePoint Online API)
+    {"id": "678536fe-1083-478a-9c59-b99265e6b0d3", "type": "Role"},
+]
+
 REQUIRED_APPLICATION_PERMISSIONS = [
     "Application.Read.All",
     "Directory.Read.All",
@@ -32,6 +41,10 @@ REQUIRED_APPLICATION_PERMISSIONS = [
     "AuditLog.Read.All",
     "Policy.Read.All",
     "RoleManagement.Read.Directory",
+    # Lets the app assign the Teams Administrator / Exchange Administrator directory
+    # roles to its own service principal automatically during validate-consent
+    # (id d01b97e9-cbc0-49fe-810a-750afd5527a3). No manual PowerShell role assignment.
+    "RoleManagement.ReadWrite.Directory",
     "SecurityEvents.Read.All",
     "IdentityRiskyUser.Read.All",
     "DeviceManagementManagedDevices.Read.All",
@@ -78,6 +91,15 @@ async def build_required_resource_access(client: GraphClient) -> list[dict[str, 
             "resourceAppId": EXCHANGE_RESOURCE_APP_ID,
             "resourceAccess": EXCHANGE_APP_PERMISSIONS,
         },
+        {
+            "resourceAppId": SHAREPOINT_ONLINE_RESOURCE_APP_ID,
+            "resourceAccess": SHAREPOINT_ONLINE_APP_PERMISSIONS,
+        },
+        # NOTE: Teams app-only PowerShell does NOT require an API permission on the
+        # Skype/Teams Tenant Admin API. It authenticates via the certificate + the Teams
+        # Administrator directory role (assigned separately in validate-consent). The app
+        # role 48ac35b8…/dc3d2358… is not a valid entitlement on that resource and makes
+        # admin consent fail with AADSTS65006, so it is intentionally omitted.
     ]
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 from io import StringIO
 from datetime import datetime, timedelta, timezone
@@ -79,13 +80,46 @@ async def get_app_graph_token(tenant: ConnectedTenant) -> str:
     return token
 
 
+async def _graph_get_retry(
+    client: GraphClient,
+    endpoint: str,
+    *,
+    params: dict[str, Any] | None = None,
+    attempts: int = 4,
+) -> dict[str, Any]:
+    """GET a Graph endpoint with retry/backoff on throttling (429), transient 5xx, and
+    connection errors. Without this, a single throttled or transient call aborts an entire
+    collector (e.g. the per-team enumeration used by the Teams controls), which surfaces as
+    the generic 'could not be automatically retrieved' fallback."""
+    delay = 2.0
+    for attempt in range(attempts):
+        try:
+            return await client.get(endpoint, params=params)
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if status in (429, 500, 502, 503, 504) and attempt < attempts - 1:
+                retry_after = (exc.response.headers.get("Retry-After") or "").strip()
+                wait = float(retry_after) if retry_after.isdigit() else delay
+                await asyncio.sleep(min(wait, 30.0))
+                delay *= 2
+                continue
+            raise
+        except httpx.RequestError:
+            if attempt < attempts - 1:
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            raise
+    return await client.get(endpoint, params=params)
+
+
 async def _get_all(client: GraphClient, endpoint: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
     values: list[dict[str, Any]] = []
-    page = await client.get(endpoint, params=params)
+    page = await _graph_get_retry(client, endpoint, params=params)
     values.extend(page.get("value") or [])
     next_link = page.get("@odata.nextLink")
     while next_link:
-        page = await client.get(next_link)
+        page = await _graph_get_retry(client, next_link)
         values.extend(page.get("value") or [])
         next_link = page.get("@odata.nextLink")
     return {"value": values}
@@ -95,19 +129,31 @@ async def _graph_get_text(tenant: ConnectedTenant, endpoint: str) -> dict[str, A
     token = await get_app_graph_token(tenant)
     url = endpoint if endpoint.startswith("https://") else f"https://graph.microsoft.com/v1.0/{endpoint.lstrip('/')}"
     _log("GRAPH_REQUEST", endpoint=endpoint)
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
-        try:
-            response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
-        except httpx.RequestError as exc:
-            return {
-                "ok": False,
-                "status_code": None,
-                "error": {
-                    "code": exc.__class__.__name__,
-                    "message": str(exc),
-                },
-                "text": "",
-            }
+    delay = 2.0
+    response = None
+    for attempt in range(3):
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+            try:
+                response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+            except httpx.RequestError as exc:
+                if attempt < 2:
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
+                return {
+                    "ok": False,
+                    "status_code": None,
+                    "error": {
+                        "code": exc.__class__.__name__,
+                        "message": str(exc),
+                    },
+                    "text": "",
+                }
+        if response.is_error and response.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+            await asyncio.sleep(delay)
+            delay *= 2
+            continue
+        break
     if response.is_error:
         try:
             error_payload: dict[str, Any] = response.json()
@@ -656,19 +702,119 @@ async def collect_entra_tenant_creation_by_non_admin(tenant: ConnectedTenant) ->
 async def collect_entra_third_party_app_integrations(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "entra_third_party_app_integrations"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
-    policy = await _authorization_policy(tenant)
-    permissions = policy.get("defaultUserRolePermissions") or {}
-    allowed = permissions.get("allowedToCreateApps")
-    status = "pass" if allowed is False else "fail"
-    evidence = {"tenant_id": tenant.tenant_id, "authorization_policy": policy}
+    endpoint = "/policies/authorizationPolicy?$select=defaultUserRolePermissions"
+    try:
+        policy = await _authorization_policy(tenant)
+    except Exception as exc:
+        reasoning = "Unable to validate the tenant configuration for third-party app integrations."
+        error_detail = f"{type(exc).__name__}: {exc}"
+        evidence = _evaluation_evidence(
+            pass_criteria="A ManagePermissionGrantsForSelf user consent policy is assigned",
+            fail_criteria="No ManagePermissionGrantsForSelf policy is assigned, or the tenant configuration cannot be validated",
+            reasoning=reasoning,
+            extra={"tenant_id": tenant.tenant_id, "configuration_validated": False, "error": error_detail},
+        )
+        return _collector_result(
+            parameter_key=parameter_key,
+            status="fail",
+            severity="high",
+            actual_value={"user_consent_enabled": None, "configuration_validated": False},
+            expected_value="User consent for third-party applications is enabled",
+            finding=reasoning,
+            graph_endpoint=endpoint,
+            evidence=evidence,
+            raw_response={"error": error_detail},
+            graph_calls=1,
+            scoring_weight=4.0,
+        )
+
+    permissions = policy.get("defaultUserRolePermissions")
+    if not isinstance(permissions, dict) or "permissionGrantPoliciesAssigned" not in permissions:
+        reasoning = "Unable to validate the tenant configuration for third-party app integrations."
+        evidence = _evaluation_evidence(
+            pass_criteria="A ManagePermissionGrantsForSelf user consent policy is assigned",
+            fail_criteria="No ManagePermissionGrantsForSelf policy is assigned, or the tenant configuration cannot be validated",
+            reasoning=reasoning,
+            extra={
+                "tenant_id": tenant.tenant_id,
+                "configuration_validated": False,
+                "error": "permissionGrantPoliciesAssigned was absent from the authorization policy response",
+                "authorization_policy": policy,
+            },
+        )
+        return _collector_result(
+            parameter_key=parameter_key,
+            status="fail",
+            severity="high",
+            actual_value={"user_consent_enabled": None, "configuration_validated": False},
+            expected_value="User consent for third-party applications is enabled",
+            finding=reasoning,
+            graph_endpoint=endpoint,
+            evidence=evidence,
+            raw_response={"authorizationPolicy": policy},
+            graph_calls=1,
+            scoring_weight=4.0,
+        )
+
+    assigned = [str(item) for item in (permissions.get("permissionGrantPoliciesAssigned") or [])]
+    user_consent_assignments = [
+        item
+        for item in assigned
+        if item.lower().startswith("managepermissiongrantsforself.")
+    ]
+    policy_ids = [item.split(".", 1)[1] for item in user_consent_assignments]
+    normalized_policy_ids = {item.lower() for item in policy_ids}
+    user_consent_enabled = bool(user_consent_assignments)
+    supported_enabled_option_selected = bool(
+        normalized_policy_ids
+        & {"microsoft-user-default-low", "microsoft-user-default-recommended"}
+    )
+    # Business rule: any enabled built-in or custom ManagePermissionGrantsForSelf
+    # user consent policy passes; disabled or unvalidated user consent fails.
+    status = "pass" if user_consent_enabled else "fail"
+
+    if not user_consent_enabled:
+        portal_configuration = "Do not allow user consent"
+        reasoning = "Third-party app integrations are disabled for users."
+    elif "microsoft-user-default-recommended" in normalized_policy_ids:
+        portal_configuration = "Let Microsoft manage your consent settings"
+        reasoning = "Third-party app integrations are enabled through Microsoft-managed user consent settings."
+    elif "microsoft-user-default-low" in normalized_policy_ids:
+        portal_configuration = "Allow user consent for apps from verified publishers, for selected permissions"
+        reasoning = "Third-party app integrations are enabled for verified publishers and selected permissions."
+    else:
+        portal_configuration = "No supported built-in portal option selected (custom user consent policy)"
+        reasoning = f"Third-party app integrations are enabled through custom user consent policy: {', '.join(policy_ids)}."
+
+    evidence = _evaluation_evidence(
+        pass_criteria="Third-party app integrations are enabled for users through a built-in or custom user consent policy",
+        fail_criteria="Third-party app integrations are disabled for users or the tenant configuration cannot be validated",
+        reasoning=reasoning,
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "configuration_validated": True,
+            "supported_enabled_option_selected": supported_enabled_option_selected,
+            "portal_configuration": portal_configuration,
+            "permissionGrantPoliciesAssigned": assigned,
+            "user_consent_policy_assignments": user_consent_assignments,
+            "user_consent_policy_ids": policy_ids,
+            "authorization_policy": policy,
+        },
+    )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="high",
-        actual_value=allowed,
-        expected_value="allowedToCreateApps=false",
-        finding=f"Users allowed to register applications: {allowed}",
-        graph_endpoint="/policies/authorizationPolicy?$select=defaultUserRolePermissions",
+        actual_value={
+            "user_consent_enabled": user_consent_enabled,
+            "configuration_validated": True,
+            "supported_enabled_option_selected": supported_enabled_option_selected,
+            "portal_configuration": portal_configuration,
+            "user_consent_policy_ids": policy_ids,
+        },
+        expected_value="User consent for third-party applications is enabled",
+        finding=reasoning,
+        graph_endpoint=endpoint,
         evidence=evidence,
         raw_response={"authorizationPolicy": policy},
         graph_calls=1,
@@ -719,27 +865,44 @@ async def collect_tenant_collaboration_invitations(tenant: ConnectedTenant) -> d
 async def collect_authentication_methods_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "authentication_methods_enabled"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
-    raw_response = {"authenticationMethodsPolicy": await _authentication_methods_policy(tenant)}
-    methods = raw_response["authenticationMethodsPolicy"].get("authenticationMethodConfigurations") or []
+    policy = await _authentication_methods_policy(tenant)
+    raw_response = {"authenticationMethodsPolicy": policy}
+    methods = policy.get("authenticationMethodConfigurations") or []
+    migration_state = str(policy.get("policyMigrationState") or "")
+    method_labels = {
+        "MicrosoftAuthenticator": "Microsoft Authenticator",
+        "TemporaryAccessPass": "Temporary Access Pass",
+        "Email": "Email OTP",
+    }
     enabled = [
-        {"method": _auth_method_name(item), "state": item.get("state")}
+        {"method": method_labels.get(_auth_method_name(item), _auth_method_name(item)), "state": item.get("state")}
         for item in methods
         if str(item.get("state") or "").lower() == "enabled"
     ]
+    all_states = [
+        {"method": method_labels.get(_auth_method_name(item), _auth_method_name(item)), "state": item.get("state")}
+        for item in methods
+    ]
+    disabled = [item for item in all_states if str(item.get("state") or "").lower() != "enabled"]
+    enabled_names = ", ".join(item["method"] for item in enabled) or "none"
     status = "pass" if len(enabled) > 2 else "fail"
-    enabled_names = ", ".join(item["method"] for item in enabled)
-    reasoning = f"{len(enabled)} authentication method(s) are enabled: {enabled_names}"
+    reasoning = f"{len(enabled)} authentication method(s) enabled: {enabled_names}"
     evidence = _evaluation_evidence(
-        pass_criteria="Authentication method has more than 2 authentication methods",
-        fail_criteria="Authentication method has less than 2 authentication methods",
+        pass_criteria="When authentication method has more than 2 authentication methods",
+        fail_criteria="When authentication method has less than 2 authentication methods",
         reasoning=reasoning,
-        extra={"tenant_id": tenant.tenant_id, "methods": [{"method": _auth_method_name(item), "state": item.get("state")} for item in methods]},
+        extra={"tenant_id": tenant.tenant_id, "policy_migration_state": migration_state, "methods": all_states},
     )
-    return _collector_result(
+    result = _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="critical",
-        actual_value={"enabled_methods": len(enabled), "methods": enabled},
+        actual_value={
+            "enabled_methods": len(enabled),
+            "disabled_methods": len(disabled),
+            "methods": all_states,
+            "policy_migration_state": migration_state,
+        },
         expected_value="More than 2 authentication methods enabled",
         finding=reasoning,
         graph_endpoint="https://graph.microsoft.com/beta/policies/authenticationMethodsPolicy",
@@ -748,6 +911,9 @@ async def collect_authentication_methods_enabled(tenant: ConnectedTenant) -> dic
         graph_calls=1,
         scoring_weight=5.0,
     )
+    # This control is classified as Critical / Security even when it passes.
+    result["severity"] = "critical"
+    return result
 
 
 async def collect_admin_consent_workflow(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -824,61 +990,198 @@ async def collect_cap_policies_for_risky_sign_ins(tenant: ConnectedTenant) -> di
 
 
 async def collect_users_without_mfa(tenant: ConnectedTenant) -> dict[str, Any]:
+    """Replicate the manual portal check using the Microsoft Entra User Registration Details report.
+
+    Manual process this mirrors:
+      Entra admin center > Identity > Authentication methods > User registration details >
+      Download export. The export has a "Multifactor authentication capable" column
+      (isMfaCapable) and a "Multifactor authentication registered" column (isMfaRegistered).
+      A user "has MFA" when they are MFA-capable — i.e., they have registered a strong MFA
+      method that the authentication methods policy allows. The tenant PASSES only when every
+      in-scope user is MFA-capable; any user that is not MFA-capable is a "user without MFA".
+
+    One supported, GA call replaces the previous per-user (N+1) approach:
+      GET /reports/authenticationMethods/userRegistrationDetails   (Microsoft Graph v1.0)
+      Permission: AuditLog.Read.All  ·  Requires Microsoft Entra ID P1/P2 (activity report).
+      https://learn.microsoft.com/graph/api/authenticationmethodsroot-list-userregistrationdetails
+
+    Scope: guest accounts are excluded (their MFA is governed by the resource tenant); disabled
+    accounts are already excluded by the report API. Members are the "capable users" population.
+    """
     parameter_key = "users_without_mfa"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
+    endpoint = "/reports/authenticationMethods/userRegistrationDetails"
+    _PASS = "Every in-scope member user is MFA-capable (MFA registered for all capable users)"
+    _FAIL = "One or more in-scope member users are not MFA-capable (no policy-allowed strong MFA method)"
+
     client = await _graph_client(tenant)
-    users_response = await _collect_users(tenant)
-    all_users = users_response.get("value") or []
-    eligible_users = [
-        u for u in all_users
-        if u.get("accountEnabled") is True
-        and u.get("userType") == "Member"
-        and len(u.get("assignedLicenses", []) or []) > 0
+    try:
+        response = await _get_all(client, endpoint, params={"$top": "999"})
+    except httpx.HTTPStatusError as exc:
+        try:
+            payload: dict[str, Any] = exc.response.json()
+        except ValueError:
+            payload = {"error": {"message": exc.response.text}}
+        error = payload.get("error") or payload
+        status_code = exc.response.status_code
+        graph_response = {"ok": False, "status_code": status_code, "error": error}
+
+        # The registration report needs BOTH Entra ID P1/P2 AND the AuditLog.Read.All app
+        # permission. A blanket "requires a license" message is misleading when the real cause
+        # is a missing permission/consent, so classify the Graph error and report accordingly.
+        if isinstance(error, dict):
+            err_text = f"{error.get('code', '')} {error.get('message', '')}".lower()
+        else:
+            err_text = str(error).lower()
+        license_signal = any(
+            token in err_text
+            for token in ["license", "licence", "premium", "not licensed", "p1", "p2", "aad premium", "entra id p"]
+        )
+        permission_signal = any(
+            token in err_text
+            for token in [
+                "authorization_requestdenied",
+                "insufficient privileges",
+                "access denied",
+                "accessdenied",
+                "does not have permission",
+                "forbidden",
+            ]
+        )
+
+        # Genuine licensing gap: HTTP 402, or a 403 that explicitly cites licensing (and does
+        # not look like a permission denial).
+        if status_code == 402 or (status_code == 403 and license_signal and not permission_signal):
+            return _licensing_required_result(
+                tenant,
+                parameter_key=parameter_key,
+                endpoint=endpoint,
+                required_sku="Microsoft Entra ID P1 or P2",
+                required_service="Microsoft Entra authentication methods registration report",
+                required_role="Reports Reader, Security Reader, or Global Reader",
+                required_permissions=["AuditLog.Read.All"],
+                expected_value="All capable users registered for MFA",
+                pass_criteria=_PASS,
+                fail_criteria=_FAIL,
+                severity="high",
+                scoring_weight=4.0,
+                graph_response=graph_response,
+            )
+
+        # Permission / consent gap (the usual cause of a 401 or a bare 403): the app is missing
+        # AuditLog.Read.All or admin consent — report that precisely, not as a licensing problem.
+        if status_code in (401, 403):
+            return _collection_error_result(
+                tenant,
+                parameter_key=parameter_key,
+                endpoint=endpoint,
+                required_api="Microsoft Graph /reports/authenticationMethods/userRegistrationDetails",
+                required_permissions=["AuditLog.Read.All"],
+                expected_value="All capable users registered for MFA",
+                pass_criteria=_PASS,
+                fail_criteria=_FAIL,
+                severity="high",
+                scoring_weight=4.0,
+                response=graph_response,
+                reason=(
+                    "The Microsoft Entra 'User registration details' report could not be read: the CRA application "
+                    "is missing the AuditLog.Read.All Microsoft Graph application permission, or admin consent has "
+                    "not been granted. Grant AuditLog.Read.All (Application) and re-run. Note this report also "
+                    "requires Microsoft Entra ID P1 or P2."
+                ),
+            )
+
+        # Any other Graph error (5xx / 404 / 429) — transient or service failure.
+        return _collection_error_result(
+            tenant,
+            parameter_key=parameter_key,
+            endpoint=endpoint,
+            required_api="Microsoft Graph /reports/authenticationMethods/userRegistrationDetails",
+            required_permissions=["AuditLog.Read.All"],
+            expected_value="All capable users registered for MFA",
+            pass_criteria=_PASS,
+            fail_criteria=_FAIL,
+            severity="high",
+            scoring_weight=4.0,
+            response=graph_response,
+        )
+
+    rows = response.get("value") or []
+    # "Capable users" population = member accounts. Guests are out of scope.
+    members = [r for r in rows if str(r.get("userType") or "").lower() != "guest"]
+    guests_excluded = len(rows) - len(members)
+
+    def _is_capable(row: dict[str, Any]) -> bool:
+        return row.get("isMfaCapable") is True
+
+    without_mfa = [
+        {
+            "id": r.get("id"),
+            "userPrincipalName": r.get("userPrincipalName"),
+            "isMfaCapable": bool(r.get("isMfaCapable")),
+            "isMfaRegistered": bool(r.get("isMfaRegistered")),
+            "methodsRegistered": r.get("methodsRegistered") or [],
+        }
+        for r in members
+        if not _is_capable(r)
     ]
-    users = eligible_users
-    method_rows = []
-    raw_methods: dict[str, Any] = {}
-    for user in users:
-        user_id = user.get("id")
-        if not user_id:
-            continue
-        methods_response = await _user_authentication_methods(client, user_id)
-        methods = methods_response.get("value") or []
-        raw_methods[user_id] = methods_response
-        method_types = [str(item.get("@odata.type") or item.get("id") or "") for item in methods]
-        mfa_methods = [
-            item for item in method_types
-            if item and "passwordAuthenticationMethod" not in item
-        ]
-        method_rows.append({
-            "id": user_id,
-            "userPrincipalName": user.get("userPrincipalName"),
-            "authMethodTypes": method_types,
-            "mfaMethodTypes": mfa_methods,
-        })
-    without_mfa = [item for item in method_rows if not item["mfaMethodTypes"]]
-    status = "pass" if not without_mfa else "fail"
-    if status == "pass":
-        reasoning = f"All {len(method_rows)} licensed Member accounts have MFA registered"
+    member_count = len(members)
+    mfa_capable_count = sum(1 for r in members if _is_capable(r))
+    mfa_registered_count = sum(1 for r in members if r.get("isMfaRegistered") is True)
+
+    if member_count == 0:
+        status = "fail"
+        reasoning = "The authentication methods registration report returned no member users to evaluate."
+    elif not without_mfa:
+        status = "pass"
+        reasoning = f"All {member_count} member user(s) are MFA-capable — every capable user is registered for MFA."
     else:
-        reasoning = f"{len(without_mfa)} licensed Member account(s) do not have a non-password MFA method registered"
+        status = "fail"
+        upns = ", ".join((u["userPrincipalName"] or u["id"]) for u in without_mfa[:20])
+        more = "" if len(without_mfa) <= 20 else f" (+{len(without_mfa) - 20} more)"
+        reasoning = (
+            f"{len(without_mfa)} of {member_count} member user(s) are not MFA-capable (no policy-allowed "
+            f"strong MFA method registered): {upns}{more}"
+        )
+
+    remediation = (
+        "Drive MFA registration for the users listed as not MFA-capable — start an authentication methods "
+        "registration campaign (Entra admin center > Identity > Authentication methods > Registration campaign) "
+        "and/or require MFA via Conditional Access. Review the same data at Authentication methods > User "
+        "registration details."
+    )
     evidence = _evaluation_evidence(
-        pass_criteria="MFA is enabled for all capable users",
-        fail_criteria="MFA is not configured for some capable users",
+        pass_criteria=_PASS,
+        fail_criteria=_FAIL,
         reasoning=reasoning,
-        extra={"tenant_id": tenant.tenant_id, "users_without_mfa": without_mfa, "users": method_rows},
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "member_user_count": member_count,
+            "mfa_capable_users": mfa_capable_count,
+            "mfa_registered_users": mfa_registered_count,
+            "users_without_mfa": without_mfa[:200],
+            "guests_excluded": guests_excluded,
+            "data_source": "Microsoft Graph /reports/authenticationMethods/userRegistrationDetails (User registration details export)",
+            "definition": "A user 'has MFA' when isMfaCapable = true (registered a strong MFA method allowed by the authentication methods policy).",
+            "remediation": remediation,
+        },
     )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="high",
-        actual_value={"users_without_mfa": len(without_mfa), "total_users": len(method_rows)},
-        expected_value="All MFA-capable users are registered for MFA",
+        actual_value={
+            "users_without_mfa": len(without_mfa),
+            "member_users": member_count,
+            "mfa_capable_users": mfa_capable_count,
+            "mfa_registered_users": mfa_registered_count,
+        },
+        expected_value="All capable (member) users are MFA-capable / registered for MFA",
         finding=reasoning,
-        graph_endpoint="/users + /users/{id}/authentication/methods",
+        graph_endpoint=endpoint,
         evidence=evidence,
-        raw_response={"users": users_response, "authenticationMethodsByUser": raw_methods},
-        graph_calls=1 + len(method_rows),
+        raw_response={"userRegistrationDetails": response},
+        graph_calls=1,
         scoring_weight=4.0,
     )
 
@@ -886,27 +1189,25 @@ async def collect_users_without_mfa(tenant: ConnectedTenant) -> dict[str, Any]:
 async def collect_user_consent_for_applications(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "user_consent_for_applications"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
-    MICROSOFT_MANAGED_POLICIES = {
-        "microsoft-user-default-low-risk",
-        "microsoft-user-default-recommended",
-        "microsoft-user-default-lowrisk",
-        "microsoft-user-default-recommendedpolicyforworktenants",
-    }
     policy = await _authorization_policy(tenant)
     permissions = policy.get("defaultUserRolePermissions") or {}
     assigned = permissions.get("permissionGrantPoliciesAssigned") or []
     if not assigned:
+        # An empty permissionGrantPoliciesAssigned means user consent is DISABLED — users
+        # cannot consent to any app (the most restrictive, secure state).
         status = "pass"
-        reasoning = "Users cannot consent for applications by default"
-    elif all(
-        any(managed in str(item).lower() for managed in MICROSOFT_MANAGED_POLICIES)
-        for item in assigned
-    ):
+        reasoning = "No user consent policy assigned — users cannot consent to applications"
+    elif any("microsoft-user-default" in str(item).lower() for item in assigned):
+        # Substring match: any Microsoft-managed default consent policy (recommended /
+        # low-risk / etc.) present, regardless of prefix or hyphenation variations.
         status = "pass"
-        reasoning = "User consent managed by Microsoft policy (low-risk only)"
+        reasoning = "User consent managed by Microsoft policy: " + ", ".join(str(item) for item in assigned)
     else:
         status = "fail"
-        reasoning = "Users can consent to applications"
+        reasoning = (
+            "Custom permission grant policy assigned — verify users cannot consent freely: "
+            + ", ".join(str(item) for item in assigned)
+        )
     evidence = _evaluation_evidence(
         pass_criteria="User consent is not set to Users can consent",
         fail_criteria="User consent is set to Users can consent",
@@ -964,7 +1265,11 @@ async def collect_restricted_access_to_microsoft_entra_admin_centre(tenant: Conn
     permissions = policy.get("defaultUserRolePermissions") or {}
     allowed = permissions.get("allowedToReadOtherUsers")
     status = "pass" if allowed is False else "fail"
-    reasoning = f"Non-admin users allowed to read other users/admin center data: {allowed}"
+    reasoning = (
+        "Access to Microsoft Entra Admin Center is restricted."
+        if status == "pass"
+        else "Access to Microsoft Entra Admin Center is not restricted."
+    )
     evidence = _evaluation_evidence(
         pass_criteria="Non-Admin Users should not have access to Microsoft Entra Admin Centre",
         fail_criteria="Non-Admin Users have access to Microsoft Entra Admin Centre",
@@ -974,7 +1279,7 @@ async def collect_restricted_access_to_microsoft_entra_admin_centre(tenant: Conn
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
-        severity="info",
+        severity="critical",
         actual_value=allowed,
         expected_value="allowedToReadOtherUsers=false",
         finding=reasoning,
@@ -1151,101 +1456,114 @@ async def collect_conditional_access_policies_exclusion(tenant: ConnectedTenant)
 
 
 async def collect_devices_without_compliance_policies(tenant: ConnectedTenant) -> dict[str, Any]:
+    """Check whether the tenant has any Microsoft Intune device COMPLIANCE POLICY.
+
+    Workload: Microsoft Intune (not Entra ID). The control is about whether
+    compliance *policies* exist so enrolled devices are actually evaluated — the
+    previous implementation read enrolled *devices* (/deviceManagement/managedDevices)
+    and graded their complianceState, which answers a different question and fails a
+    tenant that simply has no devices enrolled yet.
+
+      GET /deviceManagement/deviceCompliancePolicies   (Microsoft Graph v1.0)
+      Permission: DeviceManagementConfiguration.Read.All  ·  Requires a Microsoft Intune licence.
+      https://learn.microsoft.com/graph/api/intune-deviceconfig-devicecompliancepolicy-list
+    """
     parameter_key = "devices_without_compliance_policies"
     _log("COLLECTOR_STARTED", parameter_key=parameter_key, tenant_id=tenant.tenant_id)
+    endpoint = "/deviceManagement/deviceCompliancePolicies"
+    _SEVERITY = "medium"
+    _WEIGHT = 3.0
+    _PASS = "At least one Intune device compliance policy is configured"
+    _FAIL = "No Intune device compliance policy is configured"
+
     client = await _graph_client(tenant)
-    endpoint = "/deviceManagement/managedDevices"
     try:
         response = await _get_all(client, endpoint)
     except httpx.HTTPStatusError as exc:
         try:
-            error_payload: dict[str, Any] = exc.response.json()
+            payload: dict[str, Any] = exc.response.json()
         except ValueError:
-            error_payload = {"error": {"message": exc.response.text}}
-        graph_error = error_payload.get("error") or error_payload
-        reasoning = graph_error.get("message") or "Managed devices data is not available for this tenant"
-        evidence = _evaluation_evidence(
-            pass_criteria="Compliance policy is configured",
-            fail_criteria="Compliance policy is not configured",
-            reasoning=reasoning,
-            extra={
-                "tenant_id": tenant.tenant_id,
-                "graph_error": graph_error,
-                "status_code": exc.response.status_code,
-            },
-        )
-        return _collector_result(
+            payload = {"error": {"message": exc.response.text}}
+        error = payload.get("error") or payload
+        status_code = exc.response.status_code
+        graph_response = {"ok": False, "status_code": status_code, "error": error}
+        if status_code in (401, 402, 403):
+            # No Intune licence, or the app lacks DeviceManagementConfiguration.Read.All.
+            return _licensing_required_result(
+                tenant,
+                parameter_key=parameter_key,
+                endpoint=endpoint,
+                required_sku="Microsoft Intune (Intune Plan 1 / Microsoft 365 E3 or E5)",
+                required_service="Microsoft Intune device compliance management",
+                required_role="Intune Administrator or Global Reader",
+                required_permissions=["DeviceManagementConfiguration.Read.All"],
+                expected_value="At least one Intune device compliance policy configured",
+                pass_criteria=_PASS,
+                fail_criteria=_FAIL,
+                severity=_SEVERITY,
+                scoring_weight=_WEIGHT,
+                graph_response=graph_response,
+            )
+        return _collection_error_result(
+            tenant,
             parameter_key=parameter_key,
-            status="fail",
-            severity="info",
-            actual_value={"managed_devices_available": False, "error": graph_error},
-            expected_value="Managed device compliance data available and compliant",
-            finding=reasoning,
-            graph_endpoint=endpoint,
-            evidence=evidence,
-            raw_response={
-                "managedDevices": {
-                    "error": graph_error,
-                    "status_code": exc.response.status_code,
-                }
-            },
-            graph_calls=1,
-            scoring_weight=1.0,
+            endpoint=endpoint,
+            required_api="Microsoft Graph Intune /deviceManagement/deviceCompliancePolicies",
+            required_permissions=["DeviceManagementConfiguration.Read.All"],
+            expected_value="At least one Intune device compliance policy configured",
+            pass_criteria=_PASS,
+            fail_criteria=_FAIL,
+            severity=_SEVERITY,
+            scoring_weight=_WEIGHT,
+            response=graph_response,
         )
-    devices = response.get("value") or []
-    if len(devices) == 0:
-        reasoning = "No managed devices found. Intune/MDM is not configured in this tenant."
-        evidence = _evaluation_evidence(
-            pass_criteria="Compliance policy is configured",
-            fail_criteria="Compliance policy is not configured",
-            reasoning=reasoning,
-            extra={"tenant_id": tenant.tenant_id, "non_compliant_devices": [], "total_devices": 0},
-        )
-        return _collector_result(
-            parameter_key=parameter_key,
-            status="fail",
-            severity="info",
-            actual_value={"non_compliant_devices": 0, "total_devices": 0},
-            expected_value="No non-compliant or unmanaged devices",
-            finding=reasoning,
-            graph_endpoint="/deviceManagement/managedDevices",
-            evidence=evidence,
-            raw_response={"managedDevices": response},
-            graph_calls=1,
-            scoring_weight=1.0,
-        )
-    non_compliant = [
+
+    policies = response.get("value") or []
+    policy_rows = [
         {
-            "id": item.get("id"),
-            "deviceName": item.get("deviceName"),
-            "userPrincipalName": item.get("userPrincipalName"),
-            "complianceState": item.get("complianceState"),
-            "managementAgent": item.get("managementAgent"),
-            "operatingSystem": item.get("operatingSystem"),
+            "id": p.get("id"),
+            "displayName": p.get("displayName"),
+            "platform": str(p.get("@odata.type") or "").split(".")[-1] or None,
         }
-        for item in devices
-        if str(item.get("complianceState") or "").lower() not in {"compliant"}
+        for p in policies
     ]
-    status = "pass" if not non_compliant else "fail"
-    reasoning = f"{len(non_compliant)} device(s) are non-compliant or missing compliance state"
+    status = "pass" if policies else "fail"
+    if policies:
+        reasoning = f"{len(policies)} Intune device compliance policy(ies) are configured."
+    else:
+        reasoning = (
+            "No Intune device compliance policies are configured — enrolled devices are not evaluated for "
+            "compliance, so device-based Conditional Access cannot gate access to Microsoft 365 Copilot data."
+        )
+    remediation = (
+        "Create device compliance policies in the Microsoft Intune admin center > Devices > Compliance policies, "
+        "then require compliant devices through a Conditional Access grant control."
+    )
     evidence = _evaluation_evidence(
-        pass_criteria="Compliance policy is configured",
-        fail_criteria="Compliance policy is not configured",
+        pass_criteria=_PASS,
+        fail_criteria=_FAIL,
         reasoning=reasoning,
-        extra={"tenant_id": tenant.tenant_id, "non_compliant_devices": non_compliant, "total_devices": len(devices)},
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "compliance_policy_count": len(policies),
+            "compliance_policies": policy_rows[:50],
+            "data_source": "Microsoft Graph /deviceManagement/deviceCompliancePolicies (Microsoft Intune)",
+            "workload": "Microsoft Intune",
+            "remediation": remediation,
+        },
     )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
-        severity="info",
-        actual_value={"non_compliant_devices": len(non_compliant), "total_devices": len(devices)},
-        expected_value="No non-compliant or unmanaged devices",
+        severity=_SEVERITY,
+        actual_value={"compliance_policy_count": len(policies)},
+        expected_value="At least one Intune device compliance policy configured",
         finding=reasoning,
-        graph_endpoint="/deviceManagement/managedDevices",
+        graph_endpoint=endpoint,
         evidence=evidence,
-        raw_response={"managedDevices": response},
+        raw_response={"deviceCompliancePolicies": response},
         graph_calls=1,
-        scoring_weight=1.0,
+        scoring_weight=_WEIGHT,
     )
 
 
@@ -1384,16 +1702,16 @@ async def collect_mailbox_storage_usage(tenant: ConnectedTenant) -> dict[str, An
             "storage_usage_ratio": ratio,
         }
         mailboxes.append(item)
-        if ratio > 95:
+        if ratio >= 75:
             over_threshold.append(item)
     max_ratio = max([item["storage_usage_ratio"] for item in mailboxes], default=0.0)
     status = "pass" if not over_threshold else "fail"
     if type_column:
-        reasoning = f"{len(over_threshold)} user mailbox(es) exceed 95% storage; max {max_ratio}% — {excluded_non_user} non-user mailboxes excluded"
+        reasoning = f"{len(over_threshold)} user mailbox(es) are at or above 75% of their storage quota (highest {max_ratio}%); {excluded_non_user} non-user mailboxes were excluded from this result"
     else:
-        reasoning = f"{len(over_threshold)} mailbox(es) exceed 95% storage; max {max_ratio}% — mailbox type not available in report, no exclusion applied"
+        reasoning = f"{len(over_threshold)} mailbox(es) are at or above 75% of their storage quota (highest {max_ratio}%)"
     if over_threshold:
-        reasoning += " Note: Graph usage reports do not include mailbox type — shared/room mailboxes cannot be excluded automatically. Verify via Exchange PowerShell: Get-EXOMailbox -RecipientTypeDetails UserMailbox"
+        reasoning += ". Some of these may be shared, room, or resource mailboxes, which should be reviewed separately from standard user mailboxes."
     evidence = _evaluation_evidence(
         pass_criteria="When the active storage on mailbox is less than 75%",
         fail_criteria="When the active storage on mailbox is more than 75%",
@@ -1558,7 +1876,7 @@ async def collect_active_inactive_teams(tenant: ConnectedTenant) -> dict[str, An
     inactive_pct = _percent(len(inactive), total)
     status = "pass" if not inactive else "fail"
     if inactive:
-        reasoning = f"{len(inactive)} inactive team(s) out of {total} ({inactive_pct}%) — last activity date older than 60 days or never active"
+        reasoning = f"{len(inactive)} out of {total} ({inactive_pct}%) teams are inactive"
     else:
         reasoning = f"All {total} team(s) were active within the last 60 days"
     evidence = _evaluation_evidence(
@@ -1614,8 +1932,9 @@ async def collect_activer_inactive_teams_users(tenant: ConnectedTenant) -> dict[
     active = [row for row in users if _has_recent_activity(row, within_days=60)]
     inactive = [row for row in users if row not in active]
     inactive_ratio = _percent(len(inactive), len(users))
+    active_pct = _percent(len(active), len(users))
     status = "pass" if inactive_ratio < 15 else "fail"
-    reasoning = f"{len(active)} active Teams user(s), {len(inactive)} inactive Teams user(s), inactive ratio {inactive_ratio}%"
+    reasoning = f"{len(active)} out of {len(users)} Teams users are active ({active_pct}%)"
     evidence = _evaluation_evidence(
         pass_criteria="When the number of inactive Teams users are less than 15% for the tenant",
         fail_criteria="When the number of active Teams users are more than 15% for the tenant",
@@ -1657,7 +1976,7 @@ async def collect_active_sites_count(tenant: ConnectedTenant) -> dict[str, Any]:
     active = [row for row in sites if _has_recent_activity(row, within_days=60)]
     ratio = _percent(len(active), len(sites))
     status = "pass" if ratio >= 85 else "fail"
-    reasoning = f"{len(active)} active SharePoint site(s) out of {len(sites)} ({ratio}%) — active means Last Activity Date within the last 60 days"
+    reasoning = f"{len(active)} sites are active out of {len(sites)} ({ratio}%)"
     evidence = _evaluation_evidence(
         pass_criteria="When the number active sites on SharePoint are more than 85%",
         fail_criteria="When the number active sites on SharePoint are less than 85%",
@@ -1677,7 +1996,7 @@ async def collect_active_users_on_sharepoint(tenant: ConnectedTenant) -> dict[st
     active = [row for row in users if _has_recent_activity(row, within_days=60)]
     ratio = _percent(len(active), len(users))
     status = "pass" if ratio >= 85 else "fail"
-    reasoning = f"{len(active)} active SharePoint user(s) out of {len(users)} ({ratio}%) — active means Last Activity Date within the last 60 days"
+    reasoning = f"{len(active)} users are active out of {len(users)} ({ratio}%)"
     evidence = _evaluation_evidence(pass_criteria="When the number active users on SharePoint are more than or equal to 85%", fail_criteria="When the number active users on SharePoint are less than 85%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
     return _collector_result(parameter_key=parameter_key, status=status, severity="medium", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">=85% active SharePoint users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=3.0)
 
@@ -1691,10 +2010,12 @@ async def collect_total_active_users_on_onedrive(tenant: ConnectedTenant) -> dic
     users = [row for row in rows if str(row.get("Is Deleted") or "").strip().lower() != "true"]
     active = [row for row in users if _has_recent_activity(row, within_days=60)]
     ratio = _percent(len(active), len(users))
-    status = "pass" if ratio >= 85 else "fail"
-    reasoning = f"{len(active)} active OneDrive user(s) out of {len(users)} ({ratio}%) — active within last 60 days (D180 usage report)"
-    evidence = _evaluation_evidence(pass_criteria="When the total active user on OneDrive are more than or equal to 85%", fail_criteria="When the total active user on OneDrive are less than 85%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">=85% active OneDrive users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=1.0)
+    status = "pass" if ratio > 80 else "fail"
+    reasoning = f"{len(active)} out of {len(users)} users are active ({ratio}%) in last 2 months"
+    if status == "fail":
+        reasoning += " — below 80% threshold"
+    evidence = _evaluation_evidence(pass_criteria="When the total active users on OneDrive are more than 80%", fail_criteria="When the total active users on OneDrive are 80% or less", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "active_users": active, "all_users": users, "active_ratio": ratio})
+    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"active_users": len(active), "total_users": len(users), "active_ratio": ratio}, expected_value=">80% active OneDrive users", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=1.0)
 
 
 async def _teams_with_owners_and_members(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -1708,10 +2029,16 @@ async def _teams_with_owners_and_members(tenant: ConnectedTenant) -> dict[str, A
     teams = []
     raw: dict[str, Any] = {"teams": teams_response, "owners": {}, "members": {}}
     graph_calls = 1
+    skipped_teams = 0
     for team in teams_response.get("value") or []:
         team_id = team.get("id")
-        owners_response = await _get_all(client, f"/groups/{team_id}/owners", params={"$select": "id,displayName,userPrincipalName,mail,userType"})
-        members_response = await _get_all(client, f"/groups/{team_id}/members", params={"$select": "id,displayName,userPrincipalName,userType"})
+        try:
+            owners_response = await _get_all(client, f"/groups/{team_id}/owners", params={"$select": "id,displayName,userPrincipalName,mail,userType"})
+            members_response = await _get_all(client, f"/groups/{team_id}/members", params={"$select": "id,displayName,userPrincipalName,userType"})
+        except Exception as exc:  # noqa: BLE001 - one failing group must not blank the whole control
+            skipped_teams += 1
+            logger.warning("[GRAPH] Teams enumeration: skipped group %s after retries (%s)", team_id, exc)
+            continue
         graph_calls += 2
         owners = owners_response.get("value") or []
         members = members_response.get("value") or []
@@ -1727,7 +2054,7 @@ async def _teams_with_owners_and_members(tenant: ConnectedTenant) -> dict[str, A
             "guest_count": len(guests),
             "guest_members": guests,
         })
-    return {"teams": teams, "raw_response": raw, "graph_calls": graph_calls}
+    return {"teams": teams, "raw_response": raw, "graph_calls": graph_calls, "skipped_teams": skipped_teams}
 
 
 async def collect_minimum_number_of_owners(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -1748,7 +2075,10 @@ async def collect_minimum_number_of_owners(tenant: ConnectedTenant) -> dict[str,
     teams = data["teams"]
     under_owned = [team for team in teams if team["owner_count"] < 2]
     status = "pass" if not under_owned else "fail"
-    reasoning = f"{len(under_owned)} team(s) have fewer than 2 owners"
+    if under_owned:
+        reasoning = f"There are {len(under_owned)} teams with less than 2 owners"
+    else:
+        reasoning = f"All {len(teams)} team(s) have at least 2 owners"
     evidence = _evaluation_evidence(pass_criteria="When all teams have more than 1 Owner", fail_criteria="When teams have less than 2 Owner", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "teams": teams, "under_owned_teams": under_owned})
     return _collector_result(parameter_key=parameter_key, status=status, severity="high", actual_value={"teams_with_less_than_2_owners": len(under_owned), "total_teams": len(teams)}, expected_value="All teams have at least 2 owners", finding=reasoning, graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/owners", evidence=evidence, raw_response=data["raw_response"], graph_calls=data["graph_calls"], scoring_weight=4.0)
 
@@ -1771,7 +2101,7 @@ async def collect_orphan_teams(tenant: ConnectedTenant) -> dict[str, Any]:
     teams = data["teams"]
     orphaned = [team for team in teams if team["owner_count"] == 0]
     status = "pass" if not orphaned else "fail"
-    reasoning = f"{len(orphaned)} orphan team(s) found"
+    reasoning = "There are no orphan teams" if not orphaned else f"There are {len(orphaned)} orphan teams"
     evidence = _evaluation_evidence(pass_criteria="When there are no orphan teams", fail_criteria="When orphan teams are present", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "orphan_teams": orphaned, "teams": teams})
     return _collector_result(parameter_key=parameter_key, status=status, severity="high", actual_value={"orphan_team_count": len(orphaned), "total_teams": len(teams)}, expected_value="No orphan teams", finding=reasoning, graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/owners", evidence=evidence, raw_response=data["raw_response"], graph_calls=data["graph_calls"], scoring_weight=4.0)
 
@@ -1795,7 +2125,7 @@ async def collect_teams_with_external_users(tenant: ConnectedTenant) -> dict[str
     external = [team for team in teams if team["guest_count"] > 0]
     ratio = _percent(len(external), len(teams))
     status = "pass" if ratio < 20 else "fail"
-    reasoning = f"{len(external)} team(s) have external users ({ratio}% of teams)"
+    reasoning = f"Number of Teams with external users: {len(external)}"
     evidence = _evaluation_evidence(pass_criteria="When it is less than 20%", fail_criteria="When it is more than to 20%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "teams_with_external_users": external, "all_teams": teams, "external_team_ratio": ratio})
     return _collector_result(parameter_key=parameter_key, status=status, severity="high", actual_value={"teams_with_external_users": len(external), "total_teams": len(teams), "external_team_ratio": ratio}, expected_value="<20% Teams with external users", finding=reasoning, graph_endpoint="/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team') + /groups/{id}/members", evidence=evidence, raw_response=data["raw_response"], graph_calls=data["graph_calls"], scoring_weight=4.0)
 
@@ -1841,7 +2171,7 @@ async def collect_teams_with_external_guest_as_owner(tenant: ConnectedTenant) ->
         if any(str(owner.get("userType") or "").lower() == "guest" for owner in team.get("owners") or [])
     ]
     status = "pass" if not guest_owned else "fail"
-    reasoning = f"{len(guest_owned)} team(s) have external guest owners out of {len(teams)} Teams"
+    reasoning = f"There are {len(guest_owned)} teams with external guests as owner"
     evidence = _evaluation_evidence(
         pass_criteria="No Teams have external guests as owners",
         fail_criteria="One or more Teams have external guests as owners",
@@ -2446,15 +2776,18 @@ async def collect_secure_score_percentage(tenant: ConnectedTenant) -> dict[str, 
     current = float(latest.get("currentScore") or 0)
     maximum = float(latest.get("maxScore") or 0)
     percentage = round(current / maximum * 100, 2) if maximum else 0.0
-    status = "pass" if percentage >= 80 else "fail"
-    reasoning = f"Secure score is {percentage}% ({current}/{maximum})"
+    status = "pass" if percentage > 70 else "fail"
+    if status == "pass":
+        reasoning = f"Secure score: {percentage}% (threshold: 70%)"
+    else:
+        reasoning = f"Secure score: {percentage}% — below 70% threshold"
     evidence = _evaluation_evidence(
-        pass_criteria="When it is more than or equal to 80%",
-        fail_criteria="When it is less than 80%",
+        pass_criteria="When it is more than 70%",
+        fail_criteria="When it is 70% or less",
         reasoning=reasoning,
         extra={"tenant_id": tenant.tenant_id, "secure_score": latest, "secure_score_percentage": percentage},
     )
-    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"current_score": current, "max_score": maximum, "secure_score_percentage": percentage}, expected_value="Secure score percentage >=80%", finding=reasoning, graph_endpoint="/security/secureScores?$top=1", evidence=evidence, raw_response={"secureScores": response}, graph_calls=1, scoring_weight=5.0)
+    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"current_score": current, "max_score": maximum, "secure_score_percentage": percentage}, expected_value="Secure score percentage >70%", finding=reasoning, graph_endpoint="/security/secureScores?$top=1", evidence=evidence, raw_response={"secureScores": response}, graph_calls=1, scoring_weight=5.0)
 
 
 async def collect_audit_logs_enabled(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -2481,32 +2814,8 @@ async def collect_emergency_access_accounts(tenant: ConnectedTenant) -> dict[str
     client = await _graph_client(tenant)
     graph_calls = 0
 
-    # Primary heuristic: cloud-only accounts excluded from ALL enabled Conditional Access policies
-    cap_response = await _conditional_access_policies(tenant)
-    graph_calls += 1
-    all_policies = cap_response.get("value") or []
-    enabled_policies = [p for p in all_policies if str(p.get("state") or "").lower() == "enabled"]
-
-    excluded_from_all: set[str] | None = None
-    for pol in enabled_policies:
-        excluded = set((pol.get("conditions") or {}).get("users", {}).get("excludeUsers") or [])
-        excluded_from_all = excluded if excluded_from_all is None else excluded_from_all & excluded
-
-    cap_candidates: list[dict[str, Any]] = []
-    if excluded_from_all:
-        for user_id in excluded_from_all:
-            try:
-                user = await client.get(
-                    f"/users/{user_id}",
-                    params={"$select": "id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled"},
-                )
-                graph_calls += 1
-                if user.get("accountEnabled") and user.get("onPremisesSyncEnabled") is None:
-                    cap_candidates.append(user)
-            except httpx.HTTPStatusError:
-                graph_calls += 1
-
-    # Supplementary heuristic: Global Admin members whose name contains emergency keywords
+    # Tenant assessment rule: an emergency-access account is an enabled, cloud-only
+    # *.onmicrosoft.com user with active Global Administrator membership and zero licenses.
     roles = await client.get("/directoryRoles", params={"$filter": "displayName eq 'Global Administrator'", "$select": "id,displayName"})
     graph_calls += 1
     role = (roles.get("value") or [None])[0]
@@ -2514,76 +2823,79 @@ async def collect_emergency_access_accounts(tenant: ConnectedTenant) -> dict[str
     if role:
         members_resp = await client.get(
             f"/directoryRoles/{role['id']}/members",
-            params={"$select": "id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled"},
+            params={"$select": "id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled,assignedLicenses"},
         )
         graph_calls += 1
         members = members_resp.get("value") or []
 
-    emergency_markers = ("break", "glass", "emergency", "backup", "elevated")
-    name_matches = [
-        u for u in members
-        if any(m in str(u.get("displayName") or u.get("userPrincipalName") or "").lower() for m in emergency_markers)
-    ]
+    evaluated_accounts: list[dict[str, Any]] = []
+    emergency_accounts: list[dict[str, Any]] = []
+    for user in members:
+        user_principal_name = str(user.get("userPrincipalName") or "")
+        assigned_licenses = user.get("assignedLicenses") or []
+        account = {
+            "id": user.get("id"),
+            "displayName": user.get("displayName"),
+            "userPrincipalName": user.get("userPrincipalName"),
+            "accountEnabled": user.get("accountEnabled"),
+            "cloudOnly": user.get("onPremisesSyncEnabled") is None,
+            "onMicrosoftDomain": user_principal_name.lower().endswith(".onmicrosoft.com"),
+            "assignedLicenseCount": len(assigned_licenses),
+        }
+        evaluated_accounts.append(account)
+        if (
+            account["accountEnabled"] is True
+            and account["cloudOnly"] is True
+            and account["onMicrosoftDomain"] is True
+            and account["assignedLicenseCount"] == 0
+        ):
+            emergency_accounts.append(account)
 
-    seen: set[str] = {u.get("id") or "" for u in cap_candidates}
-    combined = list(cap_candidates)
-    for u in name_matches:
-        if u.get("id") not in seen:
-            combined.append(u)
-            seen.add(u.get("id") or "")
-
-    count = len(combined)
+    count = len(emergency_accounts)
     status = "pass" if count >= 1 else "fail"
-
-    if enabled_policies and cap_candidates:
-        reasoning = (
-            f"{count} emergency access account(s): {len(cap_candidates)} cloud-only account(s) excluded from all "
-            f"{len(enabled_policies)} enabled CA polic{'y' if len(enabled_policies) == 1 else 'ies'}, "
-            f"plus {len(name_matches)} name-heuristic match(es) among {len(members)} Global Admins"
+    if status == "pass":
+        account_names = ", ".join(
+            str(account.get("displayName") or account.get("userPrincipalName") or account.get("id"))
+            for account in emergency_accounts
         )
-    elif enabled_policies:
-        reasoning = (
-            f"{count} emergency access account(s) via name heuristic; "
-            f"no user excluded from all {len(enabled_policies)} enabled CA polic{'y' if len(enabled_policies) == 1 else 'ies'}"
+        finding = (
+            f"{count} emergency access account(s) identified: enabled cloud-only "
+            f"Global Administrator on the .onmicrosoft.com domain with 0 assigned licenses: {account_names}"
         )
     else:
-        reasoning = (
-            f"{count} emergency access account(s) identified via name heuristic "
-            f"among {len(members)} Global Administrator member(s); no enabled CA policies to apply exclusion heuristic"
-        )
+        finding = "No break glass account is present"
 
     evidence = _evaluation_evidence(
         pass_criteria="When it is Present",
         fail_criteria="When not present",
-        reasoning=reasoning,
+        reasoning=finding,
         extra={
             "tenant_id": tenant.tenant_id,
-            "enabled_cap_policy_count": len(enabled_policies),
-            "cap_exclusion_candidates": cap_candidates,
             "global_admin_members": members,
-            "emergency_access_accounts": combined,
-            "name_heuristic_markers": emergency_markers,
+            "evaluated_global_admin_accounts": evaluated_accounts,
+            "emergency_access_accounts": emergency_accounts,
         },
     )
-    return _collector_result(
+    result = _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="critical",
         actual_value={
             "emergency_access_accounts": count,
-            "cap_exclusion_count": len(cap_candidates),
-            "name_heuristic_count": len(name_matches),
             "global_admin_members": len(members),
-            "cap_policies_checked": len(enabled_policies),
+            "qualification": "Enabled cloud-only Global Administrator on the tenant .onmicrosoft.com domain with 0 assigned licenses",
         },
         expected_value="At least one identifiable emergency access account",
-        finding=reasoning,
-        graph_endpoint="/identity/conditionalAccess/policies + /directoryRoles/{id}/members + /users/{id}",
+        finding=finding,
+        graph_endpoint="/directoryRoles + /directoryRoles/{id}/members",
         evidence=evidence,
-        raw_response={"conditionalAccessPolicies": cap_response, "cap_exclusion_candidates": cap_candidates, "global_admin_members": members},
+        raw_response={"global_admin_members": members},
         graph_calls=graph_calls,
         scoring_weight=5.0,
     )
+    # This Best Practice control remains Critical even when it passes.
+    result["severity"] = "critical"
+    return result
 
 
 async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -2645,7 +2957,11 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
                 severity="critical",
                 actual_value=actual_value,
                 expected_value="Custom banned password list enabled",
-                finding=reasoning,
+                finding=(
+                    "Custom banned password list is enforced"
+                    if enabled
+                    else "Custom banned password list is not enforced"
+                ),
                 graph_endpoint=endpoint,
                 evidence=evidence,
                 raw_response={"password_policy": body, "endpoint_used": endpoint},
@@ -2691,7 +3007,7 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
                 severity="critical",
                 actual_value={"enabled": False, "custom_word_count": 0, "configured": False},
                 expected_value="Custom banned password list enabled",
-                finding=reasoning,
+                finding="Custom banned password list is not enforced",
                 graph_endpoint=endpoint,
                 evidence=evidence,
                 raw_response={"settings": settings_list, "endpoint_used": endpoint},
@@ -2751,7 +3067,11 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             severity="critical",
             actual_value=actual_value,
             expected_value="Custom banned password list enabled",
-            finding=reasoning,
+            finding=(
+                "Custom banned password list is enforced"
+                if status == "pass"
+                else "Custom banned password list is not enforced"
+            ),
             graph_endpoint=endpoint,
             evidence=evidence,
             raw_response={"password_rule_setting": pwd_setting, "endpoint_used": endpoint},
@@ -2804,7 +3124,11 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             severity="critical",
             actual_value=actual_value,
             expected_value="Custom banned password list enabled",
-            finding=reasoning,
+            finding=(
+                "Custom banned password list is enforced"
+                if status == "pass"
+                else "Custom banned password list is not enforced"
+            ),
             graph_endpoint=endpoint,
             evidence=evidence,
             raw_response={"password_protection_policy": policy, "endpoint_attempts": all_responses},
@@ -2841,7 +3165,7 @@ async def collect_custom_banned_password_list(tenant: ConnectedTenant) -> dict[s
             severity="critical",
             actual_value={"enabled": False, "custom_word_count": 0, "configured": False},
             expected_value="Custom banned password list enabled",
-            finding=reasoning,
+            finding="Custom banned password list is not enforced",
             graph_endpoint=", ".join(settings_endpoints + legacy_endpoints),
             evidence=evidence,
             raw_response={"endpoint_attempts": all_responses},
@@ -3012,29 +3336,156 @@ async def collect_sensitivity_labels_applied_to_teams(tenant: ConnectedTenant) -
 
 
 async def _sensitivity_label_graph_collector(tenant: ConnectedTenant, *, parameter_key: str, severity: str, scoring_weight: float) -> dict[str, Any]:
-    endpoint = "https://graph.microsoft.com/beta/security/informationProtection/sensitivityLabels"
-    response = await _graph_get_json_or_error(tenant, endpoint)
-    if not response.get("ok"):
+    """Validate that sensitivity labels are CONFIGURED **and actually APPLIED**.
+
+    The previous implementation passed whenever any label merely existed in the
+    tenant — a false PASS, because a configured-but-never-applied label protects
+    nothing. This collector combines two supported, documented Microsoft Graph
+    signals and is shared by every sensitivity-label parameter (single source of
+    truth — no duplicated per-parameter logic):
+
+      1. Configured labels — GET /security/informationProtection/sensitivityLabels
+         (Microsoft Purview Information Protection; InformationProtectionPolicy.Read.All).
+         A failure here is a licensing/permission gap, not a plain FAIL.
+         https://learn.microsoft.com/graph/api/security-informationprotection-list-sensitivitylabels
+      2. Applied labels — GET /groups?$filter=groupTypes/any(c:c eq 'Unified')
+         &$select=id,displayName,assignedLabels (v1.0; Group.Read.All). A label in a
+         container's assignedLabels proves it is applied to that Microsoft 365
+         group / Team / group-connected SharePoint site.
+         https://learn.microsoft.com/graph/api/group-list
+
+    PASS only when at least one label is configured AND at least one container
+    carries an applied label. Configured-but-never-applied is a FAIL.
+
+    Limitation: app-only Graph exposes container-level (group/site) application, not
+    per-file labelling; that is documented in the evidence rather than guessed at.
+    """
+    labels_endpoint = "https://graph.microsoft.com/beta/security/informationProtection/sensitivityLabels"
+    _PASS = "At least one sensitivity label is configured AND applied to a Microsoft 365 container"
+    _FAIL = "No labels configured, or labels configured but not applied to any container"
+
+    label_response = await _graph_get_json_or_error(tenant, labels_endpoint)
+    if not label_response.get("ok"):
+        # Licensing (no Purview IP) or permission (missing InformationProtectionPolicy.Read.All).
         return _licensing_required_result(
             tenant,
             parameter_key=parameter_key,
-            endpoint=endpoint,
-            required_sku="Microsoft 365 E5 or Microsoft Purview Information Protection",
+            endpoint=labels_endpoint,
+            required_sku="Microsoft 365 E5 / E5 Compliance or Microsoft Purview Information Protection",
             required_service="Microsoft Purview Information Protection",
             required_role="Compliance Administrator or Information Protection Administrator",
-            required_permissions=["InformationProtectionPolicy.Read.All"],
-            expected_value="Sensitivity labels configured and applied",
-            pass_criteria="If labels is configured and applied",
-            fail_criteria="If labels is not configured and applied",
+            required_permissions=["InformationProtectionPolicy.Read.All", "Group.Read.All"],
+            expected_value="Sensitivity labels configured and applied to Microsoft 365 containers",
+            pass_criteria=_PASS,
+            fail_criteria=_FAIL,
             severity=severity,
             scoring_weight=scoring_weight,
-            graph_response=response,
+            graph_response=label_response,
         )
-    labels = (response.get("response") or {}).get("value") or []
-    status = "pass" if labels else "fail"
-    reasoning = f"{len(labels)} sensitivity label(s) returned by Microsoft Graph"
-    evidence = _evaluation_evidence(pass_criteria="If labels is configured and applied", fail_criteria="If labels is not configured and applied", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "labels": labels})
-    return _collector_result(parameter_key=parameter_key, status=status, severity=severity, actual_value={"sensitivity_label_count": len(labels)}, expected_value="Sensitivity labels configured and applied", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sensitivityLabels": response.get("response")}, graph_calls=1, scoring_weight=scoring_weight)
+    configured_labels = (label_response.get("response") or {}).get("value") or []
+
+    # Application signal: Microsoft 365 group containers (Teams / group-connected
+    # SharePoint sites) carrying an assigned sensitivity label.
+    groups_endpoint = "/groups?$filter=groupTypes/any(c:c eq 'Unified')&$select=id,displayName,assignedLabels"
+    client = await _graph_client(tenant)
+    try:
+        groups_response = await _get_all(
+            client,
+            "/groups",
+            params={"$filter": "groupTypes/any(c:c eq 'Unified')", "$select": "id,displayName,assignedLabels"},
+        )
+    except httpx.HTTPStatusError as exc:
+        try:
+            payload: dict[str, Any] = exc.response.json()
+        except ValueError:
+            payload = {"error": {"message": exc.response.text}}
+        return _collection_error_result(
+            tenant,
+            parameter_key=parameter_key,
+            endpoint=groups_endpoint,
+            required_api="Microsoft Graph /groups (assignedLabels)",
+            required_permissions=["Group.Read.All"],
+            expected_value="Sensitivity labels configured and applied to Microsoft 365 containers",
+            pass_criteria=_PASS,
+            fail_criteria=_FAIL,
+            severity=severity,
+            scoring_weight=scoring_weight,
+            response={"ok": False, "status_code": exc.response.status_code, "error": payload.get("error") or payload},
+        )
+
+    groups = groups_response.get("value") or []
+    applied = [
+        {
+            "id": g.get("id"),
+            "displayName": g.get("displayName"),
+            "assignedLabels": [
+                (label.get("displayName") or label.get("labelId")) for label in (g.get("assignedLabels") or [])
+            ],
+        }
+        for g in groups
+        if g.get("assignedLabels")
+    ]
+    configured_count = len(configured_labels)
+    applied_count = len(applied)
+    container_count = len(groups)
+
+    if configured_count == 0:
+        status = "fail"
+        reasoning = "No sensitivity labels are configured in this tenant, so none can be applied."
+    elif applied_count == 0:
+        status = "fail"
+        reasoning = (
+            f"{configured_count} sensitivity label(s) are configured but none are applied to any of the "
+            f"{container_count} Microsoft 365 group / Team / SharePoint site container(s) — labels exist but "
+            "are not in use."
+        )
+    else:
+        status = "pass"
+        reasoning = (
+            f"{applied_count} of {container_count} Microsoft 365 container(s) have a sensitivity label applied "
+            f"({configured_count} label(s) configured)."
+        )
+
+    remediation = (
+        "Publish sensitivity labels and enable a label policy (default/auto-labelling) so they are applied to "
+        "Microsoft 365 groups, Teams, SharePoint sites and content: Microsoft Purview portal > Information "
+        "Protection > Labels and Label policies."
+    )
+    evidence = _evaluation_evidence(
+        pass_criteria=_PASS,
+        fail_criteria=_FAIL,
+        reasoning=reasoning,
+        extra={
+            "tenant_id": tenant.tenant_id,
+            "configured_label_count": configured_count,
+            "applied_container_count": applied_count,
+            "total_container_count": container_count,
+            "applied_containers": applied[:50],
+            "configured_labels": [
+                (label.get("name") or label.get("displayName")) for label in configured_labels
+            ][:50],
+            "data_source": "Graph /security/informationProtection/sensitivityLabels (configured) + /groups assignedLabels (applied)",
+            "measures": "container-level label application (Microsoft 365 groups/Teams/SharePoint sites); per-file labelling is not exposed by a supported app-only Graph API",
+            "remediation": remediation,
+        },
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status=status,
+        severity=severity,
+        actual_value={
+            "configured_label_count": configured_count,
+            "applied_container_count": applied_count,
+            "total_container_count": container_count,
+        },
+        expected_value="Sensitivity labels configured AND applied to Microsoft 365 containers",
+        finding=reasoning,
+        graph_endpoint="/security/informationProtection/sensitivityLabels + /groups?$select=assignedLabels",
+        evidence=evidence,
+        raw_response={"sensitivityLabels": label_response.get("response"), "groups": groups_response},
+        graph_calls=2,
+        scoring_weight=scoring_weight,
+    )
 
 
 async def collect_sensitivity_labels_configured_and_applied(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -3066,10 +3517,27 @@ async def collect_storage_quota_consumption(tenant: ConnectedTenant) -> dict[str
         if ratio >= 90:
             over.append(item)
     max_ratio = max([item["storage_quota_ratio"] for item in sites], default=0.0)
+    total_used = sum(item["storageUsedBytes"] for item in sites)
+    total_allocated = sum(item["storageAllocatedBytes"] for item in sites)
+
+    def _fmt_bytes(num: float) -> str:
+        tb = num / (1024 ** 4)
+        if tb >= 1:
+            return f"{round(tb, 2)} TB"
+        gb = num / (1024 ** 3)
+        if gb >= 1:
+            return f"{round(gb, 2)} GB"
+        return f"{round(num / (1024 ** 2), 2)} MB"
+
     status = "pass" if not over else "fail"
-    reasoning = f"{len(over)} SharePoint site(s) are at or above 90% storage quota; maximum {max_ratio}%"
-    evidence = _evaluation_evidence(pass_criteria="When it is less than 90%", fail_criteria="When it is more than or equal to 90%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sites": sites, "over_threshold": over, "storage_quota_consumption": max_ratio})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"sites_over_90_percent": len(over), "site_count": len(sites), "max_storage_quota_ratio": max_ratio}, expected_value="<90% SharePoint storage quota consumption", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=1.0)
+    # Sum of per-site "Storage Allocated" is each site's max quota CEILING (SharePoint
+    # over-provisions ~25 TB/site), not the tenant's purchased storage — so it is not a
+    # meaningful denominator. Report real usage across sites instead of a misleading total.
+    reasoning = f"{_fmt_bytes(total_used)} used across {len(sites)} SharePoint site(s)"
+    if over:
+        reasoning += f" — {len(over)} site(s) at or above 90% of their quota (max {max_ratio}%)"
+    evidence = _evaluation_evidence(pass_criteria="When it is less than 90%", fail_criteria="When it is more than or equal to 90%", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sites": sites, "over_threshold": over, "storage_quota_consumption": max_ratio, "total_used_bytes": total_used, "total_allocated_bytes": total_allocated})
+    return _collector_result(parameter_key=parameter_key, status=status, severity="info", actual_value={"sites_over_90_percent": len(over), "site_count": len(sites), "max_storage_quota_ratio": max_ratio, "total_used_bytes": total_used, "total_allocated_bytes": total_allocated}, expected_value="<90% SharePoint storage quota consumption", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"csv_rows": rows}, graph_calls=1, scoring_weight=1.0)
 
 
 async def collect_checking_sharing_permissions_for_each_sites_on_a_tenant(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -3120,6 +3588,14 @@ async def collect_checking_sharing_permissions_for_each_sites_on_a_tenant(tenant
 
 async def collect_getting_all_sites_with_sensitivity_keywords_on_a_tenant(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "getting_all_sites_with_sensitivity_keywords_on_a_tenant"
+    _PASS = "Sensitive sites are excluded from Copilot search via SharePoint Advanced Management"
+    _FAIL = "Sensitive sites are not excluded from Copilot search"
+    # "Sensitive SharePoint site excluded from Copilot search" (restricted content
+    # discovery) is a SharePoint Advanced Management (SAM) feature. Without the SAM
+    # license the control cannot be configured or verified.
+    sam_licensed, sku_parts, sku_response = await _sharepoint_advanced_management_licensed(tenant)
+    if not sam_licensed:
+        return _sam_unavailable_result(parameter_key=parameter_key, tenant=tenant, sku_parts=sku_parts, sku_response=sku_response, pass_criteria=_PASS, fail_criteria=_FAIL, severity="critical", scoring_weight=1.0)
     client = await _graph_client(tenant)
     endpoint = "/sites"
     try:
@@ -3142,64 +3618,166 @@ async def collect_getting_all_sites_with_sensitivity_keywords_on_a_tenant(tenant
     return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"sensitivity_keyword_site_count": len(matched), "site_count": len(sites)}, expected_value="Sites with sensitivity keywords identified when present", finding=reasoning, graph_endpoint="/sites?search=*", evidence=evidence, raw_response={"sites": response}, graph_calls=1, scoring_weight=1.0)
 
 
+# ---------------------------------------------------------------------------
+# Microsoft Purview Compliance Manager — overall Compliance Score
+#
+# Verified against official Microsoft documentation (2026-07-08):
+#   - https://learn.microsoft.com/graph/compliance-concept-overview
+#     Lists every compliance/privacy capability Microsoft Graph exposes:
+#     eDiscovery, subject rights requests, and records management. There is
+#     no Compliance Manager score API in v1.0 or beta.
+#   - https://learn.microsoft.com/purview/compliance-manager
+#     Compliance Manager's overall Compliance Score is a portal-only
+#     (compliance.microsoft.com/compliancemanager) experience.
+#   - https://learn.microsoft.com/office365/servicedescriptions/microsoft-365-service-descriptions/microsoft-365-tenantlevel-services-licensing-guidance/microsoft-purview-service-description
+#     Compliance Manager requires an Office 365 / Microsoft 365 subscription
+#     (or GCC/GCC High/DoD).
+#
+# Microsoft Graph's `/security/secureScores` is a DIFFERENT product (Secure
+# Score measures identity/device/app security posture) and must never be
+# reported as the Compliance Score. This collector therefore never calls
+# Secure Score and never estimates a compliance percentage of its own.
+#
+# Business rule — this parameter returns ONLY "pass" or "fail":
+#   PASS  = the official Compliance Manager score was retrieved AND is >= 80%.
+#   FAIL  = the score is < 80%, OR it could not be retrieved for any reason
+#           (no supported API, missing licensing, missing permissions,
+#           Compliance Manager not provisioned, or API/service errors).
+# The CRA readiness score is computed on pass/fail only, so any control that
+# cannot be validated is a failed readiness requirement. The `reason` (finding)
+# text always carries the specific root cause for the dashboard and report.
+#
+# Because Microsoft exposes no supported API today, the retrieval below always
+# yields score=None and the collector fails with a specific reason. The
+# _evaluate_compliance_score() helper keeps the >=80% pass path ready for the
+# day a real API exists — replace `_retrieve_compliance_manager_score()` with
+# a genuine call and the pass/fail logic already holds.
+# ---------------------------------------------------------------------------
+COMPLIANCE_MANAGER_ELIGIBLE_SKU_PARTS = {
+    # Per the Purview service description (see citation above): "Compliance
+    # Manager is available to organizations with Office 365 and Microsoft
+    # 365 licenses (incl. Business Premium), and to US Government Community
+    # Cloud (GCC), GCC High, and Department of Defense (DoD) customers."
+    "ENTERPRISEPACK",       # Office 365 E3
+    "ENTERPRISEPREMIUM",    # Office 365 E5
+    "SPE_E3",               # Microsoft 365 E3
+    "SPE_E5",               # Microsoft 365 E5
+    "O365_BUSINESS_PREMIUM",
+    "SPB",                  # Microsoft 365 Business Premium
+    "STANDARDWOFFPACK",     # Office 365 E1
+    "M365EDU_A3_FACULTY",
+    "M365EDU_A5_FACULTY",
+}
+
+_COMPLIANCE_SCORE_PASS_THRESHOLD = 80.0
+
+_COMPLIANCE_SCORE_NOT_AVAILABLE_REASON = (
+    "Microsoft Purview Compliance Manager does not expose an officially supported "
+    "public API for retrieving the overall Compliance Score, so it cannot be "
+    "validated automatically and is treated as a failed readiness requirement."
+)
+
+
 async def collect_compliance_score_overview(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "compliance_score_overview"
-    endpoint = "/security/secureScores"
-    client = await _graph_client(tenant)
+    endpoint = "/subscribedSkus"
+
+    # Determine the specific root cause. `score` stays None until Microsoft
+    # ships a supported Compliance Manager score API. `root_cause` is a stable
+    # machine code; `reason` is the human-readable explanation for the report.
+    score: float | None = None
+    root_cause = "api_not_supported"
+    reason = _COMPLIANCE_SCORE_NOT_AVAILABLE_REASON
+    graph_response: dict[str, Any] | None = None
+    licensed_sku_parts: list[str] = []
+
     try:
-        response = await client.get(endpoint, params={"$top": "1"})
+        sku_response = await _subscribed_skus(tenant)
     except httpx.HTTPStatusError as exc:
         try:
             payload: dict[str, Any] = exc.response.json()
         except ValueError:
             payload = {"error": {"message": exc.response.text}}
-        return _graph_limitation_result(
-            tenant,
-            parameter_key=parameter_key,
-            endpoint=endpoint,
-            response={"ok": False, "status_code": exc.response.status_code, "error": payload.get("error") or payload},
-            expected_value="Compliance posture proxy >=80%",
-            pass_criteria="When it is more than or equal to 80%",
-            fail_criteria="When it is less than 80%",
-            severity="critical",
-            scoring_weight=5.0,
+        error = payload.get("error") or payload
+        status_code = exc.response.status_code
+        graph_response = {"status_code": status_code, "error": error}
+        if status_code in (401, 403):
+            root_cause = "insufficient_permissions"
+            reason = (
+                f"{_COMPLIANCE_SCORE_NOT_AVAILABLE_REASON} The CRA application also lacks Microsoft "
+                "Graph permission to read tenant licensing (grant Organization.Read.All to the app "
+                "registration and re-run the assessment)."
+            )
+        else:
+            root_cause = "service_error"
+            reason = (
+                f"{_COMPLIANCE_SCORE_NOT_AVAILABLE_REASON} A Microsoft Graph error also prevented "
+                f"licensing verification: {error.get('message') or error}"
+            )
+        sku_response = {"value": []}
+    else:
+        skus = sku_response.get("value") or []
+        licensed_sku_parts = sorted(
+            {
+                str(sku.get("skuPartNumber") or "").upper()
+                for sku in skus
+                if float(sku.get("consumedUnits") or 0) > 0
+            }
         )
-    values = response.get("value") or []
-    latest = values[0] if values else {}
-    current = float(latest.get("currentScore") or 0)
-    maximum = float(latest.get("maxScore") or 0)
-    percentage = round(current / maximum * 100, 2) if maximum else 0.0
-    status = "pass" if percentage >= 80 else "fail"
-    reasoning = (
-        f"Compliance posture via Secure Score proxy: {percentage}% ({current}/{maximum}). "
-        "Microsoft Compliance Manager does not expose a public Graph API; Secure Score is used as the nearest automated proxy."
-    )
+        if not set(licensed_sku_parts) & COMPLIANCE_MANAGER_ELIGIBLE_SKU_PARTS:
+            root_cause = "licensing_required"
+            reason = (
+                f"{_COMPLIANCE_SCORE_NOT_AVAILABLE_REASON} Additionally, no Office 365 or Microsoft "
+                "365 subscription that entitles Compliance Manager (e.g., E3/E5, Business Premium, "
+                "GCC/GCC High/DoD) was found assigned in this tenant."
+            )
+
+    # Business rule: pass only when a real score was retrieved and is >= 80%.
+    if score is not None and score >= _COMPLIANCE_SCORE_PASS_THRESHOLD:
+        status = "pass"
+        root_cause = "score_met_threshold"
+        reason = f"Compliance Manager score is {score}% (>= {int(_COMPLIANCE_SCORE_PASS_THRESHOLD)}% threshold)."
+    elif score is not None:
+        status = "fail"
+        root_cause = "score_below_threshold"
+        reason = f"Compliance Manager score is {score}% — below the {int(_COMPLIANCE_SCORE_PASS_THRESHOLD)}% threshold."
+    else:
+        status = "fail"  # score could not be retrieved — reason/root_cause set above
+
+    _log("COMPLIANCE_SCORE_PATH", parameter_key=parameter_key, status=status, root_cause=root_cause)
+
     evidence = _evaluation_evidence(
-        pass_criteria="When it is more than or equal to 80%",
-        fail_criteria="When it is less than 80%",
-        reasoning=reasoning,
+        pass_criteria=f"Official Compliance Manager score is retrieved and is >= {int(_COMPLIANCE_SCORE_PASS_THRESHOLD)}%.",
+        fail_criteria=(
+            f"Score is < {int(_COMPLIANCE_SCORE_PASS_THRESHOLD)}%, or the official score cannot be "
+            "retrieved for any reason (unsupported API, missing licensing, missing permissions, "
+            "Compliance Manager not provisioned, or service errors)."
+        ),
+        reasoning=reason,
         extra={
             "tenant_id": tenant.tenant_id,
-            "secure_score": latest,
-            "compliance_score_proxy_percentage": percentage,
-            "data_source": "Microsoft Graph /security/secureScores (Secure Score proxy — Compliance Manager API is not publicly available)",
+            "root_cause": root_cause,
+            "compliance_manager_score": score,
+            "licensed_sku_parts_detected": licensed_sku_parts,
+            "data_source": "Microsoft Graph /subscribedSkus (licensing signal only — no Graph API exposes the Compliance Manager score)",
+            "graph_response": graph_response,
+            "reference_urls": [
+                "https://learn.microsoft.com/graph/compliance-concept-overview",
+                "https://learn.microsoft.com/purview/compliance-manager",
+                "https://learn.microsoft.com/office365/servicedescriptions/microsoft-365-service-descriptions/microsoft-365-tenantlevel-services-licensing-guidance/microsoft-purview-service-description",
+            ],
         },
     )
     return _collector_result(
         parameter_key=parameter_key,
         status=status,
         severity="critical",
-        actual_value={
-            "compliance_score_proxy": percentage,
-            "current_score": current,
-            "max_score": maximum,
-            "source": "Secure Score proxy",
-        },
-        expected_value="Compliance posture proxy >=80%",
-        finding=reasoning,
-        graph_endpoint="/security/secureScores?$top=1",
+        actual_value={"compliance_manager_score": score, "root_cause": root_cause},
+        expected_value=f"Official Microsoft Purview Compliance Manager score >= {int(_COMPLIANCE_SCORE_PASS_THRESHOLD)}%",
+        finding=reason,
+        graph_endpoint=endpoint,
         evidence=evidence,
-        raw_response={"secureScores": response},
+        raw_response={"subscribedSkus": sku_response, "graph_response": graph_response},
         graph_calls=1,
         scoring_weight=5.0,
     )
@@ -3271,8 +3849,8 @@ async def collect_audit_log_retention_duration(tenant: ConnectedTenant) -> dict[
     rows = (response.get("response") or {}).get("value") or []
     status = "fail"
     reasoning = (
-        "Audit log retention duration could not be determined. Purview PowerShell access is required "
-        "to verify the exact retention period. Manual verification needed."
+        "The audit log retention period could not be confirmed automatically and should be verified "
+        "manually in the Microsoft Purview compliance portal (Audit > retention policies)."
     )
     evidence = _evaluation_evidence(
         pass_criteria="Retention duration is determinable and retention is at least 180 days",
@@ -3417,14 +3995,21 @@ async def collect_external_sharing_settings(tenant: ConnectedTenant) -> dict[str
     if not response.get("ok"):
         return _licensing_required_result(tenant, parameter_key=parameter_key, endpoint=endpoint, required_sku="SharePoint Online", required_service="SharePoint tenant settings", required_role="SharePoint Administrator or Global Administrator", required_permissions=["SharePointTenantSettings.Read.All"], expected_value="New and existing guests or more restrictive", pass_criteria="When it is set to New and existing guests or more restrictive", fail_criteria="When it is set to Anyone(Least restrictive)", severity="high", scoring_weight=4.0, graph_response=response)
     settings = response.get("response") or {}
-    sharing = str(settings.get("sharingCapability") or settings.get("oneDriveSharingCapability") or "")
-    PASS_VALUES = {"disabled"}
-    if sharing.lower() in PASS_VALUES:
-        status = "pass"
-        reasoning = f"External sharing restricted: {sharing}"
-    else:
-        status = "fail"
-        reasoning = f"External sharing enabled: {sharing or 'not returned'} — external users can access content"
+    sharing = str(settings.get("oneDriveSharingCapability") or settings.get("sharingCapability") or "")
+    # OneDrive external sharing capability (manual criteria). Only "Disabled" and
+    # "ExistingExternalUserSharingOnly" are acceptable. "ExternalUserSharingOnly"
+    # ("new and existing guests") and "ExternalUserAndGuestSharing" ("Anyone" links)
+    # both expose content to newly invited external identities and FAIL.
+    ONEDRIVE_SHARING_MAP = {
+        "disabled": ("pass", "External sharing is disabled"),
+        "existingexternalusersharingonly": ("pass", "Set to existing external users only"),
+        "externalusersharingonly": ("fail", "Set to new and existing guests"),
+        "externaluserandguestsharing": ("fail", "Set to anyone links"),
+    }
+    status, reasoning = ONEDRIVE_SHARING_MAP.get(
+        sharing.lower(),
+        ("fail", f"Set to {sharing or 'unknown'} — could not confirm a restrictive level"),
+    )
     evidence = _evaluation_evidence(pass_criteria="When it is set to New and existing guests or more restrictive", fail_criteria="When it is set to Anyone(Least restrictive)", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
     return _collector_result(parameter_key=parameter_key, status=status, severity="high", actual_value={"sharingCapability": settings.get("sharingCapability"), "oneDriveSharingCapability": settings.get("oneDriveSharingCapability")}, expected_value="New and existing guests or more restrictive", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=4.0)
 
@@ -3437,8 +4022,13 @@ async def collect_sharepoint_modern_authentication(tenant: ConnectedTenant) -> d
         return _licensing_required_result(tenant, parameter_key=parameter_key, endpoint=endpoint, required_sku="SharePoint Online", required_service="SharePoint tenant settings", required_role="SharePoint Administrator or Global Administrator", required_permissions=["SharePointTenantSettings.Read.All"], expected_value="Modern authentication enabled / legacy auth disabled", pass_criteria="When it is enabled", fail_criteria="When it is disabled", severity="medium", scoring_weight=3.0, graph_response=response)
     settings = response.get("response") or {}
     legacy_enabled = settings.get("isLegacyAuthProtocolsEnabled")
-    status = "pass" if legacy_enabled is False else "fail"
-    reasoning = f"SharePoint legacy auth protocols enabled: {legacy_enabled}"
+    # Modern authentication is enforced only when legacy auth protocols are disabled.
+    if legacy_enabled is False:
+        status = "pass"
+        reasoning = "Apps using legacy authentication are disabled"
+    else:
+        status = "fail"
+        reasoning = "Apps using legacy authentication are enabled"
     evidence = _evaluation_evidence(pass_criteria="When it is enabled", fail_criteria="When it is disabled", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
     return _collector_result(parameter_key=parameter_key, status=status, severity="medium", actual_value={"isLegacyAuthProtocolsEnabled": legacy_enabled}, expected_value="Modern authentication enabled / legacy auth disabled", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=3.0)
 
@@ -3450,15 +4040,23 @@ async def collect_sharing_settings_external_internal(tenant: ConnectedTenant) ->
     if not response.get("ok"):
         return _licensing_required_result(tenant, parameter_key=parameter_key, endpoint=endpoint, required_sku="SharePoint Online", required_service="SharePoint tenant settings", required_role="SharePoint Administrator or Global Administrator", required_permissions=["SharePointTenantSettings.Read.All"], expected_value="Restrictive sharing settings enabled", pass_criteria="When settings enabled", fail_criteria="When restrictive setting no set up", severity="critical", scoring_weight=5.0, graph_response=response)
     settings = response.get("response") or {}
-    prevent_resharing = settings.get("isResharingByExternalUsersEnabled")
+    # SharePoint tenant SharingCapability (manual criteria). External User Sharing —
+    # existing OR new external users — is acceptable; only anonymous/"Anyone" guest
+    # sharing (ExternalUserAndGuestSharing) FAILs. This parameter evaluates
+    # SharingCapability ONLY — not PreventExternalUsersFromResharing.
     sharing = str(settings.get("sharingCapability") or "")
-    # This parameter evaluates ONLY the sharing capability level (check #1).
-    # Resharing prevention is a separate concern and must not gate this result.
-    PASS_VALUES = {"disabled", "existingexternalusersharingonly", "externalusersharingonly"}
-    status = "pass" if sharing.lower() in PASS_VALUES else "fail"
-    reasoning = f"Sharing capability level: {sharing or 'not returned'} (resharing prevention tracked separately; isResharingByExternalUsersEnabled={prevent_resharing})"
-    evidence = _evaluation_evidence(pass_criteria="When settings enabled", fail_criteria="When restrictive setting no set up", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"isResharingByExternalUsersEnabled": prevent_resharing, "sharingCapability": settings.get("sharingCapability")}, expected_value="Restrictive sharing settings enabled", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=5.0)
+    SHAREPOINT_SHARING_MAP = {
+        "disabled": ("pass", "External sharing is disabled"),
+        "existingexternalusersharingonly": ("pass", "Set to Existing External User Sharing only"),
+        "externalusersharingonly": ("pass", "Set to External User Sharing only"),
+        "externaluserandguestsharing": ("fail", "Set to Anyone / anonymous guest sharing"),
+    }
+    status, reasoning = SHAREPOINT_SHARING_MAP.get(
+        sharing.lower(),
+        ("fail", f"SharingCapability={sharing or 'unknown'} — could not confirm a restrictive level"),
+    )
+    evidence = _evaluation_evidence(pass_criteria="External User Sharing (existing or new external users) or more restrictive", fail_criteria="Anyone / anonymous guest sharing enabled", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
+    return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"sharingCapability": sharing}, expected_value="External User Sharing only or more restrictive", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=5.0)
 
 
 async def collect_sharepoint_and_onedrive_guest_access_expiry(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -3494,26 +4092,29 @@ async def collect_sharepoint_and_onedrive_guest_access_expiry(tenant: ConnectedT
 
 async def collect_days_to_retain_a_deleted_user_s_onedrive(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "days_to_retain_a_deleted_user_s_onedrive"
-    command = "Get-SPOTenant | Select OrphanedPersonalSitesRetentionPeriod,OneDriveRetentionPeriod"
-    settings, blocked = await _sharepoint_settings_or_status(
-        tenant,
-        parameter_key=parameter_key,
-        expected_value="Deleted user's OneDrive retention period is configured",
-        pass_criteria="Deleted user's OneDrive retention period is configured",
-        fail_criteria="Deleted user's OneDrive retention period is not configured or is below the expected baseline",
-        severity="low",
-        scoring_weight=2.0,
-        command=command,
-    )
-    if blocked:
-        return blocked
-    assert settings is not None
-    retention = settings.get("orphanedPersonalSitesRetentionPeriod") or settings.get("oneDriveRetentionPeriod")
-    configured = retention is not None and str(retention) != "0"
-    status = "pass" if configured else "fail"
-    reasoning = f"OneDrive deleted user retention setting returned: {retention if retention is not None else 'not returned'}"
-    evidence = _evaluation_evidence(pass_criteria="Deleted user's OneDrive retention period is configured", fail_criteria="Deleted user's OneDrive retention period is not configured or is below the expected baseline", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings, "required_powershell_command": command})
-    return _collector_result(parameter_key=parameter_key, status=status, severity="low", actual_value={"oneDriveRetentionPeriod": retention}, expected_value="Deleted user's OneDrive retention period is configured", finding=reasoning, graph_endpoint="https://graph.microsoft.com/beta/admin/sharepoint/settings", evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=2.0)
+    endpoint = "https://graph.microsoft.com/beta/admin/sharepoint/settings"
+    response = await _graph_get_json_or_error(tenant, endpoint)
+    if not response.get("ok"):
+        result = _licensing_required_result(tenant, parameter_key=parameter_key, endpoint=endpoint, required_sku="SharePoint Online", required_service="SharePoint tenant settings", required_role="SharePoint Administrator or Global Administrator", required_permissions=["SharePointTenantSettings.Read.All"], expected_value="Deleted OneDrive retained for at least 180 days", pass_criteria="Retention period is 180 days or more", fail_criteria="Retention period is below 180 days", severity="low", scoring_weight=2.0, graph_response=response)
+        result["raw_value"]["required_powershell_command"] = "Get-SPOTenant | Select OrphanedPersonalSitesRetentionPeriod"
+        return result
+    settings = response.get("response") or {}
+    # Graph exposes the deleted-user OneDrive retention as
+    # deletedUserPersonalSiteRetentionPeriodInDays (PnP: OrphanedPersonalSitesRetentionPeriod).
+    retention = settings.get("deletedUserPersonalSiteRetentionPeriodInDays")
+    if retention is None:
+        retention = settings.get("orphanedPersonalSitesRetentionPeriod") or settings.get("oneDriveRetentionPeriod")
+    try:
+        days = int(retention) if retention is not None else None
+    except (TypeError, ValueError):
+        days = None
+    status = "pass" if (days is not None and days >= 180) else "fail"
+    if days is None:
+        reasoning = "Deleted user's OneDrive retention period could not be read"
+    else:
+        reasoning = f"Set for {days} days"
+    evidence = _evaluation_evidence(pass_criteria="Retention period is 180 days or more", fail_criteria="Retention period is below 180 days", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "sharepoint_settings": settings})
+    return _collector_result(parameter_key=parameter_key, status=status, severity="low", actual_value={"deletedUserPersonalSiteRetentionPeriodInDays": days}, expected_value="Deleted OneDrive retained for at least 180 days", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=2.0)
 
 
 async def collect_expiration_policy_for_anyone_links(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -3574,37 +4175,75 @@ async def collect_permission_setting_for_anyone_links(tenant: ConnectedTenant) -
     return _collector_result(parameter_key=parameter_key, status=status, severity="critical", actual_value={"sharingCapability": sharing, "defaultSharingLinkType": default_link, "fileAnonymousLinkType": file_link, "folderAnonymousLinkType": folder_link}, expected_value="Anyone links are disabled or restricted to view-only least privilege access", finding=reasoning, graph_endpoint="https://graph.microsoft.com/beta/admin/sharepoint/settings", evidence=evidence, raw_response={"sharepointSettings": settings}, graph_calls=1, scoring_weight=5.0)
 
 
+async def _sharepoint_advanced_management_licensed(
+    tenant: ConnectedTenant,
+) -> tuple[bool, list[str], dict[str, Any]]:
+    """Return whether the tenant is licensed for SharePoint Advanced Management (SAM).
+
+    Inactive-site policies, site-ownership policies and Copilot/restricted-content
+    discovery are SAM add-on features. Detection is by subscribed SKU part number so
+    the check stays multi-tenant (no hardcoded tenant values).
+    """
+    sku_response = await _subscribed_skus(tenant)
+    parts = [str(sku.get("skuPartNumber") or "") for sku in (sku_response.get("value") or [])]
+    normalized = ["".join(ch for ch in part.upper() if ch.isalnum()) for part in parts]
+    licensed = any("SHAREPOINTADVANCEDMANAGEMENT" in part for part in normalized)
+    return licensed, parts, sku_response
+
+
+def _sam_unavailable_result(
+    *,
+    parameter_key: str,
+    tenant: ConnectedTenant,
+    sku_parts: list[str],
+    sku_response: dict[str, Any],
+    pass_criteria: str,
+    fail_criteria: str,
+    severity: str,
+    scoring_weight: float,
+) -> dict[str, Any]:
+    reasoning = "Part of SharePoint Advanced Management"
+    evidence = _evaluation_evidence(
+        pass_criteria=pass_criteria,
+        fail_criteria=fail_criteria,
+        reasoning=f"{reasoning} — the SharePoint Advanced Management add-on license is not present in this tenant, so this control cannot be enforced or verified.",
+        extra={"tenant_id": tenant.tenant_id, "subscribed_sku_parts": sku_parts, "sam_licensed": False},
+    )
+    return _collector_result(
+        parameter_key=parameter_key,
+        status="fail",
+        severity=severity,
+        actual_value={"sam_licensed": False, "subscribed_sku_parts": sku_parts},
+        expected_value="SharePoint Advanced Management licensed and policy configured",
+        finding=reasoning,
+        graph_endpoint="/subscribedSkus",
+        evidence=evidence,
+        raw_response={"subscribedSkus": sku_response},
+        graph_calls=1,
+        scoring_weight=scoring_weight,
+    )
+
+
 async def collect_inactive_site_policies(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "inactive_site_policies"
+    _PASS = "Inactive site policies are configured via SharePoint Advanced Management"
+    _FAIL = "Inactive site policies are not configured"
+    # Inactive Site Policies is a SharePoint Advanced Management (SAM) feature.
+    sam_licensed, sku_parts, sku_response = await _sharepoint_advanced_management_licensed(tenant)
+    if not sam_licensed:
+        return _sam_unavailable_result(parameter_key=parameter_key, tenant=tenant, sku_parts=sku_parts, sku_response=sku_response, pass_criteria=_PASS, fail_criteria=_FAIL, severity="medium", scoring_weight=3.0)
     endpoint = "/reports/getSharePointSiteUsageDetail(period='D180')"
     report = await _graph_get_text(tenant, endpoint)
     if not report.get("ok"):
-        spo_msg = "SharePoint Online advanced management license not available in this tenant"
-        evidence = _evaluation_evidence(
-            pass_criteria="Inactive site policies are configured",
-            fail_criteria="Inactive site policies are not configured",
-            reasoning=spo_msg,
-            extra={"tenant_id": tenant.tenant_id, "endpoint": endpoint, "response": str(report.get("response", ""))[:200]},
-        )
-        return _collector_result(
-            parameter_key=parameter_key,
-            status="fail",
-            severity="medium",
-            actual_value={"error": spo_msg},
-            expected_value="Inactive site policy is configured",
-            finding=spo_msg,
-            graph_endpoint=endpoint,
-            evidence=evidence,
-            raw_response={"error": spo_msg},
-            graph_calls=1,
-            scoring_weight=3.0,
-        )
+        spo_msg = "Part of SharePoint Advanced Management"
+        evidence = _evaluation_evidence(pass_criteria=_PASS, fail_criteria=_FAIL, reasoning=spo_msg, extra={"tenant_id": tenant.tenant_id, "endpoint": endpoint, "response": str(report.get("response", ""))[:200]})
+        return _collector_result(parameter_key=parameter_key, status="fail", severity="medium", actual_value={"error": spo_msg}, expected_value="Inactive site policy is configured", finding=spo_msg, graph_endpoint=endpoint, evidence=evidence, raw_response={"error": spo_msg}, graph_calls=1, scoring_weight=3.0)
     rows = _csv_rows(report)
     inactive = [row for row in rows if not _has_activity(row)]
     ratio = _percent(len(inactive), len(rows))
     status = "pass" if ratio < 20 else "fail"
     reasoning = f"{len(inactive)} inactive SharePoint site(s) found out of {len(rows)} reported sites ({ratio}%)"
-    evidence = _evaluation_evidence(pass_criteria="Inactive site policies are configured", fail_criteria="Inactive site policies are not configured", reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "site_usage_rows": rows[:50], "inactive_sites": inactive[:50], "required_powershell_command": "Get-SPOSite -Limit All | Select Url,LastContentModifiedDate,Owner"})
+    evidence = _evaluation_evidence(pass_criteria=_PASS, fail_criteria=_FAIL, reasoning=reasoning, extra={"tenant_id": tenant.tenant_id, "site_usage_rows": rows[:50], "inactive_sites": inactive[:50], "required_powershell_command": "Get-SPOSite -Limit All | Select Url,LastContentModifiedDate,Owner"})
     return _collector_result(parameter_key=parameter_key, status=status, severity="medium", actual_value={"site_count": len(rows), "inactive_site_count": len(inactive), "inactive_site_percent": ratio}, expected_value="Inactive site policy is configured", finding=reasoning, graph_endpoint=endpoint, evidence=evidence, raw_response={"sharePointSiteUsageDetail": {"row_count": len(rows)}}, graph_calls=1, scoring_weight=3.0)
 
 
@@ -3621,32 +4260,11 @@ async def collect_site_ownership_policies(tenant: ConnectedTenant) -> dict[str, 
 
     client = await _graph_client(tenant)
 
-    # SharePoint Advanced Management (SAM) license is required for the site ownership
-    # policies feature. If the tenant is not licensed for SAM, the feature is unavailable.
-    sku_response = await _subscribed_skus(tenant)
-    sku_parts = [str(sku.get("skuPartNumber") or "").upper() for sku in (sku_response.get("value") or [])]
-    sam_licensed = any("SHAREPOINTADVANCEDMANAGEMENT" in part or "ADVANCED_COMMUNICATIONS" in part for part in sku_parts)
+    # Site Ownership Policies is a SharePoint Advanced Management (SAM) feature. If the
+    # tenant is not licensed for SAM, the control cannot be enforced or verified.
+    sam_licensed, sku_parts, sku_response = await _sharepoint_advanced_management_licensed(tenant)
     if not sam_licensed:
-        reasoning = "SharePoint Advanced Management license not found — site ownership policies feature not available in this tenant"
-        evidence = _evaluation_evidence(
-            pass_criteria=_PASS_CRITERIA,
-            fail_criteria=_FAIL_CRITERIA,
-            reasoning=reasoning,
-            extra={"tenant_id": tenant.tenant_id, "subscribed_sku_parts": sku_parts, "sam_licensed": False},
-        )
-        return _collector_result(
-            parameter_key=parameter_key,
-            status="fail",
-            severity="medium",
-            actual_value={"sam_licensed": False},
-            expected_value="SharePoint Advanced Management licensed and site ownership policy configured",
-            finding=reasoning,
-            graph_endpoint="/subscribedSkus",
-            evidence=evidence,
-            raw_response={"subscribedSkus": sku_response},
-            graph_calls=1,
-            scoring_weight=3.0,
-        )
+        return _sam_unavailable_result(parameter_key=parameter_key, tenant=tenant, sku_parts=sku_parts, sku_response=sku_response, pass_criteria=_PASS_CRITERIA, fail_criteria=_FAIL_CRITERIA, severity="medium", scoring_weight=3.0)
 
     # Use M365 Groups as proxy for SharePoint team sites — no SPO license required
     groups_resp = await _graph_get_json_or_error(

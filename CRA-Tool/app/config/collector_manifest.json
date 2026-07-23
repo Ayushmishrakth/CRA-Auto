@@ -401,8 +401,8 @@
   {
     "parameter_key": "sharepoint_and_onedrive_guest_access_expiry",
     "domain": "collaboration",
-    "service": "onedrive",
-    "script": "app/powershell/onedrive/onedrive_master.ps1",
+    "service": "sharepoint",
+    "script": "app/powershell/sharepoint/sharepoint_master.ps1",
     "output_type": "csv",
     "output_file": "sharepoint_and_onedrive_guest_access_expiry.csv",
     "parser": "onedrive_csv_parser",
@@ -1069,8 +1069,8 @@
       "*"
     ],
     "severity": "high",
-    "supports_graph": false,
-    "supports_powershell": true,
+    "supports_graph": true,
+    "supports_powershell": false,
     "timeout_seconds": 900,
     "output_root": "artifacts",
     "admin_url": null

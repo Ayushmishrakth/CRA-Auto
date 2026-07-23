@@ -122,19 +122,29 @@ DEFAULT_REPORT_CONFIG = {
         "partner_logo": "app/services/reporting/assets/techplustalent-logo.png",
     },
     "typography": {
-        "heading_font": "Calibri Light",
+        "heading_font": "Calibri",
         "body_font": "Calibri",
-        "h1_size": 18,
+        "h1_size": 16,
         "h2_size": 14,
+        "h3_size": 12,
         "body_size": 11,
         "caption_size": 11,
+        "h1_color": "003366",
+        "h2_color": "003366",
+        "line_spacing": 1.5,
     },
     "layout": {
-        "top_margin": 0.68,
-        "bottom_margin": 0.62,
-        "left_margin": 0.72,
-        "right_margin": 0.72,
+        "top_margin": 1.0,
+        "bottom_margin": 1.0,
+        "left_margin": 1.0,
+        "right_margin": 1.0,
         "chart_dpi": 220,
+    },
+    "table_styling": {
+        "header_bg_color": "F2F2F2",
+        "header_text_color": "000000",
+        "border_color": "CCCCCC",
+        "cell_padding": 0.05,
     },
     "severity_definitions": {
         "Critical": {"color": "8B0000", "description": "Immediate remediation required before Copilot rollout."},
@@ -263,14 +273,17 @@ def _styled_heading(doc, text, config, level=1, color=None, before=0, after=8):
     heading = doc.add_heading(str(text), level=level)
     heading.paragraph_format.space_before = Pt(before)
     heading.paragraph_format.space_after = Pt(after)
+    heading.paragraph_format.line_spacing = 1.5
     size_key = "h1_size" if level == 1 else "h2_size"
+    color_key = "h1_color" if level == 1 else "h2_color"
+    default_color = _cfg(config, "typography", color_key, "003366" if level == 1 else "003366")
     for run in heading.runs:
         _apply_run_style(
             run,
             config,
             size_key=size_key,
             bold=True,
-            color=color or _cfg(config, "branding", "secondary_color", "2F5496"),
+            color=color or default_color,
             font_kind="heading",
         )
     return heading
@@ -280,7 +293,7 @@ def _body_paragraph(doc, text="", config=None, before=0, after=6, bold=False, it
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(before)
     p.paragraph_format.space_after = Pt(after)
-    p.paragraph_format.line_spacing = 1.08
+    p.paragraph_format.line_spacing = _cfg(config, "typography", "line_spacing", 1.5)
     run = p.add_run(str(text))
     _apply_run_style(run, config, "body_size", bold=bold, color=color)
     run.font.italic = italic
@@ -336,6 +349,38 @@ def _set_cell_text(cell, text, config, size_key="body_size", bold=False, color=N
     run = paragraph.add_run(str(text))
     _apply_run_style(run, config, size_key, bold=bold, color=color)
     return paragraph
+
+def _set_table_header_style(table, config=None):
+    """Apply professional styling to table header row."""
+    config = config or DEFAULT_REPORT_CONFIG
+    header_bg = _cfg(config, "table_styling", "header_bg_color", "F2F2F2")
+    border_color = _cfg(config, "table_styling", "border_color", "CCCCCC")
+
+    if table.rows:
+        header_cells = table.rows[0].cells
+        for cell in header_cells:
+            _set_cell_bg(cell, header_bg)
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            if cell.paragraphs:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.bold = True
+                        run.font.size = Pt(11)
+
+    for row in table.rows:
+        for cell in row.cells:
+            tcPr = cell._element.tcPr
+            if tcPr is None:
+                tcPr = cell._element.get_or_add_tcPr()
+            tcBorders = OxmlElement("w:tcBorders")
+            for border_name in ["top", "left", "bottom", "right", "insideH", "insideV"]:
+                border = OxmlElement(f"w:{border_name}")
+                border.set(qn("w:val"), "single")
+                border.set(qn("w:sz"), "12")
+                border.set(qn("w:space"), "0")
+                border.set(qn("w:color"), border_color)
+                tcBorders.append(border)
+            tcPr.append(tcBorders)
 
 def _card_table(doc, columns, widths=None, row_height=None):
     table = doc.add_table(rows=1, cols=columns)
@@ -4079,24 +4124,40 @@ def _add_assessment_summary_page(doc, assessment_data):
                 r.bold = True
 
     p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after = Pt(6)
     r = p.add_run('Readiness Score:')
     r.font.bold = True
-    r.font.size = Pt(11)
+    r.font.size = Pt(12)
     r.font.name = 'Calibri'
+    r.font.color.rgb = _hex_color('003366')
 
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(8)
     r = p.add_run(readiness_text)
     r.font.italic = True
     r.font.size = Pt(11)
     r.font.name = 'Calibri'
 
-    p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(10)
-    r = p.add_run(readiness_score_text)
-    r.font.size = Pt(14)
-    r.font.bold = True
-    r.font.name = 'Calibri'
+    score_table = doc.add_table(rows=1, cols=1)
+    score_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    score_cell = score_table.rows[0].cells[0]
+    _set_cell_bg(score_cell, 'EBF4FD')
+    score_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    score_para = score_cell.paragraphs[0]
+    score_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    score_para.paragraph_format.space_before = Pt(8)
+    score_para.paragraph_format.space_after = Pt(8)
+    score_run = score_para.add_run(readiness_score_text)
+    score_run.font.size = Pt(28)
+    score_run.font.bold = True
+    score_run.font.name = 'Calibri'
+    score_run.font.color.rgb = _hex_color('0078D4')
+    _remove_table_borders(score_table)
+    score_table.autofit = False
+    score_table.allow_autofit = False
+    for row in score_table.rows:
+        row.height = Inches(0.8)
 
     meter = _add_readiness_gauge(doc, readiness_score) if readiness_score is not None else None
     if meter:

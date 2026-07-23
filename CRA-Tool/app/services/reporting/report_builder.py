@@ -3014,13 +3014,19 @@ def _build_cover_page(doc, report_data):
     BASE = os.path.dirname(os.path.abspath(__file__))
     ROOT = os.path.abspath(os.path.join(BASE, '..', '..', '..'))
 
-    # Use TPT logo as default, or custom logo if provided
-    logo_path = report_data.get('company_logo_path')
-    if not logo_path:
+    # Use custom logo if provided, or TPT logo as default
+    logo_path = report_data.get('logo_path')
+
+    if logo_path and os.path.exists(str(logo_path)):
+        # Use provided custom logo
+        pass
+    else:
+        # Fall back to TPT logo
         logo_path = os.path.join(ROOT, 'app', 'services', 'reporting', 'assets', 'techplustalent-logo.png')
 
-    if not os.path.exists(str(logo_path)) if logo_path else False:
-        logo_path = os.path.join(ROOT, 'storage', 'assets', 'logo.png')
+        if not os.path.exists(logo_path):
+            # Try alternate TPT logo location
+            logo_path = os.path.join(ROOT, 'storage', 'assets', 'techplustalent-logo.png')
 
     # Header table with gradient background
     header_tbl = doc.add_table(rows=1, cols=1)

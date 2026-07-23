@@ -3143,19 +3143,7 @@ def _build_cover_page(doc, report_data):
         run(p, 'Microsoft 365 Copilot',
             11, bold=True, color='0078D4')
 
-    pPr = p._p.get_or_add_pPr()
-    tabs = OxmlElement('w:tabs')
-    tab = OxmlElement('w:tab')
-    tab.set(qn('w:val'), 'right')
-    tab.set(qn('w:pos'), '8640')
-    tabs.append(tab)
-    pPr.append(tabs)
-
-    tab_run = p.add_run('\t')
-    tab_run.font.name = 'Calibri'
-
-    # Organization name on right (logo now at top)
-    run(p, company, 13, bold=True, color='1A1A1A')
+    # No text on right side - logo and organization name removed from this section
 
     p2 = para(space_before=0, space_after=14)
     run(p2, 'Readiness Assessment Platform',

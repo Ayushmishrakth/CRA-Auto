@@ -3829,86 +3829,17 @@ async def collect_auto_expiration_policy_for_inactive_m365_groups(tenant: Connec
 
 async def collect_audit_log_retention_duration(tenant: ConnectedTenant) -> dict[str, Any]:
     parameter_key = "audit_log_retention_duration"
-    try:
-        from app.services.powershell import PowerShellExecutionEngine
-
-        ps_engine = PowerShellExecutionEngine()
-        result = await ps_engine.execute_purview_collector(
-            tenant_id=tenant.tenant_id,
-            collector_name="powershell.audit_log_retention_duration",
-            parameter_key=parameter_key,
-        )
-
-        if result.get("status") == "error" or not result.get("ok"):
-            return _governance_unverifiable_fail(
-                tenant,
-                parameter_key=parameter_key,
-                service_name="Microsoft Purview",
-                portal_location="Purview Compliance Portal > Audit > Retention Policies",
-                expected_value="Audit log retention policy configured",
-                pass_criteria="When policies are set up",
-                fail_criteria="When no policies are set up",
-                severity="medium",
-                scoring_weight=3.0,
-            )
-
-        policies = result.get("policies", [])
-
-        if not policies or len(policies) == 0:
-            reasoning = "No audit log retention policy configured"
-            status = "fail"
-            actual_value = {"audit_log_retention_policies_count": 0}
-        else:
-            highest_priority_policy = policies[0]
-            retention_duration = highest_priority_policy.get("RetentionDuration", "Unknown")
-            policy_name = highest_priority_policy.get("Name", "Unnamed Policy")
-            reasoning = f"Audit log retention policy configured: {retention_duration} (Policy: {policy_name})"
-            status = "pass"
-            actual_value = {
-                "audit_log_retention_policies_count": len(policies),
-                "highest_priority_retention_duration": retention_duration,
-                "highest_priority_policy_name": policy_name,
-                "all_policies": policies,
-            }
-
-        evidence = _evaluation_evidence(
-            pass_criteria="When policies are set up",
-            fail_criteria="When no policies are set up",
-            reasoning=reasoning,
-            extra={
-                "tenant_id": tenant.tenant_id,
-                "policies_retrieved": policies,
-                "source": "Get-UnifiedAuditLogRetentionPolicy (Purview PowerShell)",
-            },
-        )
-
-        return _collector_result(
-            parameter_key=parameter_key,
-            status=status,
-            severity="medium",
-            actual_value=actual_value,
-            expected_value="Audit log retention policy configured",
-            finding=reasoning,
-            evidence=evidence,
-            raw_response={"unified_audit_log_retention_policies": policies},
-            graph_calls=0,
-            powershell_calls=1,
-            scoring_weight=3.0,
-        )
-
-    except Exception as e:
-        logger.warning(f"[AUDIT_LOG_RETENTION] Collector error: {e}")
-        return _governance_unverifiable_fail(
-            tenant,
-            parameter_key=parameter_key,
-            service_name="Microsoft Purview",
-            portal_location="Purview Compliance Portal > Audit > Retention Policies",
-            expected_value="Audit log retention policy configured",
-            pass_criteria="When policies are set up",
-            fail_criteria="When no policies are set up",
-            severity="medium",
-            scoring_weight=3.0,
-        )
+    return _governance_unverifiable_fail(
+        tenant,
+        parameter_key=parameter_key,
+        service_name="Microsoft Purview",
+        portal_location="Purview Compliance Portal > Audit > Retention Policies",
+        expected_value="Audit log retention policy configured",
+        pass_criteria="When policies are set up",
+        fail_criteria="When no policies are set up",
+        severity="medium",
+        scoring_weight=3.0,
+    )
 
 
 async def collect_dlp_rules_configured(tenant: ConnectedTenant) -> dict[str, Any]:
@@ -4437,6 +4368,7 @@ GRAPH_COLLECTORS = {
     "teams_external_unmanaged_user_communication": collect_teams_external_unmanaged_user_communication,
     "teams_file_storage_option": collect_teams_file_storage_option,
     "teams_with_external_users": collect_teams_with_external_users,
+    # audit_log_retention_duration is PowerShell-collected (POWERSHELL_REQUIRED_PARAMETERS)
     "copilot_integration_enabled": collect_copilot_integration_enabled,
     "meeting_transcription_enabled": collect_meeting_transcription_enabled,
     "meeting_recording_retention_policies": collect_meeting_recording_retention_policies,
@@ -4450,7 +4382,6 @@ GRAPH_COLLECTORS = {
     "auto_expiration_policy_for_inactive_m365_groups": collect_auto_expiration_policy_for_inactive_m365_groups,
     "secure_score_percentage": collect_secure_score_percentage,
     "audit_logs_enabled": collect_audit_logs_enabled,
-    "audit_log_retention_duration": collect_audit_log_retention_duration,
     "dlp_rules_configured": collect_dlp_rules_configured,
     "information_protection_labels_applied": collect_information_protection_labels_applied,
     "sensitivity_labels_configured_and_applied": collect_sensitivity_labels_configured_and_applied,

@@ -1,4 +1,30 @@
 import api from "./axiosClient";
+import { tokenStorage } from "../utils/tokenStorage";
+
+/**
+ * Refresh access token proactively before long-running operations
+ */
+async function ensureTokenFresh() {
+  const refreshToken = tokenStorage.getRefreshToken();
+  if (!refreshToken) return;
+
+  try {
+    const response = await api.post("/auth/refresh", {
+      refresh_token: refreshToken,
+    });
+
+    const data = response?.data?.data || response?.data || {};
+    if (data.access_token) {
+      tokenStorage.setTokens({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+    }
+  } catch (error) {
+    // Silently fail — the request interceptor will handle auth failures
+    console.debug("[REPORT] Token refresh before generation failed", error.message);
+  }
+}
 
 /**
  * Generate a customized report with logo and company details
@@ -10,6 +36,9 @@ export async function generateCustomizedReport(assessmentId, {
   companyAddress = "",
   format = "docx",
 }) {
+  // Ensure token is fresh before starting the long-running operation
+  await ensureTokenFresh();
+
   const formData = new FormData();
 
   if (logoFile) {

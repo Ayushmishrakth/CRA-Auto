@@ -3004,13 +3004,83 @@ def _build_cover_page(doc, report_data):
 
     # -- PAGE MARGINS -----------------------------
     sec = doc.sections[0]
-    sec.top_margin = Inches(0.48)
+    sec.top_margin = Inches(0.0)
     sec.bottom_margin = Inches(0.52)
-    sec.left_margin = Inches(0.72)
-    sec.right_margin = Inches(0.72)
+    sec.left_margin = Inches(0.0)
+    sec.right_margin = Inches(0.0)
     sec.different_first_page_header_footer = True
 
-    # TOP BLUE BAR
+    # GRADIENT HEADER WITH LOGO
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    ROOT = os.path.abspath(os.path.join(BASE, '..', '..', '..'))
+
+    # Use TPT logo as default, or custom logo if provided
+    logo_path = report_data.get('company_logo_path')
+    if not logo_path:
+        logo_path = os.path.join(ROOT, 'app', 'services', 'reporting', 'assets', 'techplustalent-logo.png')
+
+    if not os.path.exists(str(logo_path)) if logo_path else False:
+        logo_path = os.path.join(ROOT, 'storage', 'assets', 'logo.png')
+
+    # Header table with gradient background
+    header_tbl = doc.add_table(rows=1, cols=1)
+    header_tbl.autofit = False
+    header_tbl.allow_autofit = False
+    header_cell = header_tbl.rows[0].cells[0]
+
+    # Set header background to light gradient color
+    header_tcPr = header_cell._tc.get_or_add_tcPr()
+    header_shd = OxmlElement('w:shd')
+    header_shd.set(qn('w:val'), 'clear')
+    header_shd.set(qn('w:color'), 'auto')
+    header_shd.set(qn('w:fill'), 'EBF4FD')
+    header_tcPr.append(header_shd)
+
+    # Remove header table borders
+    header_tblPr = header_tbl._tbl.find(qn('w:tblPr'))
+    if header_tblPr is None:
+        header_tblPr = OxmlElement('w:tblPr')
+        header_tbl._tbl.insert(0, header_tblPr)
+    header_tblBdr = OxmlElement('w:tblBorders')
+    for s in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+        b = OxmlElement(f'w:{s}')
+        b.set(qn('w:val'), 'none')
+        header_tblBdr.append(b)
+    header_tblPr.append(header_tblBdr)
+
+    # Set header height
+    header_trPr = header_tbl.rows[0]._tr.get_or_add_trPr()
+    header_trH = OxmlElement('w:trHeight')
+    header_trH.set(qn('w:val'), str(int(1.2 * 1440)))
+    header_trH.set(qn('w:hRule'), 'exact')
+    header_trPr.append(header_trH)
+
+    # Add logo to header (right aligned)
+    header_para = header_cell.paragraphs[0]
+    header_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    header_para.paragraph_format.space_before = Pt(12)
+    header_para.paragraph_format.space_after = Pt(12)
+    header_para.paragraph_format.right_indent = Inches(0.48)
+
+    if logo_path and os.path.exists(str(logo_path)):
+        try:
+            logo_run = header_para.add_run()
+            logo_run.add_picture(str(logo_path), height=Inches(0.9))
+            logo_run.font.name = 'Calibri'
+        except Exception as e:
+            logger.warning(f'[COVER] Could not load logo: {e}')
+            logo_header_run = header_para.add_run('[Company Logo]')
+            logo_header_run.font.size = Pt(10)
+            logo_header_run.font.color.rgb = R('0078D4')
+    else:
+        logo_header_run = header_para.add_run('[Company Logo]')
+        logo_header_run.font.size = Pt(10)
+        logo_header_run.font.color.rgb = R('0078D4')
+
+    # Add spacing after header
+    doc.add_paragraph()
+
+    # TOP BLUE BAR (kept for consistency with existing design)
     tb = doc.add_table(rows=1, cols=1)
     tb.style = 'Table Grid'
     tc = tb.rows[0].cells[0]
@@ -3051,11 +3121,9 @@ def _build_cover_page(doc, report_data):
         p._element.getparent().remove(p._element)
     tc.add_paragraph()
 
-    # LOGO ROW: Copilot logo left, partner logo right
+    # LOGO ROW: Copilot logo left, organization name right
     p = para(space_before=14, space_after=4)
 
-    BASE = os.path.dirname(os.path.abspath(__file__))
-    ROOT = os.path.abspath(os.path.join(BASE, '..', '..', '..'))
     copilot = os.path.join(ROOT, 'storage', 'assets', 'copilot_clean.png')
     if not os.path.exists(copilot):
         copilot = os.path.join(ROOT, 'storage', 'assets', 'copilot_logo.png')
@@ -3083,17 +3151,8 @@ def _build_cover_page(doc, report_data):
     tab_run = p.add_run('\t')
     tab_run.font.name = 'Calibri'
 
-    if logo and os.path.exists(str(logo)):
-        try:
-            rl = p.add_run()
-            rl.add_picture(str(logo),
-                           height=Inches(0.34))
-            rl.font.name = 'Calibri'
-        except Exception:
-            run(p, partner, 12, bold=True,
-                color='1A1A1A')
-    else:
-        run(p, partner, 13, bold=True, color='1A1A1A')
+    # Organization name on right (logo now at top)
+    run(p, company, 13, bold=True, color='1A1A1A')
 
     p2 = para(space_before=0, space_after=14)
     run(p2, 'Readiness Assessment Platform',
